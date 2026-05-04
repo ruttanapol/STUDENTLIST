@@ -1159,16 +1159,15 @@ let realtimeChannel = null;
 function lsGet(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 
+// ---- ค่า Supabase ที่ฝังไว้ในไฟล์ ----
+const FIXED_SB_URL = 'https://yfglsapfxtredrypqjda.supabase.co';
+const FIXED_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmZ2xzYXBmeHRyZWRyeXBxamRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4ODE1NDcsImV4cCI6MjA5MzQ1NzU0N30.OJaG2eZwznl17EtObNAKfqQ2h712UmMLZIWw9jJJNzo';
+
 // ---- ตรวจว่าเคย setup ไว้แล้วหรือยัง ----
 function checkSetupOnLoad() {
-  const saved = lsGet('sb_config');
-  if(saved && saved.url && saved.key) {
-    document.getElementById('sb-url').value = saved.url;
-    document.getElementById('sb-key').value = saved.key;
-    connectSupabase(true); // auto-connect silently
-  } else {
-    document.getElementById('setup-overlay').style.display = 'flex';
-  }
+  document.getElementById('sb-url').value = FIXED_SB_URL;
+  document.getElementById('sb-key').value = FIXED_SB_KEY;
+  connectSupabase(true); // auto-connect silently
 }
 
 async function connectSupabase(silent = false) {
@@ -1189,9 +1188,12 @@ async function connectSupabase(silent = false) {
   btn.disabled = true;
 
   try {
-    SB = supabase.createClient(url, key);
+    SB = supabase.createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: { fetch: (...args) => fetch(...args) }
+    });
     // ทดสอบ connection
-    const { error } = await SB.from('students').select('id').limit(1);
+    const { data, error } = await SB.from('students').select('id').limit(1);
     if(error) throw new Error(error.message);
 
     USE_SUPABASE = true;
@@ -1201,7 +1203,7 @@ async function connectSupabase(silent = false) {
     statusText.textContent = '✅ เชื่อมต่อสำเร็จ!';
 
     await loadFromSupabase();
-    setupRealtime();
+    setTimeout(() => setupRealtime(), 500);
 
     setTimeout(() => {
       document.getElementById('setup-overlay').style.display = 'none';
