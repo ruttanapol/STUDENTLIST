@@ -557,9 +557,76 @@ input:focus, select:focus {
   font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;
   background:var(--purple-light);color:var(--purple);flex-shrink:0;
 }
+
+/* ===== SCAN SUCCESS POPUP ===== */
+.scan-success-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.55);
+  z-index:9999; display:none; align-items:center; justify-content:center;
+  backdrop-filter:blur(6px);
+}
+.scan-success-overlay.on { display:flex; }
+.scan-success-box {
+  background:#fff; border-radius:24px; padding:32px 28px 28px;
+  max-width:320px; width:90%; text-align:center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  animation: popIn .35s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes popIn {
+  from { transform:scale(0.6); opacity:0; }
+  to   { transform:scale(1); opacity:1; }
+}
+.scan-success-icon {
+  width:72px; height:72px; border-radius:50%;
+  background: linear-gradient(135deg, var(--green), var(--green-dark));
+  display:flex; align-items:center; justify-content:center;
+  margin: 0 auto 16px;
+  box-shadow: 0 8px 24px rgba(34,197,94,0.4);
+  animation: iconBounce .5s ease .1s both;
+}
+@keyframes iconBounce {
+  0%   { transform:scale(0); }
+  60%  { transform:scale(1.15); }
+  100% { transform:scale(1); }
+}
+.scan-success-title {
+  font-size:22px; font-weight:800; color:var(--text); margin-bottom:6px;
+}
+.scan-success-name {
+  font-size:18px; font-weight:700; color:var(--green-dark); margin-bottom:4px;
+}
+.scan-success-detail {
+  font-size:14px; color:var(--text2); margin-bottom:4px;
+}
+.scan-success-score {
+  font-size:16px; font-weight:700; color:var(--purple); margin-bottom:20px;
+}
+.scan-success-close {
+  width:100%; padding:13px; font-size:16px; font-weight:700;
+  border-radius:12px; border:none; cursor:pointer;
+  background: linear-gradient(135deg, var(--green), var(--green-dark));
+  color:#fff; box-shadow: 0 4px 16px rgba(34,197,94,0.4);
+  transition: all .2s;
+}
+.scan-success-close:active { opacity:.85; transform:scale(0.98); }
 </style>
 
 <div class="app">
+
+<!-- ===== SCAN SUCCESS POPUP ===== -->
+<div id="scan-success-overlay" class="scan-success-overlay" onclick="closeScanSuccess()">
+  <div class="scan-success-box" onclick="event.stopPropagation()">
+    <div class="scan-success-icon">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <div class="scan-success-title">✅ บันทึกสำเร็จ!</div>
+    <div class="scan-success-name" id="popup-stu-name">—</div>
+    <div class="scan-success-detail" id="popup-hw-detail">—</div>
+    <div class="scan-success-score" id="popup-score"></div>
+    <button class="scan-success-close" onclick="closeScanSuccess()">ปิด / สแกนต่อไป</button>
+  </div>
+</div>
 
 <!-- ===== LOGIN ===== -->
 <div id="s-login" class="screen on">
@@ -1205,6 +1272,9 @@ function recordScan(sid, scoreOverride) {
     item.innerHTML = `<div class="log-main"><div style="font-weight:700;">${stu.name} <span class="room-pill">${stu.room}</span></div><div class="log-sub">ชิ้นที่ ${hwNum}: ${hwTitle}${scoreBadge} · ${now}</div></div><span class="badge b-ok">✓ บันทึก</span>`;
     log.prepend(item);
     toast('บันทึก ' + stu.name + (scoreText!==null?' ('+scoreText+'/'+maxScore+')':'') + ' ✅');
+    playScanSuccess();
+    showScanSuccessPopup(stu.name, hwNum, hwTitle, scoreText, maxScore);
+    stopScan();
   }
   document.getElementById('scan-count').textContent = log.querySelectorAll('.log-item').length + ' รายการ';
 }
@@ -1218,14 +1288,30 @@ function toggleScan() {
   if(!scanning) startScan(); else stopScan();
 }
 
+let _scanCooldown = false;
+let _scanCooldownTimer = null;
+const SCAN_COOLDOWN_MS = 2500; // หน่วงหลังสแกนสำเร็จ 2.5 วิ
+
 function startScan() {
   const ph = document.getElementById('scan-ph');
   if(ph) ph.style.display = 'none';
+  _scanCooldown = false;
   qr = new Html5Qrcode('reader');
   qr.start(
     {facingMode: 'environment'},
-    {fps: 10, qrbox: {width: 190, height: 190}},
-    t => { recordScan(t); },
+    {fps: 5, qrbox: {width: 200, height: 200}},
+    t => {
+      if(_scanCooldown) return;          // ยังอยู่ใน cooldown → ข้าม
+      _scanCooldown = true;
+      recordScan(t);
+      // แสดง overlay บอกว่ากำลัง cooldown
+      showScanCooldown();
+      clearTimeout(_scanCooldownTimer);
+      _scanCooldownTimer = setTimeout(() => {
+        _scanCooldown = false;
+        hideScanCooldown();
+      }, SCAN_COOLDOWN_MS);
+    },
     () => {}
   ).then(() => {
     scanning = true;
@@ -1238,8 +1324,69 @@ function startScan() {
   });
 }
 
+function showScanCooldown() {
+  let el = document.getElementById('scan-cooldown-overlay');
+  if(!el) {
+    el = document.createElement('div');
+    el.id = 'scan-cooldown-overlay';
+    el.style.cssText = 'position:absolute;inset:0;background:rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center;border-radius:12px;pointer-events:none;';
+    el.innerHTML = '<div style="background:#fff;border-radius:12px;padding:8px 18px;font-size:15px;font-weight:700;color:var(--green-dark);box-shadow:0 2px 8px rgba(0,0,0,0.15);">✅ บันทึกแล้ว — รอสแกนครั้งถัดไป</div>';
+    const wrap = document.getElementById('scanner-wrap');
+    if(wrap) { wrap.style.position='relative'; wrap.appendChild(el); }
+  }
+  el.style.display = 'flex';
+}
+
+function hideScanCooldown() {
+  const el = document.getElementById('scan-cooldown-overlay');
+  if(el) el.style.display = 'none';
+}
+
+function playScanSuccess() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // เสียง "ปี๊ป" สำเร็จ 2 โน้ต
+    const notes = [880, 1320];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.15;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      osc.start(t);
+      osc.stop(t + 0.25);
+    });
+  } catch(e) {}
+}
+
+function showScanSuccessPopup(stuName, hwNum, hwTitle, score, maxScore) {
+  document.getElementById('popup-stu-name').textContent = stuName;
+  document.getElementById('popup-hw-detail').textContent = `งานครั้งที่ ${hwNum}: ${hwTitle}`;
+  const scoreEl = document.getElementById('popup-score');
+  if(score !== null && score !== undefined) {
+    scoreEl.textContent = `คะแนน: ${score} / ${maxScore}`;
+    scoreEl.style.display = '';
+  } else {
+    scoreEl.textContent = '';
+    scoreEl.style.display = 'none';
+  }
+  document.getElementById('scan-success-overlay').classList.add('on');
+}
+
+function closeScanSuccess() {
+  document.getElementById('scan-success-overlay').classList.remove('on');
+}
+
 function stopScan() {
   if(qr) {
+    clearTimeout(_scanCooldownTimer);
+    _scanCooldown = false;
+    hideScanCooldown();
     qr.stop().then(() => {
       scanning = false;
       const b = document.getElementById('scan-toggle');
