@@ -1855,9 +1855,10 @@ function showDetail(sid){
 
 function renderManage(){
   // Rooms chips
+  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort();
+  if(allRooms.length&&!allRooms.every(r=>DB.rooms.includes(r))){DB.rooms=allRooms;}
   const roomSel=document.getElementById('ns-room');
-  if(roomSel)roomSel.innerHTML=DB.rooms.map(r=>`<option>${r}</option>`).join('');
-  const editRoomSel=document.getElementById('edit-stu-room');
+  if(roomSel)roomSel.innerHTML=allRooms.map(r=>`<option>${r}</option>`).join('');
   const chips=document.getElementById('room-chips');
   if(chips)chips.innerHTML=DB.rooms.length?DB.rooms.map(r=>`<div style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #C4B5FD;border-radius:20px;padding:5px 12px;font-size:13px;font-weight:600;color:var(--purple);">${r}<button onclick="delRoom('${r}')" style="background:none;border:none;cursor:pointer;color:#94A3B8;font-size:16px;padding:0;line-height:1;">×</button></div>`).join(''):'<div style="font-size:13px;color:var(--text3);">ยังไม่มีห้องเรียน — เพิ่มก่อนเลย</div>';
   // Students with search filter
@@ -1890,10 +1891,16 @@ function renderManage(){
 
 function openEditStu(id){
   const s=DB.students.find(x=>x.id===id);if(!s)return;
+  // รวมห้องจาก DB.rooms + ห้องจากนักเรียนทั้งหมด เผื่อ settings ยังไม่โหลด
+  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort();
+  // ถ้าห้องของนักเรียนคนนี้ไม่อยู่ใน list ให้เพิ่มเข้าไปด้วย
+  if(s.room&&!allRooms.includes(s.room))allRooms.push(s.room);
   document.getElementById('edit-stu-old-id').value=s.id;
   document.getElementById('edit-stu-id').value=s.id;
   document.getElementById('edit-stu-name').value=s.name;
-  document.getElementById('edit-stu-room').innerHTML=DB.rooms.map(r=>`<option ${r===s.room?'selected':''}>${r}</option>`).join('');
+  document.getElementById('edit-stu-room').innerHTML=allRooms.length
+    ?allRooms.map(r=>`<option ${r===s.room?'selected':''}>${r}</option>`).join('')
+    :`<option>${s.room||'ไม่มีห้อง'}</option>`;
   document.getElementById('edit-stu-modal').style.display='flex';
 }
 function closeEditStu(){document.getElementById('edit-stu-modal').style.display='none';}
