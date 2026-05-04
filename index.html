@@ -553,64 +553,215 @@ input:focus, select:focus {
 .score-input-row {
   display:flex;align-items:center;gap:8px;margin-top:8px;
 }
-.score-badge {
-  font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;
-  background:var(--purple-light);color:var(--purple);flex-shrink:0;
+/* ===== SUPABASE SETUP SCREEN ===== */
+.setup-overlay {
+  position:fixed;inset:0;z-index:99999;
+  background: linear-gradient(160deg,#4F8EF7 0%,#7C3AED 50%,#EC4899 100%);
+  display:flex;align-items:center;justify-content:center;padding:20px;
 }
+.setup-box {
+  background:#fff;border-radius:24px;padding:28px 24px;
+  max-width:420px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,0.25);
+  max-height:90vh;overflow-y:auto;
+}
+.setup-title {font-size:20px;font-weight:800;color:var(--text);margin-bottom:4px;}
+.setup-sub {font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6;}
+.setup-step {
+  background:var(--bg);border-radius:14px;padding:14px 16px;margin-bottom:12px;
+  border-left:4px solid var(--blue);
+}
+.setup-step-num {font-size:11px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
+.setup-step-text {font-size:13px;color:var(--text);line-height:1.7;}
+.setup-step-text code {
+  background:rgba(79,142,247,0.12);color:var(--blue-dark);
+  padding:1px 6px;border-radius:5px;font-size:12px;font-family:monospace;
+}
+.setup-step-text b {color:var(--text);}
+.setup-field-label {font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;margin-top:14px;display:block;}
+.setup-input {
+  width:100%;padding:11px 14px;font-size:14px;
+  border:1.5px solid var(--border);border-radius:10px;
+  background:#fff;color:var(--text);outline:none;
+  font-family:'Sarabun',sans-serif;
+  transition:border-color .2s;
+}
+.setup-input:focus {border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,142,247,0.15);}
+.setup-connect-btn {
+  width:100%;padding:15px;font-size:17px;font-weight:700;
+  border-radius:12px;border:none;cursor:pointer;margin-top:16px;
+  background:linear-gradient(135deg,var(--blue),#7C3AED);color:#fff;
+  box-shadow:0 4px 16px rgba(79,142,247,0.4);transition:all .2s;
+  font-family:'Sarabun',sans-serif;
+}
+.setup-connect-btn:active{opacity:.85;transform:scale(0.98);}
+.setup-connect-btn:disabled{opacity:.5;cursor:not-allowed;}
+.setup-err {font-size:13px;color:var(--red);margin-top:8px;min-height:18px;}
+.setup-status {
+  display:flex;align-items:center;gap:8px;font-size:13px;
+  padding:10px 14px;border-radius:10px;margin-top:10px;
+}
+.setup-status.ok {background:var(--green-light);color:var(--green-dark);}
+.setup-status.err {background:var(--red-light);color:#B91C1C;}
+.setup-status.loading {background:var(--blue-light);color:var(--blue-dark);}
+.sql-block {
+  background:#1E293B;color:#E2E8F0;border-radius:10px;
+  padding:12px 14px;font-size:11px;font-family:monospace;
+  line-height:1.7;overflow-x:auto;margin:8px 0;white-space:pre;
+}
+.copy-sql-btn {
+  font-size:12px;font-weight:600;padding:5px 12px;
+  border-radius:8px;border:1.5px solid var(--border);
+  background:#fff;color:var(--text2);cursor:pointer;
+  transition:all .2s;font-family:'Sarabun',sans-serif;
+  margin-bottom:6px;
+}
+.copy-sql-btn:active{background:var(--bg);}
+.realtime-dot {
+  width:8px;height:8px;border-radius:50%;background:var(--green);
+  display:inline-block;margin-right:4px;
+  animation:pulse 1.5s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 
 /* ===== SCAN SUCCESS POPUP ===== */
 .scan-success-overlay {
-  position:fixed; inset:0; background:rgba(0,0,0,0.55);
-  z-index:9999; display:none; align-items:center; justify-content:center;
+  position:fixed;inset:0;background:rgba(0,0,0,0.55);
+  z-index:9999;display:none;align-items:center;justify-content:center;
   backdrop-filter:blur(6px);
 }
-.scan-success-overlay.on { display:flex; }
+.scan-success-overlay.on{display:flex;}
 .scan-success-box {
-  background:#fff; border-radius:24px; padding:32px 28px 28px;
-  max-width:320px; width:90%; text-align:center;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-  animation: popIn .35s cubic-bezier(0.175,0.885,0.32,1.275);
+  background:#fff;border-radius:24px;padding:32px 28px 28px;
+  max-width:320px;width:90%;text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,0.25);
+  animation:popIn .35s cubic-bezier(0.175,0.885,0.32,1.275);
 }
-@keyframes popIn {
-  from { transform:scale(0.6); opacity:0; }
-  to   { transform:scale(1); opacity:1; }
-}
+@keyframes popIn{from{transform:scale(0.6);opacity:0;}to{transform:scale(1);opacity:1;}}
 .scan-success-icon {
-  width:72px; height:72px; border-radius:50%;
-  background: linear-gradient(135deg, var(--green), var(--green-dark));
-  display:flex; align-items:center; justify-content:center;
-  margin: 0 auto 16px;
-  box-shadow: 0 8px 24px rgba(34,197,94,0.4);
-  animation: iconBounce .5s ease .1s both;
+  width:72px;height:72px;border-radius:50%;
+  background:linear-gradient(135deg,var(--green),var(--green-dark));
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 16px;
+  box-shadow:0 8px 24px rgba(34,197,94,0.4);
+  animation:iconBounce .5s ease .1s both;
 }
-@keyframes iconBounce {
-  0%   { transform:scale(0); }
-  60%  { transform:scale(1.15); }
-  100% { transform:scale(1); }
-}
-.scan-success-title {
-  font-size:22px; font-weight:800; color:var(--text); margin-bottom:6px;
-}
-.scan-success-name {
-  font-size:18px; font-weight:700; color:var(--green-dark); margin-bottom:4px;
-}
-.scan-success-detail {
-  font-size:14px; color:var(--text2); margin-bottom:4px;
-}
-.scan-success-score {
-  font-size:16px; font-weight:700; color:var(--purple); margin-bottom:20px;
-}
+@keyframes iconBounce{0%{transform:scale(0);}60%{transform:scale(1.15);}100%{transform:scale(1);}}
+.scan-success-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:6px;}
+.scan-success-name{font-size:18px;font-weight:700;color:var(--green-dark);margin-bottom:4px;}
+.scan-success-detail{font-size:14px;color:var(--text2);margin-bottom:4px;}
+.scan-success-score{font-size:16px;font-weight:700;color:var(--purple);margin-bottom:20px;}
 .scan-success-close {
-  width:100%; padding:13px; font-size:16px; font-weight:700;
-  border-radius:12px; border:none; cursor:pointer;
-  background: linear-gradient(135deg, var(--green), var(--green-dark));
-  color:#fff; box-shadow: 0 4px 16px rgba(34,197,94,0.4);
-  transition: all .2s;
+  width:100%;padding:13px;font-size:16px;font-weight:700;
+  border-radius:12px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--green),var(--green-dark));
+  color:#fff;box-shadow:0 4px 16px rgba(34,197,94,0.4);
+  transition:all .2s;font-family:'Sarabun',sans-serif;
 }
-.scan-success-close:active { opacity:.85; transform:scale(0.98); }
+.scan-success-close:active{opacity:.85;transform:scale(0.98);}
+
 </style>
 
 <div class="app">
+
+<!-- ===== SUPABASE SETUP ===== -->
+<div id="setup-overlay" class="setup-overlay">
+  <div class="setup-box">
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#4F8EF7,#7C3AED);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="setup-title">เชื่อมต่อ Supabase</div>
+      <div class="setup-sub">ตั้งค่าครั้งเดียว — ข้อมูลเรียลไทม์ทุกเครื่อง</div>
+    </div>
+
+    <div class="setup-step" style="border-color:#22C55E;">
+      <div class="setup-step-num" style="color:#16A34A;">ขั้นที่ 1 — สร้าง Project</div>
+      <div class="setup-step-text">
+        ไปที่ <b>supabase.com</b> → กด <b>Start your project</b> → Sign in with GitHub (ฟรี)<br>
+        → <b>New project</b> → ตั้งชื่อ เลือก Region <b>Southeast Asia (Singapore)</b> → สร้าง (รอ ~2 นาที)
+      </div>
+    </div>
+
+    <div class="setup-step" style="border-color:#8B5CF6;">
+      <div class="setup-step-num" style="color:#7C3AED;">ขั้นที่ 2 — สร้าง Tables</div>
+      <div class="setup-step-text">
+        ไปที่ <b>SQL Editor</b> (ไอคอนฐานข้อมูล) → New query → วางโค้ดด้านล่าง → <b>Run</b>
+      </div>
+      <button class="copy-sql-btn" onclick="copySQL()">📋 คัดลอก SQL</button>
+      <div class="sql-block" id="sql-block">-- วางใน SQL Editor แล้วกด Run
+CREATE TABLE IF NOT EXISTS students (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  room TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS homeworks (
+  num INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  subject TEXT DEFAULT '',
+  max_score INTEGER DEFAULT 100
+);
+
+CREATE TABLE IF NOT EXISTS submissions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  student_id TEXT NOT NULL,
+  hw_num INTEGER NOT NULL,
+  hw_title TEXT,
+  room TEXT,
+  score NUMERIC,
+  max_score INTEGER DEFAULT 100,
+  submitted_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(student_id, hw_num)
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value JSONB
+);
+
+-- เปิด Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE submissions;
+ALTER PUBLICATION supabase_realtime ADD TABLE students;
+ALTER PUBLICATION supabase_realtime ADD TABLE homeworks;
+
+-- ปิด RLS (สำหรับใช้ภายในโรงเรียน)
+ALTER TABLE students DISABLE ROW LEVEL SECURITY;
+ALTER TABLE homeworks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE submissions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE settings DISABLE ROW LEVEL SECURITY;</div>
+    </div>
+
+    <div class="setup-step" style="border-color:#F59E0B;">
+      <div class="setup-step-num" style="color:#B45309;">ขั้นที่ 3 — คัดลอก Keys</div>
+      <div class="setup-step-text">
+        ไปที่ <b>Project Settings</b> (ไอคอนเฟือง ซ้ายล่าง) → <b>API</b><br>
+        → คัดลอก <b>Project URL</b> และ <b>anon public</b> key ด้านล่างนี้
+      </div>
+    </div>
+
+    <label class="setup-field-label">🔗 Project URL</label>
+    <input class="setup-input" id="sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co" autocomplete="off" spellcheck="false">
+
+    <label class="setup-field-label">🔑 anon / public Key</label>
+    <input class="setup-input" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." autocomplete="off" spellcheck="false">
+
+    <div id="setup-err" class="setup-err"></div>
+    <div id="setup-status" style="display:none;" class="setup-status loading">
+      <span>⏳</span><span id="setup-status-text">กำลังเชื่อมต่อ...</span>
+    </div>
+
+    <button class="setup-connect-btn" id="setup-connect-btn" onclick="connectSupabase()">
+      🚀 เชื่อมต่อและเริ่มใช้งาน
+    </button>
+
+    <div style="text-align:center;margin-top:14px;">
+      <button onclick="useLocalMode()" style="background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer;text-decoration:underline;font-family:'Sarabun',sans-serif;">
+        ใช้แบบออฟไลน์ (localStorage เดิม)
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== SCAN SUCCESS POPUP ===== -->
 <div id="scan-success-overlay" class="scan-success-overlay" onclick="closeScanSuccess()">
@@ -988,6 +1139,8 @@ input:focus, select:focus {
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -995,463 +1148,659 @@ input:focus, select:focus {
 <script>
 const ADMIN_PW = 'teacher123';
 
-// สร้างข้อมูลตัวอย่าง 15 ห้อง ห้องละ 40 คน
-function generateSampleStudents() {
-  const rooms = [
-    'ม.1/1','ม.1/2','ม.1/3','ม.1/4','ม.1/5',
-    'ม.2/1','ม.2/2','ม.2/3','ม.2/4','ม.2/5',
-    'ม.3/1','ม.3/2','ม.3/3','ม.3/4','ม.3/5'
-  ];
-  const firstNames = ['สมชาย','สมหญิง','วิทย์','มาลี','ปิยะ','นภา','ธนา','กานต์','ชลิดา','อนุชา',
-    'พิชัย','รัตนา','ศิริ','ประสิทธิ์','วิไล','สุดา','นิรันดร์','กมลชนก','ธีรพงศ์','อภิชัย',
-    'กัญญา','ปรีชา','สุภาพ','วีระ','รักษ์','ธิดา','ชาญชัย','พรชัย','วันเพ็ญ','ศักดิ์ชัย',
-    'พิมพ์ใจ','เกรียงศักดิ์','ดวงใจ','วรรณา','มนัส','ยุพิน','สถาพร','ลัดดา','บุญชู','สิริกร'];
-  const lastNames = ['ใจดี','แสนสวย','รู้มาก','ดีงาม','ขยัน','สดใส','รวยทรัพย์','บริสุทธิ์','ใฝ่ดี','ตั้งใจ',
-    'มีสุข','งามเนตร','เจริญ','พูนทรัพย์','สว่างใจ','มงคล','วิเศษ','เลิศประเสริฐ','ศรีวิไล','อุดมสุข',
-    'ทองดี','พลอยงาม','สมบูรณ์','รุ่งเรือง','สุขสวัสดิ์','ใจแก้ว','ภิรมย์','มั่นคง','สุขสม','เพชรงาม',
-    'นาคทอง','รุ้งนภา','ทรัพย์ทวี','จิตรดี','สะอาด','คงคา','ชัยมงคล','พรหมดี','ทองเจริญ','ศรีไพศาล'];
-  const students = [];
-  let counter = 1;
-  rooms.forEach(room => {
-    for(let i = 0; i < 40; i++) {
-      students.push({
-        id: '67' + String(counter).padStart(4, '0'),
-        name: firstNames[i % firstNames.length] + ' ' + lastNames[i % lastNames.length],
-        room
-      });
-      counter++;
-    }
-  });
-  return { rooms, students };
+// ============================================================
+//  SUPABASE + LOCAL FALLBACK LAYER
+// ============================================================
+let SB = null;          // Supabase client
+let USE_SUPABASE = false;
+let realtimeChannel = null;
+
+// LocalStorage helpers (fallback)
+function lsGet(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+
+// ---- ตรวจว่าเคย setup ไว้แล้วหรือยัง ----
+function checkSetupOnLoad() {
+  const saved = lsGet('sb_config');
+  if(saved && saved.url && saved.key) {
+    document.getElementById('sb-url').value = saved.url;
+    document.getElementById('sb-key').value = saved.key;
+    connectSupabase(true); // auto-connect silently
+  } else {
+    document.getElementById('setup-overlay').style.display = 'flex';
+  }
 }
 
-const _sample = generateSampleStudents();
+async function connectSupabase(silent = false) {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  const errEl = document.getElementById('setup-err');
+  const statusEl = document.getElementById('setup-status');
+  const statusText = document.getElementById('setup-status-text');
+  const btn = document.getElementById('setup-connect-btn');
 
+  errEl.textContent = '';
+  if(!url || !key) { errEl.textContent = 'กรุณากรอก URL และ Key ให้ครบ'; return; }
+  if(!url.startsWith('https://')) { errEl.textContent = 'URL ต้องขึ้นต้นด้วย https://'; return; }
+
+  statusEl.style.display = 'flex';
+  statusEl.className = 'setup-status loading';
+  statusText.textContent = 'กำลังเชื่อมต่อ...';
+  btn.disabled = true;
+
+  try {
+    SB = supabase.createClient(url, key);
+    // ทดสอบ connection
+    const { error } = await SB.from('students').select('id').limit(1);
+    if(error) throw new Error(error.message);
+
+    USE_SUPABASE = true;
+    lsSet('sb_config', {url, key});
+
+    statusEl.className = 'setup-status ok';
+    statusText.textContent = '✅ เชื่อมต่อสำเร็จ!';
+
+    await loadFromSupabase();
+    setupRealtime();
+
+    setTimeout(() => {
+      document.getElementById('setup-overlay').style.display = 'none';
+    }, silent ? 0 : 800);
+
+  } catch(e) {
+    SB = null;
+    USE_SUPABASE = false;
+    statusEl.className = 'setup-status err';
+    statusText.textContent = '❌ เชื่อมต่อไม่ได้';
+    errEl.textContent = 'Error: ' + e.message + ' — ตรวจสอบ URL/Key และการสร้าง Tables';
+    btn.disabled = false;
+  }
+}
+
+function useLocalMode() {
+  USE_SUPABASE = false;
+  loadDB();
+  document.getElementById('setup-overlay').style.display = 'none';
+  toast('โหมดออฟไลน์ (localStorage)', 'warn');
+}
+
+function copySQL() {
+  const sql = document.getElementById('sql-block').textContent;
+  navigator.clipboard.writeText(sql).then(() => {
+    toast('คัดลอก SQL แล้ว ✅');
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = sql;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('คัดลอก SQL แล้ว ✅');
+  });
+}
+
+// ============================================================
+//  DATA LAYER — อ่าน/เขียนผ่าน Supabase หรือ localStorage
+// ============================================================
 let DB = {
-  rooms: _sample.rooms,
+  rooms: [],
   subjects: ['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา'],
-  students: _sample.students,
-  homeworks: [
-    {num:1,title:'แบบฝึกหัดบทที่ 1',subject:'คณิตศาสตร์',maxScore:10},
-    {num:2,title:'รายงานกลุ่ม',subject:'วิทยาศาสตร์',maxScore:20},
-    {num:3,title:'เรียงความ',subject:'ภาษาไทย',maxScore:15},
-    {num:4,title:'แบบฝึกหัดบทที่ 2',subject:'คณิตศาสตร์',maxScore:10},
-    {num:5,title:'ศัพท์ภาษาอังกฤษ',subject:'ภาษาอังกฤษ',maxScore:20},
-  ],
+  students: [],
+  homeworks: [],
   submissions: {}
 };
 
+function loadDB(){const d=lsGet('hwdb5');if(d)DB=d;}
+function saveDB(){if(!USE_SUPABASE)lsSet('hwdb5',DB);}
+
+async function loadFromSupabase() {
+  if(!SB) return;
+  const [stuRes, hwRes, subRes, setRes] = await Promise.all([
+    SB.from('students').select('*'),
+    SB.from('homeworks').select('*').order('num'),
+    SB.from('submissions').select('*'),
+    SB.from('settings').select('*')
+  ]);
+
+  DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room}));
+  DB.rooms = [...new Set(DB.students.map(s => s.room))].sort();
+  DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100}));
+
+  const subs = {};
+  (subRes.data || []).forEach(r => {
+    const key = r.student_id + '_' + r.hw_num;
+    subs[key] = {
+      sid: r.student_id, hwNum: r.hw_num, hwTitle: r.hw_title,
+      room: r.room, score: r.score, maxScore: r.max_score||100,
+      ts: r.submitted_at ? new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : ''
+    };
+  });
+  DB.submissions = subs;
+
+  // settings: subjects, rooms
+  const settingsMap = {};
+  (setRes.data || []).forEach(r => { settingsMap[r.key] = r.value; });
+  if(settingsMap['subjects']) DB.subjects = settingsMap['subjects'];
+  if(settingsMap['rooms']) DB.rooms = settingsMap['rooms'];
+}
+
+// ---- Realtime subscription ----
+function setupRealtime() {
+  if(!SB || realtimeChannel) return;
+  realtimeChannel = SB.channel('db-changes')
+    .on('postgres_changes', {event:'*', schema:'public', table:'submissions'}, async () => {
+      await reloadSubmissions();
+      renderDashboard();
+      renderStudentIfOpen();
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'students'}, async () => {
+      await reloadStudents();
+      renderDashboard();
+      if(document.getElementById('ap-manage')?.classList.contains('on')) renderManage();
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'homeworks'}, async () => {
+      await reloadHomeworks();
+      renderDashboard();
+    })
+    .subscribe();
+  showRealtimeDot();
+}
+
+function showRealtimeDot() {
+  const tb = document.getElementById('admin-topbar-name');
+  if(tb && !document.getElementById('rt-dot')) {
+    const dot = document.createElement('span');
+    dot.id = 'rt-dot';
+    dot.title = 'Realtime เชื่อมต่ออยู่';
+    dot.innerHTML = ' <span class="realtime-dot"></span>';
+    tb.parentNode.insertBefore(dot, tb.nextSibling);
+  }
+}
+
+async function reloadSubmissions() {
+  if(!SB) return;
+  const {data} = await SB.from('submissions').select('*');
+  const subs = {};
+  (data||[]).forEach(r => {
+    const key = r.student_id + '_' + r.hw_num;
+    subs[key] = {sid:r.student_id,hwNum:r.hw_num,hwTitle:r.hw_title,room:r.room,
+      score:r.score,maxScore:r.max_score||100,
+      ts:r.submitted_at?new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}):''};
+  });
+  DB.submissions = subs;
+}
+
+async function reloadStudents() {
+  if(!SB) return;
+  const {data} = await SB.from('students').select('*');
+  DB.students = (data||[]).map(r=>({id:r.id,name:r.name,room:r.room}));
+  DB.rooms = [...new Set(DB.students.map(s=>s.room))].sort();
+}
+
+async function reloadHomeworks() {
+  if(!SB) return;
+  const {data} = await SB.from('homeworks').select('*').order('num');
+  DB.homeworks = (data||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100}));
+}
+
+let _currentStuId = null; // track which student is viewing
+
+function renderStudentIfOpen() {
+  if(_currentStuId) {
+    const s = DB.students.find(x => x.id === _currentStuId);
+    if(s) renderStudentView(s);
+  }
+}
+
+// ============================================================
+//  CRUD helpers — Supabase or localStorage
+// ============================================================
+async function sbAddStudent(stu) {
+  if(USE_SUPABASE) {
+    const {error} = await SB.from('students').insert({id:stu.id,name:stu.name,room:stu.room});
+    if(error) throw error;
+    await reloadStudents();
+  } else {
+    DB.students.push(stu);
+    if(!DB.rooms.includes(stu.room)) DB.rooms.push(stu.room);
+    saveDB();
+  }
+}
+
+async function sbUpdateStudent(oldId, stu) {
+  if(USE_SUPABASE) {
+    const {error} = await SB.from('students').update({id:stu.id,name:stu.name,room:stu.room}).eq('id', oldId);
+    if(error) throw error;
+    // ถ้า id เปลี่ยน ต้องย้าย submissions
+    if(oldId !== stu.id) {
+      const {data: subs} = await SB.from('submissions').select('*').eq('student_id', oldId);
+      for(const s of (subs||[])) {
+        await SB.from('submissions').update({student_id: stu.id}).eq('id', s.id);
+      }
+    }
+    await reloadStudents();
+  } else {
+    const s = DB.students.find(x => x.id === oldId);
+    if(s) { s.id=stu.id; s.name=stu.name; s.room=stu.room; }
+    if(oldId !== stu.id) {
+      const newSubs = {};
+      Object.entries(DB.submissions).forEach(([k,v]) => {
+        if(k.startsWith(oldId+'_')) { const hw=k.split('_')[1]; newSubs[stu.id+'_'+hw]={...v,sid:stu.id}; }
+        else newSubs[k]=v;
+      });
+      DB.submissions = newSubs;
+    }
+    saveDB();
+  }
+}
+
+async function sbDeleteStudent(id) {
+  if(USE_SUPABASE) {
+    await SB.from('submissions').delete().eq('student_id', id);
+    const {error} = await SB.from('students').delete().eq('id', id);
+    if(error) throw error;
+    await reloadStudents();
+  } else {
+    DB.students = DB.students.filter(s => s.id !== id);
+    saveDB();
+  }
+}
+
+async function sbAddHomework(hw) {
+  if(USE_SUPABASE) {
+    const {error} = await SB.from('homeworks').upsert({num:hw.num,title:hw.title,subject:hw.subject||'',max_score:hw.maxScore||100});
+    if(error) throw error;
+    await reloadHomeworks();
+  } else {
+    const existing = DB.homeworks.find(h => h.num === hw.num);
+    if(existing) { existing.title=hw.title; existing.subject=hw.subject; existing.maxScore=hw.maxScore; }
+    else { DB.homeworks.push(hw); DB.homeworks.sort((a,b)=>a.num-b.num); }
+    saveDB();
+  }
+}
+
+async function sbDeleteHomework(num) {
+  if(USE_SUPABASE) {
+    const {error} = await SB.from('homeworks').delete().eq('num', num);
+    if(error) throw error;
+    await reloadHomeworks();
+  } else {
+    DB.homeworks = DB.homeworks.filter(h => h.num !== num);
+    saveDB();
+  }
+}
+
+async function sbRecordSubmission(sub) {
+  // sub = {sid, hwNum, hwTitle, room, score, maxScore}
+  if(USE_SUPABASE) {
+    const {error} = await SB.from('submissions').upsert({
+      student_id: sub.sid, hw_num: sub.hwNum, hw_title: sub.hwTitle,
+      room: sub.room, score: sub.score, max_score: sub.maxScore
+    }, {onConflict: 'student_id,hw_num'});
+    if(error) throw error;
+    await reloadSubmissions();
+  } else {
+    const key = sub.sid + '_' + sub.hwNum;
+    DB.submissions[key] = {...sub, ts: ts()};
+    saveDB();
+  }
+}
+
+async function sbUpdateScore(sid, hwNum, score) {
+  if(USE_SUPABASE) {
+    const {error} = await SB.from('submissions').update({score}).eq('student_id', sid).eq('hw_num', hwNum);
+    if(error) throw error;
+    await reloadSubmissions();
+  } else {
+    const key = sid + '_' + hwNum;
+    if(DB.submissions[key]) DB.submissions[key].score = score;
+    saveDB();
+  }
+}
+
+async function sbSaveSettings(key, value) {
+  if(USE_SUPABASE) {
+    await SB.from('settings').upsert({key, value}, {onConflict: 'key'});
+  } else {
+    saveDB();
+  }
+}
+
+async function sbImportStudents(students) {
+  if(USE_SUPABASE) {
+    const rows = students.map(s => ({id:s.id,name:s.name,room:s.room}));
+    const {error} = await SB.from('students').upsert(rows, {onConflict:'id', ignoreDuplicates:true});
+    if(error) throw error;
+    await reloadStudents();
+  } else {
+    let added = 0;
+    students.forEach(s => {
+      if(!DB.students.find(x=>x.id===s.id)) {
+        DB.students.push(s);
+        if(!DB.rooms.includes(s.room)) DB.rooms.push(s.room);
+        added++;
+      }
+    });
+    saveDB();
+    return added;
+  }
+  return students.length;
+}
+
+// ============================================================
+//  APP LOGIC (same as before, now async where needed)
+// ============================================================
 let qr = null, scanning = false, curRoom = 'all';
 
-function lsGet(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch(e) { return null; } }
-function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
-function loadDB() { const d = lsGet('hwdb5'); if(d) DB = d; }
-function saveDB() { lsSet('hwdb5', DB); }
-loadDB();
+function togglePw(id,btn){const el=document.getElementById(id);if(el.type==='password'){el.type='text';btn.textContent='ซ่อน';}else{el.type='password';btn.textContent='แสดง';}}
 
-function togglePw(id, btn) {
-  const el = document.getElementById(id);
-  if(el.type === 'password') { el.type = 'text'; btn.textContent = 'ซ่อน'; }
-  else { el.type = 'password'; btn.textContent = 'แสดง'; }
-}
-
-function toast(msg, type='ok') {
-  const t = document.getElementById('toast-a');
-  if(!t) return;
-  t.textContent = msg;
-  t.className = 'tbar on t-' + type;
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast-a');
+  if(!t)return;
+  t.textContent=msg;
+  t.className='tbar on t-'+type;
   clearTimeout(t._t);
-  t._t = setTimeout(() => t.classList.remove('on'), 2800);
+  t._t=setTimeout(()=>t.classList.remove('on'),2800);
 }
 
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   document.getElementById(id).classList.add('on');
 }
 
-function loginAdmin() {
-  const pw = document.getElementById('admin-pw').value;
-  document.getElementById('admin-err').textContent = '';
-  if(pw === ADMIN_PW) {
+function loginAdmin(){
+  const pw=document.getElementById('admin-pw').value;
+  document.getElementById('admin-err').textContent='';
+  if(pw===ADMIN_PW){
     showScreen('s-admin');
     populateScanSelects();
-    document.getElementById('admin-pw').value = '';
+    document.getElementById('admin-pw').value='';
   } else {
-    document.getElementById('admin-err').textContent = 'รหัสผ่านไม่ถูกต้อง ลองอีกครั้ง';
+    document.getElementById('admin-err').textContent='รหัสผ่านไม่ถูกต้อง ลองอีกครั้ง';
   }
 }
 
-function loginStudent() {
-  const sid = document.getElementById('stu-id').value.trim();
-  document.getElementById('stu-err').textContent = '';
-  if(!sid) { document.getElementById('stu-err').textContent = 'กรุณากรอกเลขประจำตัว'; return; }
-  const s = DB.students.find(x => x.id === sid);
-  if(!s) { document.getElementById('stu-err').textContent = 'ไม่พบเลขประจำตัวนี้ในระบบ'; return; }
+async function loginStudent(){
+  const sid=document.getElementById('stu-id').value.trim();
+  document.getElementById('stu-err').textContent='';
+  if(!sid){document.getElementById('stu-err').textContent='กรุณากรอกเลขประจำตัว';return;}
+  // ถ้า Supabase: refresh submissions ก่อน
+  if(USE_SUPABASE) await reloadSubmissions();
+  const s=DB.students.find(x=>x.id===sid);
+  if(!s){document.getElementById('stu-err').textContent='ไม่พบเลขประจำตัวนี้ในระบบ';return;}
+  _currentStuId = sid;
   showScreen('s-stu');
-  document.getElementById('stu-id').value = '';
+  document.getElementById('stu-id').value='';
   renderStudentView(s);
 }
 
-function logout() {
-  if(scanning) stopScan();
-  showScreen('s-login');
-}
+function logout(){if(scanning)stopScan();_currentStuId=null;showScreen('s-login');}
 
-function renderStudentView(s) {
-  document.getElementById('stu-avatar').textContent = s.name.substring(0, 2);
-  document.getElementById('stu-display-name').textContent = s.name;
-  document.getElementById('stu-display-room').textContent = 'ห้อง ' + s.room + ' · รหัส ' + s.id;
-
-  const done = DB.homeworks.filter(h => DB.submissions[s.id + '_' + h.num]);
-  const miss = DB.homeworks.filter(h => !DB.submissions[s.id + '_' + h.num]);
-  const pct = DB.homeworks.length ? Math.round(done.length / DB.homeworks.length * 100) : 0;
-
-  let html = `
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;">
-      <div class="scard" style="background:linear-gradient(135deg,#DCFCE7,#BBF7D0);border:1.5px solid #86EFAC;">
-        <div class="snum" style="color:#16A34A;">${done.length}</div>
-        <div class="slbl">✅ ส่งแล้ว</div>
-      </div>
-      <div class="scard" style="background:linear-gradient(135deg,#FEE2E2,#FECACA);border:1.5px solid #FCA5A5;">
-        <div class="snum" style="color:#B91C1C;">${miss.length}</div>
-        <div class="slbl">❌ ยังไม่ส่ง</div>
-      </div>
-    </div>
-    <div class="card" style="margin-bottom:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <span style="font-size:14px;color:var(--text2);font-weight:600;">ความคืบหน้า</span>
-        <span style="font-size:16px;font-weight:700;color:${pct===100?'var(--green-dark)':'var(--blue)'};">${pct}%</span>
-      </div>
-      <div class="prog-bar" style="height:10px;"><div class="prog-fill" style="width:${pct}%;"></div></div>
-    </div>`;
-
-  if(!DB.homeworks.length) {
-    html += '<div class="empty">ยังไม่มีรายการงาน</div>';
-  } else {
-    html += '<div class="my-hw-card">';
-    DB.homeworks.forEach(h => {
-      const sub = DB.submissions[s.id + '_' + h.num];
-      html += `<div class="my-hw-row">
-        <div>
-          <div style="font-size:15px;font-weight:700;color:var(--text);">ชิ้นที่ ${h.num}: ${h.title}</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:2px;">${h.subject}</div>
-        </div>
-        ${sub
-          ? `<div class="hw-status-ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>${sub.score !== null && sub.score !== undefined ? sub.score+'/'+(sub.maxScore||h.maxScore||100)+' คะแนน' : sub.ts}</div>`
-          : `<div class="hw-status-no"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>ยังไม่ส่ง</div>`
-        }
-      </div>`;
+function renderStudentView(s){
+  document.getElementById('stu-avatar').textContent=s.name.substring(0,2);
+  document.getElementById('stu-display-name').textContent=s.name;
+  document.getElementById('stu-display-room').textContent='ห้อง '+s.room+' · รหัส '+s.id;
+  const done=DB.homeworks.filter(h=>DB.submissions[s.id+'_'+h.num]);
+  const miss=DB.homeworks.filter(h=>!DB.submissions[s.id+'_'+h.num]);
+  const pct=DB.homeworks.length?Math.round(done.length/DB.homeworks.length*100):0;
+  let html=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;">
+    <div class="scard" style="background:linear-gradient(135deg,#DCFCE7,#BBF7D0);border:1.5px solid #86EFAC;"><div class="snum" style="color:#16A34A;">${done.length}</div><div class="slbl">✅ ส่งแล้ว</div></div>
+    <div class="scard" style="background:linear-gradient(135deg,#FEE2E2,#FECACA);border:1.5px solid #FCA5A5;"><div class="snum" style="color:#B91C1C;">${miss.length}</div><div class="slbl">❌ ยังไม่ส่ง</div></div>
+  </div>
+  <div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:14px;color:var(--text2);font-weight:600;">ความคืบหน้า</span><span style="font-size:16px;font-weight:700;color:${pct===100?'var(--green-dark)':'var(--blue)'};">${pct}%</span></div><div class="prog-bar" style="height:10px;"><div class="prog-fill" style="width:${pct}%;"></div></div></div>`;
+  if(!DB.homeworks.length){html+='<div class="empty">ยังไม่มีรายการงาน</div>';}
+  else{
+    html+='<div class="my-hw-card">';
+    DB.homeworks.forEach(h=>{
+      const sub=DB.submissions[s.id+'_'+h.num];
+      html+=`<div class="my-hw-row"><div><div style="font-size:15px;font-weight:700;color:var(--text);">ชิ้นที่ ${h.num}: ${h.title}</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">${h.subject}</div></div>${sub?`<div class="hw-status-ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>${sub.score!==null&&sub.score!==undefined?sub.score+'/'+(sub.maxScore||h.maxScore||100)+' คะแนน':sub.ts}</div>`:`<div class="hw-status-no"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>ยังไม่ส่ง</div>`}</div>`;
     });
-    html += '</div>';
+    html+='</div>';
   }
-  document.getElementById('stu-content').innerHTML = html;
+  document.getElementById('stu-content').innerHTML=html;
 }
 
-function showAP(id, btn) {
-  document.querySelectorAll('#s-admin .page').forEach(p => p.classList.remove('on'));
-  document.querySelectorAll('.bnav-btn').forEach(b => b.classList.remove('on'));
-  document.getElementById('ap-' + id).classList.add('on');
+function showAP(id,btn){
+  document.querySelectorAll('#s-admin .page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('ap-'+id).classList.add('on');
   btn.classList.add('on');
-  if(id === 'dash') renderDashboard();
-  if(id === 'manage') renderManage();
+  if(id==='dash')renderDashboard();
+  if(id==='manage')renderManage();
 }
 
-function ts() {
-  return new Date().toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'});
-}
+function ts(){return new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});}
 
-let hwAutoSaveTimer = null;
+let hwAutoSaveTimer=null;
 
-function populateScanSelects() {
-  // populate subject dropdown in scan
-  const ss = document.getElementById('hw-subj-input');
-  if(ss) ss.innerHTML = DB.subjects.map(s => `<option>${s}</option>`).join('');
-
-  // load last saved hw state or first hw
-  const saved = lsGet('hw_current');
-  if(saved) {
-    if(document.getElementById('hw-num-input')) document.getElementById('hw-num-input').value = saved.num || '';
-    if(document.getElementById('hw-title-input')) document.getElementById('hw-title-input').value = saved.title || '';
-    if(ss && saved.subject) ss.value = saved.subject;
-    const msEl = document.getElementById('hw-maxscore-input');
-    if(msEl && saved.maxScore) msEl.value = saved.maxScore;
-  } else if(DB.homeworks.length) {
-    const h = DB.homeworks[0];
-    if(document.getElementById('hw-num-input')) document.getElementById('hw-num-input').value = h.num;
-    if(document.getElementById('hw-title-input')) document.getElementById('hw-title-input').value = h.title;
-    if(ss) ss.value = h.subject;
-    const msEl2 = document.getElementById('hw-maxscore-input');
-    if(msEl2) msEl2.value = h.maxScore || 100;
+function populateScanSelects(){
+  const ss=document.getElementById('hw-subj-input');
+  if(ss)ss.innerHTML=DB.subjects.map(s=>`<option>${s}</option>`).join('');
+  const saved=lsGet('hw_current');
+  if(saved){
+    if(document.getElementById('hw-num-input'))document.getElementById('hw-num-input').value=saved.num||'';
+    if(document.getElementById('hw-title-input'))document.getElementById('hw-title-input').value=saved.title||'';
+    if(ss&&saved.subject)ss.value=saved.subject;
+    const msEl=document.getElementById('hw-maxscore-input');
+    if(msEl&&saved.maxScore)msEl.value=saved.maxScore;
+  } else if(DB.homeworks.length){
+    const h=DB.homeworks[0];
+    if(document.getElementById('hw-num-input'))document.getElementById('hw-num-input').value=h.num;
+    if(document.getElementById('hw-title-input'))document.getElementById('hw-title-input').value=h.title;
+    if(ss)ss.value=h.subject;
+    const msEl2=document.getElementById('hw-maxscore-input');
+    if(msEl2)msEl2.value=h.maxScore||100;
   }
   updateConflictWarn();
 }
 
-function onHWFieldChange() {
-  // บันทึกอัตโนมัติหลัง 600ms หยุดพิมพ์
-  const badge = document.getElementById('hw-save-badge');
-  if(badge) badge.style.display = 'none';
+function onHWFieldChange(){
+  const badge=document.getElementById('hw-save-badge');
+  if(badge)badge.style.display='none';
   clearTimeout(hwAutoSaveTimer);
-  hwAutoSaveTimer = setTimeout(() => {
-    const num = parseInt(document.getElementById('hw-num-input').value);
-    const title = document.getElementById('hw-title-input').value.trim();
-    const subject = document.getElementById('hw-subj-input').value;
-    const maxScore = parseInt(document.getElementById('hw-maxscore-input').value) || 100;
-    if(!num || !title) return;
-
-    // บันทึก/อัปเดต homework ใน DB
-    const existing = DB.homeworks.find(h => h.num === num);
-    if(existing) {
-      existing.title = title;
-      existing.subject = subject;
-      existing.maxScore = maxScore;
-    } else {
-      DB.homeworks.push({num, title, subject, maxScore});
-      DB.homeworks.sort((a,b) => a.num - b.num);
-    }
-    lsSet('hw_current', {num, title, subject, maxScore});
-    saveDB();
-
-    if(badge) { badge.style.display = ''; setTimeout(() => badge.style.display = 'none', 2000); }
+  hwAutoSaveTimer=setTimeout(async()=>{
+    const num=parseInt(document.getElementById('hw-num-input').value);
+    const title=document.getElementById('hw-title-input').value.trim();
+    const subject=document.getElementById('hw-subj-input').value;
+    const maxScore=parseInt(document.getElementById('hw-maxscore-input').value)||100;
+    if(!num||!title)return;
+    await sbAddHomework({num,title,subject,maxScore});
+    lsSet('hw_current',{num,title,subject,maxScore});
+    if(badge){badge.style.display='';setTimeout(()=>badge.style.display='none',2000);}
     updateConflictWarn();
-  }, 600);
+  },600);
 }
 
-function updateConflictWarn() {
-  const num = parseInt(document.getElementById('hw-num-input')?.value);
-  const title = document.getElementById('hw-title-input')?.value.trim();
-  const warn = document.getElementById('hw-conflict-warn');
-  if(!warn) return;
-  const existing = num && DB.homeworks.find(h => h.num === num);
-  if(existing && title && existing.title !== title) {
-    warn.textContent = `⚠️ งานครั้งที่ ${num} มีอยู่แล้ว: "${existing.title}" — จะถูกแทนที่เมื่อบันทึก`;
-    warn.style.display = 'block';
+function updateConflictWarn(){
+  const num=parseInt(document.getElementById('hw-num-input')?.value);
+  const title=document.getElementById('hw-title-input')?.value.trim();
+  const warn=document.getElementById('hw-conflict-warn');
+  if(!warn)return;
+  const existing=num&&DB.homeworks.find(h=>h.num===num);
+  if(existing&&title&&existing.title!==title){warn.textContent=`⚠️ งานครั้งที่ ${num} มีอยู่แล้ว: "${existing.title}" — จะถูกแทนที่เมื่อบันทึก`;warn.style.display='block';}
+  else{warn.style.display='none';}
+}
+
+async function recordScan(sid, scoreOverride){
+  sid=sid.trim();
+  const hwNum=parseInt(document.getElementById('hw-num-input').value)||1;
+  const hwTitle=document.getElementById('hw-title-input').value.trim()||'ชิ้นที่ '+hwNum;
+  const maxScore=parseInt(document.getElementById('hw-maxscore-input')?.value)||100;
+  let score=null;
+  if(scoreOverride!==undefined&&scoreOverride!==null&&scoreOverride!==''){
+    score=parseFloat(scoreOverride);
   } else {
-    warn.style.display = 'none';
+    const scoreEl=document.getElementById('manual-score');
+    if(scoreEl&&scoreEl.value!==''){score=parseFloat(scoreEl.value);scoreEl.value='';}
   }
-}
+  const stu=DB.students.find(s=>s.id===sid);
+  const key=sid+'_'+hwNum;
+  const log=document.getElementById('scan-log');
+  const empty=log.querySelector('.empty');
+  if(empty)empty.remove();
+  const item=document.createElement('div');
+  item.className='log-item';
 
-function recordScan(sid, scoreOverride) {
-  sid = sid.trim();
-  const hwNum = parseInt(document.getElementById('hw-num-input').value) || 1;
-  const hwTitle = document.getElementById('hw-title-input').value.trim() || 'ชิ้นที่ ' + hwNum;
-  const maxScore = parseInt(document.getElementById('hw-maxscore-input')?.value) || 100;
-  // คะแนนที่กรอก: ถ้า scoreOverride มีค่าใช้เลย, ถ้าไม่มีดูจาก manual-score input
-  let score = null;
-  if(scoreOverride !== undefined && scoreOverride !== null && scoreOverride !== '') {
-    score = parseFloat(scoreOverride);
+  if(!stu){
+    item.innerHTML=`<div class="log-main"><div>รหัส <b>${sid}</b></div><div class="log-sub">ไม่พบในระบบ</div></div><span class="badge b-err">ไม่พบ</span>`;
+    log.prepend(item);
+    toast('ไม่พบรหัส '+sid,'err');
+  } else if(DB.submissions[key]&&scoreOverride===undefined){
+    item.innerHTML=`<div class="log-main"><div style="font-weight:700;">${stu.name}</div><div class="log-sub">งานชิ้นที่ ${hwNum} ส่งซ้ำ</div></div><span class="badge b-dup">ซ้ำ</span>`;
+    log.prepend(item);
+    toast(stu.name+' ส่งงานนี้แล้ว','warn');
   } else {
-    const scoreEl = document.getElementById('manual-score');
-    if(scoreEl && scoreEl.value !== '') {
-      score = parseFloat(scoreEl.value);
-      scoreEl.value = '';
+    const now=ts();
+    const scoreText=score!==null&&!isNaN(score)?score:null;
+    try {
+      await sbRecordSubmission({sid,hwNum,hwTitle,room:stu.room,score:scoreText,maxScore});
+      const scoreBadge=scoreText!==null?` · <b style="color:var(--purple);">${scoreText}/${maxScore}</b>`:'';
+      item.innerHTML=`<div class="log-main"><div style="font-weight:700;">${stu.name} <span class="room-pill">${stu.room}</span></div><div class="log-sub">ชิ้นที่ ${hwNum}: ${hwTitle}${scoreBadge} · ${now}</div></div><span class="badge b-ok">✓ บันทึก</span>`;
+      log.prepend(item);
+      toast('บันทึก '+stu.name+(scoreText!==null?' ('+scoreText+'/'+maxScore+')':'')+'✅');
+      playScanSuccess();
+      showScanSuccessPopup(stu.name, hwNum, hwTitle, scoreText, maxScore);
+      stopScan();
+    } catch(e) {
+      item.innerHTML=`<div class="log-main"><div style="font-weight:700;">${stu.name}</div><div class="log-sub">บันทึกไม่สำเร็จ: ${e.message}</div></div><span class="badge b-err">Error</span>`;
+      log.prepend(item);
+      toast('บันทึกไม่สำเร็จ: '+e.message,'err');
     }
   }
-  const stu = DB.students.find(s => s.id === sid);
-  const key = sid + '_' + hwNum;
-  const log = document.getElementById('scan-log');
-  const empty = log.querySelector('.empty');
-  if(empty) empty.remove();
-
-  const item = document.createElement('div');
-  item.className = 'log-item';
-
-  if(!stu) {
-    item.innerHTML = `<div class="log-main"><div>รหัส <b>${sid}</b></div><div class="log-sub">ไม่พบในระบบ</div></div><span class="badge b-err">ไม่พบ</span>`;
-    log.prepend(item);
-    toast('ไม่พบรหัส ' + sid, 'err');
-  } else if(DB.submissions[key] && scoreOverride === undefined) {
-    item.innerHTML = `<div class="log-main"><div style="font-weight:700;">${stu.name}</div><div class="log-sub">งานชิ้นที่ ${hwNum} ส่งซ้ำ</div></div><span class="badge b-dup">ซ้ำ</span>`;
-    log.prepend(item);
-    toast(stu.name + ' ส่งงานนี้แล้ว', 'warn');
-  } else {
-    const now = ts();
-    const scoreText = score !== null && !isNaN(score) ? score : null;
-    DB.submissions[key] = {sid, hwNum, hwTitle, room: stu.room, ts: now, score: scoreText, maxScore};
-    saveDB();
-    const scoreBadge = scoreText !== null ? ` · <b style="color:var(--purple);">${scoreText}/${maxScore}</b>` : '';
-    item.innerHTML = `<div class="log-main"><div style="font-weight:700;">${stu.name} <span class="room-pill">${stu.room}</span></div><div class="log-sub">ชิ้นที่ ${hwNum}: ${hwTitle}${scoreBadge} · ${now}</div></div><span class="badge b-ok">✓ บันทึก</span>`;
-    log.prepend(item);
-    toast('บันทึก ' + stu.name + (scoreText!==null?' ('+scoreText+'/'+maxScore+')':'') + ' ✅');
-    playScanSuccess();
-    showScanSuccessPopup(stu.name, hwNum, hwTitle, scoreText, maxScore);
-    stopScan();
-  }
-  document.getElementById('scan-count').textContent = log.querySelectorAll('.log-item').length + ' รายการ';
+  document.getElementById('scan-count').textContent=log.querySelectorAll('.log-item').length+' รายการ';
 }
 
-function submitManual() {
-  const v = document.getElementById('manual-id').value.trim();
-  if(v) { recordScan(v); document.getElementById('manual-id').value = ''; }
-}
+function submitManual(){const v=document.getElementById('manual-id').value.trim();if(v){recordScan(v);document.getElementById('manual-id').value='';}}
 
-function toggleScan() {
-  if(!scanning) startScan(); else stopScan();
-}
+function toggleScan(){if(!scanning)startScan();else stopScan();}
 
-let _scanCooldown = false;
-let _scanCooldownTimer = null;
-const SCAN_COOLDOWN_MS = 2500; // หน่วงหลังสแกนสำเร็จ 2.5 วิ
+let _scanCooldown=false;
+let _scanCooldownTimer=null;
+const SCAN_COOLDOWN_MS=2500;
 
-function startScan() {
-  const ph = document.getElementById('scan-ph');
-  if(ph) ph.style.display = 'none';
-  _scanCooldown = false;
-  qr = new Html5Qrcode('reader');
+function startScan(){
+  const ph=document.getElementById('scan-ph');
+  if(ph)ph.style.display='none';
+  _scanCooldown=false;
+  qr=new Html5Qrcode('reader');
   qr.start(
-    {facingMode: 'environment'},
-    {fps: 5, qrbox: {width: 200, height: 200}},
-    t => {
-      if(_scanCooldown) return;          // ยังอยู่ใน cooldown → ข้าม
-      _scanCooldown = true;
+    {facingMode:'environment'},
+    {fps:5,qrbox:{width:200,height:200}},
+    t=>{
+      if(_scanCooldown)return;
+      _scanCooldown=true;
       recordScan(t);
-      // แสดง overlay บอกว่ากำลัง cooldown
       showScanCooldown();
       clearTimeout(_scanCooldownTimer);
-      _scanCooldownTimer = setTimeout(() => {
-        _scanCooldown = false;
-        hideScanCooldown();
-      }, SCAN_COOLDOWN_MS);
+      _scanCooldownTimer=setTimeout(()=>{_scanCooldown=false;hideScanCooldown();},SCAN_COOLDOWN_MS);
     },
-    () => {}
-  ).then(() => {
-    scanning = true;
-    const b = document.getElementById('scan-toggle');
-    b.textContent = '⏹ หยุดสแกน';
-    b.className = 'btn-lg btn-scan-stop';
-  }).catch(() => {
-    toast('ไม่สามารถเปิดกล้องได้', 'err');
-    if(ph) ph.style.display = '';
+    ()=>{}
+  ).then(()=>{
+    scanning=true;
+    const b=document.getElementById('scan-toggle');
+    b.textContent='⏹ หยุดสแกน';
+    b.className='btn-lg btn-scan-stop';
+  }).catch(()=>{
+    toast('ไม่สามารถเปิดกล้องได้','err');
+    if(ph)ph.style.display='';
   });
 }
 
-function showScanCooldown() {
-  let el = document.getElementById('scan-cooldown-overlay');
-  if(!el) {
-    el = document.createElement('div');
-    el.id = 'scan-cooldown-overlay';
-    el.style.cssText = 'position:absolute;inset:0;background:rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center;border-radius:12px;pointer-events:none;';
-    el.innerHTML = '<div style="background:#fff;border-radius:12px;padding:8px 18px;font-size:15px;font-weight:700;color:var(--green-dark);box-shadow:0 2px 8px rgba(0,0,0,0.15);">✅ บันทึกแล้ว — รอสแกนครั้งถัดไป</div>';
-    const wrap = document.getElementById('scanner-wrap');
-    if(wrap) { wrap.style.position='relative'; wrap.appendChild(el); }
+function showScanCooldown(){
+  let el=document.getElementById('scan-cooldown-overlay');
+  if(!el){
+    el=document.createElement('div');
+    el.id='scan-cooldown-overlay';
+    el.style.cssText='position:absolute;inset:0;background:rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center;border-radius:12px;pointer-events:none;';
+    el.innerHTML='<div style="background:#fff;border-radius:12px;padding:8px 18px;font-size:15px;font-weight:700;color:var(--green-dark);box-shadow:0 2px 8px rgba(0,0,0,0.15);">✅ บันทึกแล้ว — รอสแกนครั้งถัดไป</div>';
+    const wrap=document.getElementById('scanner-wrap');
+    if(wrap){wrap.style.position='relative';wrap.appendChild(el);}
   }
-  el.style.display = 'flex';
+  el.style.display='flex';
 }
+function hideScanCooldown(){const el=document.getElementById('scan-cooldown-overlay');if(el)el.style.display='none';}
 
-function hideScanCooldown() {
-  const el = document.getElementById('scan-cooldown-overlay');
-  if(el) el.style.display = 'none';
-}
-
-function playScanSuccess() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    // เสียง "ปี๊ป" สำเร็จ 2 โน้ต
-    const notes = [880, 1320];
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      const t = ctx.currentTime + i * 0.15;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-      osc.start(t);
-      osc.stop(t + 0.25);
+function playScanSuccess(){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    [880,1320].forEach((freq,i)=>{
+      const osc=ctx.createOscillator(),gain=ctx.createGain();
+      osc.connect(gain);gain.connect(ctx.destination);
+      osc.type='sine';osc.frequency.value=freq;
+      const t=ctx.currentTime+i*0.15;
+      gain.gain.setValueAtTime(0,t);gain.gain.linearRampToValueAtTime(0.4,t+0.02);gain.gain.exponentialRampToValueAtTime(0.001,t+0.25);
+      osc.start(t);osc.stop(t+0.25);
     });
-  } catch(e) {}
+  }catch(e){}
 }
-
-function showScanSuccessPopup(stuName, hwNum, hwTitle, score, maxScore) {
-  document.getElementById('popup-stu-name').textContent = stuName;
-  document.getElementById('popup-hw-detail').textContent = `งานครั้งที่ ${hwNum}: ${hwTitle}`;
-  const scoreEl = document.getElementById('popup-score');
-  if(score !== null && score !== undefined) {
-    scoreEl.textContent = `คะแนน: ${score} / ${maxScore}`;
-    scoreEl.style.display = '';
-  } else {
-    scoreEl.textContent = '';
-    scoreEl.style.display = 'none';
-  }
+function showScanSuccessPopup(stuName,hwNum,hwTitle,score,maxScore){
+  document.getElementById('popup-stu-name').textContent=stuName;
+  document.getElementById('popup-hw-detail').textContent=`งานครั้งที่ ${hwNum}: ${hwTitle}`;
+  const scoreEl=document.getElementById('popup-score');
+  if(score!==null&&score!==undefined){scoreEl.textContent=`คะแนน: ${score} / ${maxScore}`;scoreEl.style.display='';}
+  else{scoreEl.textContent='';scoreEl.style.display='none';}
   document.getElementById('scan-success-overlay').classList.add('on');
 }
+function closeScanSuccess(){document.getElementById('scan-success-overlay').classList.remove('on');}
 
-function closeScanSuccess() {
-  document.getElementById('scan-success-overlay').classList.remove('on');
-}
-
-function stopScan() {
-  if(qr) {
+function stopScan(){
+  if(qr){
     clearTimeout(_scanCooldownTimer);
-    _scanCooldown = false;
+    _scanCooldown=false;
     hideScanCooldown();
-    qr.stop().then(() => {
-      scanning = false;
-      const b = document.getElementById('scan-toggle');
-      b.textContent = '📷 เปิดกล้องสแกน';
-      b.className = 'btn-lg btn-scan-go';
-      const ph = document.getElementById('scan-ph');
-      if(ph) ph.style.display = '';
+    qr.stop().then(()=>{
+      scanning=false;
+      const b=document.getElementById('scan-toggle');
+      b.textContent='📷 เปิดกล้องสแกน';
+      b.className='btn-lg btn-scan-go';
+      const ph=document.getElementById('scan-ph');
+      if(ph)ph.style.display='';
     });
   }
 }
 
-function renderDashboard() {
-  const rooms = [...new Set(DB.students.map(s => s.room))].sort();
-  const totalSubs = Object.keys(DB.submissions).length;
-
-  document.getElementById('stats-grid').innerHTML = `
+function renderDashboard(){
+  const rooms=[...new Set(DB.students.map(s=>s.room))].sort();
+  const totalSubs=Object.keys(DB.submissions).length;
+  document.getElementById('stats-grid').innerHTML=`
     <div class="scard"><div class="snum">${DB.students.length}</div><div class="slbl">👨‍🎓 นักเรียนทั้งหมด</div></div>
     <div class="scard"><div class="snum" style="color:var(--green-dark);">${totalSubs}</div><div class="slbl">✅ ส่งงานแล้ว (ครั้ง)</div></div>
     <div class="scard"><div class="snum" style="color:var(--purple);">${DB.homeworks.length}</div><div class="slbl">📝 งานทั้งหมด</div></div>
     <div class="scard"><div class="snum" style="color:#B45309;">${rooms.length}</div><div class="slbl">🏫 ห้องเรียน</div></div>`;
-
-  document.getElementById('room-tabs').innerHTML =
-    `<button class="rtab ${curRoom==='all'?'on':''}" onclick="setRoom('all')">ทุกห้อง</button>` +
-    rooms.map(r => `<button class="rtab ${curRoom===r?'on':''}" onclick="setRoom('${r}')">${r}</button>`).join('');
-
+  document.getElementById('room-tabs').innerHTML=
+    `<button class="rtab ${curRoom==='all'?'on':''}" onclick="setRoom('all')">ทุกห้อง</button>`+
+    rooms.map(r=>`<button class="rtab ${curRoom===r?'on':''}" onclick="setRoom('${r}')">${r}</button>`).join('');
   renderTable();
 }
 
-function setRoom(r) { curRoom = r; renderDashboard(); }
+function setRoom(r){curRoom=r;renderDashboard();}
 
-function renderTable() {
-  const q = (document.getElementById('srch').value || '').toLowerCase();
-  let list = DB.students;
-  if(curRoom !== 'all') list = list.filter(s => s.room === curRoom);
-  if(q) list = list.filter(s => s.id.includes(q) || s.name.toLowerCase().includes(q));
-  const sl = document.getElementById('stu-list');
-
-  if(!list.length) { sl.innerHTML = '<div class="empty">ไม่พบนักเรียน</div>'; return; }
-
-  sl.innerHTML = list.map(s => {
-    const done = DB.homeworks.filter(h => DB.submissions[s.id + '_' + h.num]).length;
-    const pct = DB.homeworks.length ? Math.round(done / DB.homeworks.length * 100) : 0;
-    const dots = DB.homeworks.map(h => {
-      const sub = DB.submissions[s.id+'_'+h.num];
-      const scoreLabel = (sub && sub.score !== null && sub.score !== undefined) ? sub.score : '';
-      const tip = sub ? (scoreLabel !== '' ? `${scoreLabel}/${sub.maxScore||h.maxScore||100}` : 'ส่งแล้ว') : 'ยังไม่ส่ง';
-      return `<div class="hw-dot ${sub?'dot-ok':'dot-no'}" title="${tip}" style="cursor:${sub?'pointer':'default'};"
+function renderTable(){
+  const q=(document.getElementById('srch').value||'').toLowerCase();
+  let list=DB.students;
+  if(curRoom!=='all')list=list.filter(s=>s.room===curRoom);
+  if(q)list=list.filter(s=>s.id.includes(q)||s.name.toLowerCase().includes(q));
+  const sl=document.getElementById('stu-list');
+  if(!list.length){sl.innerHTML='<div class="empty">ไม่พบนักเรียน</div>';return;}
+  sl.innerHTML=list.map(s=>{
+    const done=DB.homeworks.filter(h=>DB.submissions[s.id+'_'+h.num]).length;
+    const pct=DB.homeworks.length?Math.round(done/DB.homeworks.length*100):0;
+    const dots=DB.homeworks.map(h=>{
+      const sub=DB.submissions[s.id+'_'+h.num];
+      const scoreLabel=(sub&&sub.score!==null&&sub.score!==undefined)?sub.score:'';
+      return `<div class="hw-dot ${sub?'dot-ok':'dot-no'}" style="cursor:${sub?'pointer':'default'};"
         onclick="${sub?`openEditScore('${s.id}',${h.num})`:''}">
-        ${scoreLabel !== '' ? `<span style="font-size:10px;">${scoreLabel}</span>` : h.num}
+        ${scoreLabel!==''?`<span style="font-size:10px;">${scoreLabel}</span>`:h.num}
       </div>`;
     }).join('');
     return `<div class="stu-row" onclick="showDetail('${s.id}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div>
-          <div class="stu-name">${s.name}</div>
-          <div class="stu-meta">${s.id} · <span class="room-pill">${s.room}</span></div>
-        </div>
+        <div><div class="stu-name">${s.name}</div><div class="stu-meta">${s.id} · <span class="room-pill">${s.room}</span></div></div>
         <div style="text-align:right;font-size:14px;margin-top:2px;">
           <span style="font-weight:700;color:var(--green-dark);font-size:16px;">${done}</span>
           <span style="color:var(--text3);">/${DB.homeworks.length}</span>
-          ${(() => {
-            let sc=0, mx=0;
-            DB.homeworks.forEach(h=>{const sub=DB.submissions[s.id+'_'+h.num];if(sub){const ms=sub.maxScore||h.maxScore||100;sc+=(sub.score!==null&&sub.score!==undefined?sub.score:ms);mx+=ms;}else{mx+=h.maxScore||100;}});
-            return mx>0?`<span style="font-size:12px;color:var(--purple);font-weight:700;margin-left:4px;">${sc}/${mx}</span>`:'';
-          })()}
+          ${(()=>{let sc=0,mx=0;DB.homeworks.forEach(h=>{const sub=DB.submissions[s.id+'_'+h.num];if(sub){const ms=sub.maxScore||h.maxScore||100;sc+=(sub.score!==null&&sub.score!==undefined?sub.score:ms);mx+=ms;}else{mx+=h.maxScore||100;}});return mx>0?`<span style="font-size:12px;color:var(--purple);font-weight:700;margin-left:4px;">${sc}/${mx}</span>`:'';})()}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin:8px 0 4px;">
@@ -1463,823 +1812,355 @@ function renderTable() {
   }).join('');
 }
 
-function showDetail(sid) {
-  const s = DB.students.find(x => x.id === sid);
-  if(!s) return;
-  const done = DB.homeworks.filter(h => DB.submissions[s.id + '_' + h.num]);
-  const miss = DB.homeworks.filter(h => !DB.submissions[s.id + '_' + h.num]);
-  const p = document.getElementById('detail-panel');
-  p.style.display = 'block';
-  p.innerHTML = `<div class="detail-sheet">
+function showDetail(sid){
+  const s=DB.students.find(x=>x.id===sid);
+  if(!s)return;
+  const done=DB.homeworks.filter(h=>DB.submissions[s.id+'_'+h.num]);
+  const miss=DB.homeworks.filter(h=>!DB.submissions[s.id+'_'+h.num]);
+  const p=document.getElementById('detail-panel');
+  p.style.display='block';
+  p.innerHTML=`<div class="detail-sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <div>
-        <div style="font-size:16px;font-weight:700;color:var(--text);">${s.name}</div>
-        <div style="font-size:13px;color:var(--text2);margin-top:2px;">${s.id} · <span class="room-pill">${s.room}</span></div>
-      </div>
-      <button onclick="document.getElementById('detail-panel').style.display='none'"
-        style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;color:var(--text2);display:flex;align-items:center;justify-content:center;">✕</button>
+      <div><div style="font-size:16px;font-weight:700;">${s.name}</div><div style="font-size:13px;color:var(--text2);margin-top:2px;">${s.id} · <span class="room-pill">${s.room}</span></div></div>
+      <button onclick="document.getElementById('detail-panel').style.display='none'" style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;color:var(--text2);display:flex;align-items:center;justify-content:center;">✕</button>
     </div>
     <div style="font-size:13px;font-weight:700;color:var(--green-dark);margin-bottom:6px;">✅ ส่งแล้ว (${done.length})</div>
-    ${done.map(h => {
-      const sub = DB.submissions[s.id+'_'+h.num];
-      const scoreStr = (sub.score !== null && sub.score !== undefined) ? `<span style="font-size:12px;font-weight:700;color:var(--purple);background:var(--purple-light);padding:2px 8px;border-radius:10px;">${sub.score}/${sub.maxScore||h.maxScore||100}</span>` : '';
-      return `<div class="ds-row"><span>${h.title} ${scoreStr}</span><span style="font-size:12px;color:var(--text3);">${sub.ts}</span></div>`;
-    }).join('') || '<div style="font-size:13px;color:var(--text3);padding:6px 0;">ยังไม่มี</div>'}
+    ${done.map(h=>{const sub=DB.submissions[s.id+'_'+h.num];const scoreStr=(sub.score!==null&&sub.score!==undefined)?`<span style="font-size:12px;font-weight:700;color:var(--purple);background:var(--purple-light);padding:2px 8px;border-radius:10px;">${sub.score}/${sub.maxScore||h.maxScore||100}</span>`:'';;return `<div class="ds-row"><span>${h.title} ${scoreStr}</span><span style="font-size:12px;color:var(--text3);">${sub.ts}</span></div>`;}).join('')||'<div style="font-size:13px;color:var(--text3);padding:6px 0;">ยังไม่มี</div>'}
     <div style="font-size:13px;font-weight:700;color:var(--red);margin:12px 0 6px;">❌ ยังไม่ส่ง (${miss.length})</div>
-    ${miss.map(h => `<div class="ds-row"><span>${h.title}</span><span style="font-size:12px;color:var(--text2);">${h.subject}</span></div>`).join('') || '<div style="font-size:13px;color:var(--green-dark);padding:6px 0;">🎉 ส่งครบทุกชิ้น!</div>'}
+    ${miss.map(h=>`<div class="ds-row"><span>${h.title}</span><span style="font-size:12px;color:var(--text2);">${h.subject}</span></div>`).join('')||'<div style="font-size:13px;color:var(--green-dark);padding:6px 0;">🎉 ส่งครบทุกชิ้น!</div>'}
   </div>`;
-  p.scrollIntoView({behavior:'smooth', block:'nearest'});
+  p.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-function renderManage() {
-  document.getElementById('ns-room').innerHTML = DB.rooms.map(r => `<option>${r}</option>`).join('');
-  document.getElementById('sl-manage').innerHTML = DB.students.map(s =>
-    `<tr>
-      <td style="font-size:12px;">${s.id}</td>
-      <td style="font-size:13px;">${s.name}</td>
-      <td style="font-size:12px;">${s.room}</td>
-      <td style="white-space:nowrap;">
-        <button class="del-btn" style="background:var(--blue-light);color:var(--blue-dark);border-color:var(--blue-light);margin-right:4px;" onclick="openEditStu('${s.id}')">แก้ไข</button>
-        <button class="del-btn" onclick="delStu('${s.id}')">ลบ</button>
-      </td>
-    </tr>`
+function renderManage(){
+  document.getElementById('ns-room').innerHTML=DB.rooms.map(r=>`<option>${r}</option>`).join('');
+  document.getElementById('sl-manage').innerHTML=DB.students.map(s=>
+    `<tr><td style="font-size:12px;">${s.id}</td><td style="font-size:13px;">${s.name}</td><td style="font-size:12px;">${s.room}</td>
+    <td style="white-space:nowrap;">
+      <button class="del-btn" style="background:var(--blue-light);color:var(--blue-dark);border-color:var(--blue-light);margin-right:4px;" onclick="openEditStu('${s.id}')">แก้ไข</button>
+      <button class="del-btn" onclick="delStu('${s.id}')">ลบ</button>
+    </td></tr>`
   ).join('');
-  document.getElementById('subj-list').innerHTML = DB.subjects.map(s =>
-    `<tr><td>${s}</td><td><button class="del-btn" onclick="delSubj('${s}')">ลบ</button></td></tr>`
-  ).join('');
-  // refresh scan subject dropdown if visible
-  const ss = document.getElementById('hw-subj-input');
-  if(ss) ss.innerHTML = DB.subjects.map(s => `<option>${s}</option>`).join('');
-  // refresh hw manage subject select
-  const hwSubjEl = document.getElementById('n-hwsubj');
-  if(hwSubjEl) hwSubjEl.innerHTML = DB.subjects.map(s => `<option>${s}</option>`).join('');
-  // render hw manage list
-  const hwList = document.getElementById('hw-manage-list');
-  if(hwList) hwList.innerHTML = DB.homeworks.map(h =>
-    `<tr>
-      <td style="text-align:center;font-weight:700;color:var(--purple);">${h.num}</td>
-      <td style="font-size:13px;">${h.title}</td>
-      <td style="text-align:center;font-size:12px;font-weight:700;color:var(--blue);">${h.maxScore||100}</td>
-      <td style="font-size:11px;color:var(--text2);">${h.subject||''}</td>
-      <td><button class="del-btn" onclick="delHW(${h.num})">ลบ</button></td>
-    </tr>`
-  ).join('');
+  document.getElementById('subj-list').innerHTML=DB.subjects.map(s=>`<tr><td>${s}</td><td><button class="del-btn" onclick="delSubj('${s}')">ลบ</button></td></tr>`).join('');
+  const ss=document.getElementById('hw-subj-input');
+  if(ss)ss.innerHTML=DB.subjects.map(s=>`<option>${s}</option>`).join('');
+  const hwSubjEl=document.getElementById('n-hwsubj');
+  if(hwSubjEl)hwSubjEl.innerHTML=DB.subjects.map(s=>`<option>${s}</option>`).join('');
+  const hwList=document.getElementById('hw-manage-list');
+  if(hwList)hwList.innerHTML=DB.homeworks.map(h=>`<tr>
+    <td style="text-align:center;font-weight:700;color:var(--purple);">${h.num}</td>
+    <td style="font-size:13px;">${h.title}</td>
+    <td style="text-align:center;font-size:12px;font-weight:700;color:var(--blue);">${h.maxScore||100}</td>
+    <td style="font-size:11px;color:var(--text2);">${h.subject||''}</td>
+    <td><button class="del-btn" onclick="delHW(${h.num})">ลบ</button></td>
+  </tr>`).join('');
 }
 
-
-// ===== EDIT STUDENT =====
-function openEditStu(id) {
-  const s = DB.students.find(x => x.id === id);
-  if(!s) return;
-  document.getElementById('edit-stu-old-id').value = s.id;
-  document.getElementById('edit-stu-id').value = s.id;
-  document.getElementById('edit-stu-name').value = s.name;
-  document.getElementById('edit-stu-room').innerHTML = DB.rooms.map(r => `<option ${r===s.room?'selected':''}>${r}</option>`).join('');
-  document.getElementById('edit-stu-modal').style.display = 'flex';
+function openEditStu(id){
+  const s=DB.students.find(x=>x.id===id);if(!s)return;
+  document.getElementById('edit-stu-old-id').value=s.id;
+  document.getElementById('edit-stu-id').value=s.id;
+  document.getElementById('edit-stu-name').value=s.name;
+  document.getElementById('edit-stu-room').innerHTML=DB.rooms.map(r=>`<option ${r===s.room?'selected':''}>${r}</option>`).join('');
+  document.getElementById('edit-stu-modal').style.display='flex';
+}
+function closeEditStu(){document.getElementById('edit-stu-modal').style.display='none';}
+async function saveEditStu(){
+  const oldId=document.getElementById('edit-stu-old-id').value;
+  const newId=document.getElementById('edit-stu-id').value.trim();
+  const newName=document.getElementById('edit-stu-name').value.trim();
+  const newRoom=document.getElementById('edit-stu-room').value;
+  if(!newId||!newName){toast('กรอกให้ครบ','warn');return;}
+  if(newId!==oldId&&DB.students.find(x=>x.id===newId)){toast('รหัสนี้มีอยู่แล้ว','warn');return;}
+  try {
+    await sbUpdateStudent(oldId,{id:newId,name:newName,room:newRoom});
+    renderManage();closeEditStu();toast('แก้ไข '+newName+' เรียบร้อย ✅');
+  } catch(e){toast('แก้ไขไม่สำเร็จ: '+e.message,'err');}
 }
 
-function closeEditStu() {
-  document.getElementById('edit-stu-modal').style.display = 'none';
+async function openEditScore(sid,hwNum){
+  const key=sid+'_'+hwNum;
+  const sub=DB.submissions[key];
+  const hw=DB.homeworks.find(h=>h.num===parseInt(hwNum));
+  if(!sub)return;
+  const cur=(sub.score!==null&&sub.score!==undefined)?sub.score:'';
+  const max=sub.maxScore||hw?.maxScore||100;
+  const newScore=prompt(`แก้ไขคะแนน ${DB.students.find(s=>s.id===sid)?.name||sid}\nงานครั้งที่ ${hwNum} (เต็ม ${max})\nคะแนนปัจจุบัน: ${cur!==''?cur:'ยังไม่ได้กรอก'}`,cur);
+  if(newScore===null)return;
+  const parsed=newScore.trim()===''?null:parseFloat(newScore);
+  if(newScore.trim()!==''&&isNaN(parsed)){toast('กรุณากรอกตัวเลข','warn');return;}
+  try {
+    await sbUpdateScore(sid,parseInt(hwNum),parsed);
+    renderDashboard();toast('บันทึกคะแนนแล้ว ✅');
+  } catch(e){toast('บันทึกคะแนนไม่สำเร็จ: '+e.message,'err');}
 }
 
-function saveEditStu() {
-  const oldId = document.getElementById('edit-stu-old-id').value;
-  const newId = document.getElementById('edit-stu-id').value.trim();
-  const newName = document.getElementById('edit-stu-name').value.trim();
-  const newRoom = document.getElementById('edit-stu-room').value;
-
-  if(!newId || !newName) { toast('กรอกให้ครบ', 'warn'); return; }
-  if(newId !== oldId && DB.students.find(x => x.id === newId)) {
-    toast('รหัสนี้มีอยู่แล้ว', 'warn'); return;
-  }
-
-  const s = DB.students.find(x => x.id === oldId);
-  if(!s) return;
-  s.id = newId;
-  s.name = newName;
-  s.room = newRoom;
-
-  // ถ้ารหัสเปลี่ยน ให้ย้าย submission keys ด้วย
-  if(newId !== oldId) {
-    const newSubs = {};
-    Object.entries(DB.submissions).forEach(([k, v]) => {
-      if(k.startsWith(oldId + '_')) {
-        const hwNum = k.split('_')[1];
-        newSubs[newId + '_' + hwNum] = {...v, sid: newId};
-      } else {
-        newSubs[k] = v;
-      }
-    });
-    DB.submissions = newSubs;
-  }
-
-  saveDB();
-  renderManage();
-  closeEditStu();
-  toast('แก้ไข ' + newName + ' เรียบร้อย ✅');
-}
-
-// ===== EDIT SCORE ในตาราง dash =====
-function openEditScore(sid, hwNum) {
-  const key = sid + '_' + hwNum;
-  const sub = DB.submissions[key];
-  const hw = DB.homeworks.find(h => h.num === parseInt(hwNum));
-  if(!sub) return;
-  const cur = (sub.score !== null && sub.score !== undefined) ? sub.score : '';
-  const max = sub.maxScore || hw?.maxScore || 100;
-  const newScore = prompt(`แก้ไขคะแนน ${DB.students.find(s=>s.id===sid)?.name||sid}\nงานครั้งที่ ${hwNum} (เต็ม ${max})\nคะแนนปัจจุบัน: ${cur !== '' ? cur : 'ยังไม่ได้กรอก'}`, cur);
-  if(newScore === null) return;
-  const parsed = newScore.trim() === '' ? null : parseFloat(newScore);
-  if(newScore.trim() !== '' && isNaN(parsed)) { toast('กรุณากรอกตัวเลข', 'warn'); return; }
-  DB.submissions[key].score = parsed;
-  saveDB();
-  renderDashboard();
-  toast('บันทึกคะแนนแล้ว ✅');
-}
-
-// ===== EXCEL IMPORT =====
-let xlImportData = []; // pending rows
-
-function downloadTemplate() {
-  const wb = XLSX.utils.book_new();
-  const wsData = [
-    ['เลขประจำตัว', 'ชื่อ-สกุล', 'ห้อง'],
-    ['67001', 'สมชาย ใจดี', 'ม.1/1'],
-    ['67002', 'สมหญิง แสนสวย', 'ม.1/1'],
-    ['67003', 'วิทย์ รู้มาก', 'ม.1/2'],
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:16},{wch:28},{wch:12}];
-  XLSX.utils.book_append_sheet(wb, ws, 'รายชื่อนักเรียน');
-  XLSX.writeFile(wb, 'template_รายชื่อนักเรียน.xlsx');
+let xlImportData=[];
+function downloadTemplate(){
+  const wb=XLSX.utils.book_new();
+  const wsData=[['เลขประจำตัว','ชื่อ-สกุล','ห้อง'],['67001','สมชาย ใจดี','ม.1/1'],['67002','สมหญิง แสนสวย','ม.1/1'],['67003','วิทย์ รู้มาก','ม.1/2']];
+  const ws=XLSX.utils.aoa_to_sheet(wsData);ws['!cols']=[{wch:16},{wch:28},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws,'รายชื่อนักเรียน');XLSX.writeFile(wb,'template_รายชื่อนักเรียน.xlsx');
   toast('ดาวน์โหลด Template แล้ว ✅');
 }
 
-function handleXLUpload(e) {
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      const data = new Uint8Array(ev.target.result);
-      const wb = XLSX.read(data, {type:'array'});
-
-      // ตรวจว่ามีหลาย Sheet → ถามรวม หรือ เลือก sheet แรก
-      const validSheets = wb.SheetNames.filter(n => {
-        const ws = wb.Sheets[n];
-        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-        return rows.length > 3;
-      });
-
-      if(validSheets.length > 1) {
-        // หลาย Sheet → นำเข้าทุก Sheet พร้อมกัน
-        parseMultiSheet(wb, validSheets, file.name);
-      } else {
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-        parseXLRows(rows, file.name);
-      }
-    } catch(err) {
-      toast('อ่านไฟล์ไม่ได้: ' + err.message, 'err');
-    }
+function handleXLUpload(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const data=new Uint8Array(ev.target.result);
+      const wb=XLSX.read(data,{type:'array'});
+      const validSheets=wb.SheetNames.filter(n=>{const ws=wb.Sheets[n];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});return rows.length>3;});
+      if(validSheets.length>1){parseMultiSheet(wb,validSheets,file.name);}
+      else{const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});parseXLRows(rows,file.name);}
+    }catch(err){toast('อ่านไฟล์ไม่ได้: '+err.message,'err');}
   };
-  reader.readAsArrayBuffer(file);
-  e.target.value = '';
+  reader.readAsArrayBuffer(file);e.target.value='';
 }
 
-function parseMultiSheet(wb, sheetNames, filename) {
-  xlImportData = [];
-
-  sheetNames.forEach(sheetName => {
-    const ws = wb.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-    if(!rows.length) return;
-
-    // ตรวจรูปแบบ รร.
-    const r0 = String(rows[0]?.[0] || '');
-    const isBanchang = r0.includes('รายชื่อนักเรียน') || r0.includes('มัธยม') || r0.includes('ประถม');
-
-    // ดึงชื่อห้องจาก title หรือ sheet name
-    let roomFromTitle = '';
-    if(isBanchang) {
-      const m = r0.match(/ที่\s*(\d+\/\d+)/);
-      if(m) roomFromTitle = 'ม.' + m[1];
-      else {
-        const m2 = r0.match(/(\d+\/\d+)/);
-        if(m2) roomFromTitle = 'ม.' + m2[1];
-      }
-    }
-    // fallback: ใช้ชื่อ sheet
-    if(!roomFromTitle) roomFromTitle = sheetName;
-
-    // หา header row
-    let headerIdx = 2;
-    for(let i = 0; i < Math.min(6, rows.length); i++) {
-      const cells = (rows[i]||[]).map(c => String(c));
-      if(cells.some(c => c.includes('เลขที่')) && cells.some(c => c.includes('เลขประจำตัว'))) {
-        headerIdx = i; break;
-      }
-    }
-
-    // ตรวจ columns จาก header
-    const hdr = (rows[headerIdx]||[]).map(c => String(c).trim());
-    let colId=1, colTitle=3, colFirst=4, colLast=5;
-    hdr.forEach((h,i) => {
-      if((h.includes('เลขประจำตัวนร') || (h.includes('เลขประจำตัว') && !h.includes('ประชาชน'))) && i>0) colId = i;
-      // ตรวจเฉพาะ "ชื่อ" ที่ไม่มีคำว่า "สกุล" ด้วย (กรณี "ชื่อ - สกุล" merged → ไม่นับ)
-      if(h.includes('ชื่อ') && !h.includes('สกุล') && !h.includes('โรงเรียน') && i>colId) colFirst = i;
-      // ตรวจ "สกุล" ที่ไม่มีคำว่า "ชื่อ" (หลีกเลี่ยง "ชื่อ - สกุล")
-      if(h.includes('สกุล') && !h.includes('ชื่อ')) colLast = i;
-    });
-    // ป้องกัน colFirst/colLast ชี้ที่เดียวกัน (merged header "ชื่อ - สกุล")
-    if(colFirst === colLast || colFirst === colTitle) { colFirst = colTitle + 1; colLast = colTitle + 2; }
-
-    rows.slice(headerIdx + 1).forEach(r => {
-      if(!r || r.every(c => c===null||c===undefined||String(c).trim()==='')) return;
-      // strip trailing ".0" ที่ Excel ใส่ให้เลขประจำตัว (เช่น 66001 → "66001.0")
-      const rawId = String(r[colId]||'').trim().replace(/\.0+$/, '');
-      if(!rawId || !/^\d+$/.test(rawId)) return;
-
-      const prefix = String(r[colTitle]||'').trim();
-      const firstName = String(r[colFirst]||'').trim();
-      const lastName = String(r[colLast]||'').trim();
-      const fullName = [prefix, firstName, lastName].filter(Boolean).join(' ');
-      if(!fullName) return;
-
-      xlImportData.push({ id: rawId, name: fullName, room: roomFromTitle });
+function parseMultiSheet(wb,sheetNames,filename){
+  xlImportData=[];
+  sheetNames.forEach(sheetName=>{
+    const ws=wb.Sheets[sheetName];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    if(!rows.length)return;
+    const r0=String(rows[0]?.[0]||'');
+    const isBanchang=r0.includes('รายชื่อนักเรียน')||r0.includes('มัธยม')||r0.includes('ประถม');
+    let roomFromTitle='';
+    if(isBanchang){const m=r0.match(/ที่\s*(\d+\/\d+)/);if(m)roomFromTitle='ม.'+m[1];else{const m2=r0.match(/(\d+\/\d+)/);if(m2)roomFromTitle='ม.'+m2[1];}}
+    if(!roomFromTitle)roomFromTitle=sheetName;
+    let headerIdx=2;
+    for(let i=0;i<Math.min(6,rows.length);i++){const cells=(rows[i]||[]).map(c=>String(c));if(cells.some(c=>c.includes('เลขที่'))&&cells.some(c=>c.includes('เลขประจำตัว'))){headerIdx=i;break;}}
+    const hdr=(rows[headerIdx]||[]).map(c=>String(c).trim());
+    let colId=1,colTitle=3,colFirst=4,colLast=5;
+    hdr.forEach((h,i)=>{if((h.includes('เลขประจำตัวนร')||(h.includes('เลขประจำตัว')&&!h.includes('ประชาชน')))&&i>0)colId=i;if(h.includes('ชื่อ')&&!h.includes('สกุล')&&!h.includes('โรงเรียน')&&i>colId)colFirst=i;if(h.includes('สกุล')&&!h.includes('ชื่อ'))colLast=i;});
+    if(colFirst===colLast||colFirst===colTitle){colFirst=colTitle+1;colLast=colTitle+2;}
+    rows.slice(headerIdx+1).forEach(r=>{
+      if(!r||r.every(c=>c===null||c===undefined||String(c).trim()===''))return;
+      const rawId=String(r[colId]||'').trim().replace(/\.0+$/,'');
+      if(!rawId||!/^\d+$/.test(rawId))return;
+      const prefix=String(r[colTitle]||'').trim();
+      const firstName=String(r[colFirst]||'').trim();
+      const lastName=String(r[colLast]||'').trim();
+      const fullName=[prefix,firstName,lastName].filter(Boolean).join(' ');
+      if(!fullName)return;
+      xlImportData.push({id:rawId,name:fullName,room:roomFromTitle});
     });
   });
-
-  if(!xlImportData.length) { toast('ไม่พบข้อมูลในไฟล์', 'warn'); return; }
+  if(!xlImportData.length){toast('ไม่พบข้อมูลในไฟล์','warn');return;}
   renderXLPreview(`${filename} (${sheetNames.length} ห้อง)`);
 }
 
-function parseXLRows(rows, filename) {
-  if(!rows.length) { toast('ไฟล์ว่างเปล่า', 'warn'); return; }
-
-  // ===== ตรวจจับรูปแบบ รร.บ้านฉาง =====
-  // รูปแบบ: แถว0=ชื่อห้อง, แถว1=แผนการเรียน+ครู, แถว2=header, แถว3+=ข้อมูล
-  // คอลัมน์: 0=เลขที่, 1=เลขประจำตัว, 2=เลขบัตรปชช., 3=คำนำหน้า, 4=ชื่อ, 5=นามสกุล
-  function detectBanchang(rows) {
-    const r0 = String(rows[0]?.[0] || '');
-    const r1 = String(rows[1]?.[0] || '');
-    const r2 = rows[2] || [];
-    const isTitleRow = r0.includes('รายชื่อนักเรียน') || r0.includes('มัธยม') || r0.includes('ประถม');
-    const hasHeader = r2.some(c => String(c).includes('เลขที่') || String(c).includes('เลขประจำตัว'));
-    return isTitleRow || hasHeader;
-  }
-
-  // ===== ดึงชื่อห้องจากหัวข้อ =====
-  function extractRoomFromTitle(titleStr) {
-    // "รายชื่อนักเรียนชั้นมัธยมศึกษาปีที่ 4/1 ปีการศึกษา..."
-    const m = titleStr.match(/ชั้น([^\s]+(?:\s*\d+\/\d+)?)|ที่\s*(\d+\/\d+)|(\d+\/\d+)/);
-    if(m) {
-      const raw = (m[1]||m[2]||m[3]||'').trim();
-      // แปลง "มัธยมศึกษาปีที่4/1" → "ม.4/1"
-      const m2 = raw.match(/มัธยมศึกษาปีที่\s*(\d+\/\d+)/i);
-      if(m2) return 'ม.' + m2[1];
-      const m3 = raw.match(/ประถมศึกษาปีที่\s*(\d+\/\d+)/i);
-      if(m3) return 'ป.' + m3[1];
-      if(/^\d+\/\d+$/.test(raw)) return 'ม.' + raw;
-      return raw;
-    }
-    return '';
-  }
-
-  const isBanchang = detectBanchang(rows);
-
-  if(isBanchang) {
-    // ---- รูปแบบ รร. (multi-sheet aware: เรียกจาก sheet เดียว) ----
-    const title0 = String(rows[0]?.[0] || '');
-    const roomFromTitle = extractRoomFromTitle(title0);
-
-    // หา header row: แถวที่มี "เลขที่" หรือ "เลขประจำตัว"
-    let headerIdx = 2;
-    for(let i = 0; i < Math.min(6, rows.length); i++) {
-      const cells = (rows[i] || []).map(c => String(c));
-      if(cells.some(c => c.includes('เลขที่')) && cells.some(c => c.includes('เลขประจำตัว'))) {
-        headerIdx = i; break;
-      }
-    }
-
-    // ตรวจตำแหน่งคอลัมน์จาก header row
-    const hdr = (rows[headerIdx] || []).map(c => String(c).trim());
-    let colNum=-1, colId=-1, colTitle=-1, colFirst=-1, colLast=-1;
-    hdr.forEach((h,i) => {
-      if(h.includes('เลขที่') && colNum<0) colNum = i;
-      if((h.includes('เลขประจำตัวนร') || h.includes('รหัส')) && colId<0) colId = i;
-      // "ชื่อ - สกุล" = merged header → ไม่ใช้ตรวจ colFirst/colLast จาก cell นี้
-      // ตรวจเฉพาะเมื่อ header บอก "ชื่อ" เพียงคำเดียว หรือ "ชื่อตัว/ชื่อแรก"
-      if(h.includes('ชื่อ') && !h.includes('สกุล') && !h.includes('โรงเรียน') && colFirst<0) colFirst = i;
-      if(h.includes('สกุล') && !h.includes('ชื่อ') && colLast<0) colLast = i;
-      if(h.includes('คำนำหน้า') || h === 'นาย' || h === 'น.ส.' || h === 'นาง') colTitle = i;
+function parseXLRows(rows,filename){
+  if(!rows.length){toast('ไฟล์ว่างเปล่า','warn');return;}
+  function detectBanchang(rows){const r0=String(rows[0]?.[0]||'');const r2=rows[2]||[];const isTitleRow=r0.includes('รายชื่อนักเรียน')||r0.includes('มัธยม')||r0.includes('ประถม');const hasHeader=r2.some(c=>String(c).includes('เลขที่')||String(c).includes('เลขประจำตัว'));return isTitleRow||hasHeader;}
+  function extractRoomFromTitle(titleStr){const m=titleStr.match(/ชั้น([^\s]+(?:\s*\d+\/\d+)?)|ที่\s*(\d+\/\d+)|(\d+\/\d+)/);if(m){const raw=(m[1]||m[2]||m[3]||'').trim();const m2=raw.match(/มัธยมศึกษาปีที่\s*(\d+\/\d+)/i);if(m2)return 'ม.'+m2[1];const m3=raw.match(/ประถมศึกษาปีที่\s*(\d+\/\d+)/i);if(m3)return 'ป.'+m3[1];if(/^\d+\/\d+$/.test(raw))return 'ม.'+raw;return raw;}return '';}
+  const isBanchang=detectBanchang(rows);
+  if(isBanchang){
+    const title0=String(rows[0]?.[0]||'');const roomFromTitle=extractRoomFromTitle(title0);
+    let headerIdx=2;
+    for(let i=0;i<Math.min(6,rows.length);i++){const cells=(rows[i]||[]).map(c=>String(c));if(cells.some(c=>c.includes('เลขที่'))&&cells.some(c=>c.includes('เลขประจำตัว'))){headerIdx=i;break;}}
+    const hdr=(rows[headerIdx]||[]).map(c=>String(c).trim());
+    let colNum=-1,colId=-1,colTitle=-1,colFirst=-1,colLast=-1;
+    hdr.forEach((h,i)=>{if(h.includes('เลขที่')&&colNum<0)colNum=i;if((h.includes('เลขประจำตัวนร')||h.includes('รหัส'))&&colId<0)colId=i;if(h.includes('ชื่อ')&&!h.includes('สกุล')&&!h.includes('โรงเรียน')&&colFirst<0)colFirst=i;if(h.includes('สกุล')&&!h.includes('ชื่อ')&&colLast<0)colLast=i;if(h.includes('คำนำหน้า')||h==='นาย'||h==='น.ส.'||h==='นาง')colTitle=i;});
+    if(colNum<0)colNum=0;if(colId<0)colId=1;if(colTitle<0)colTitle=3;if(colFirst<0)colFirst=4;if(colLast<0)colLast=5;if(colFirst===colLast){colFirst=colTitle+1;colLast=colTitle+2;}
+    xlImportData=[];
+    rows.slice(headerIdx+1).forEach(r=>{
+      if(!r||r.every(c=>c===null||c===undefined||String(c).trim()===''))return;
+      const rawId=String(r[colId]||'').trim().replace(/\.0+$/,'');
+      if(!rawId||!/^\d+$/.test(rawId))return;
+      const prefix=String(r[colTitle]||'').trim();const firstName=String(r[colFirst]||'').trim();const lastName=String(r[colLast]||'').trim();
+      const fullName=[prefix,firstName,lastName].filter(Boolean).join(' ');
+      const room=roomFromTitle||DB.rooms[0]||'';if(!fullName)return;
+      xlImportData.push({id:rawId,name:fullName,room});
     });
-    // fallback: รูปแบบ บ้านฉาง col 0=เลขที่,1=รหัส,3=คำนำหน้า,4=ชื่อ,5=สกุล
-    if(colNum<0) colNum=0;
-    if(colId<0) colId=1;
-    if(colTitle<0) colTitle=3;
-    if(colFirst<0) colFirst=4;
-    if(colLast<0) colLast=5;
-    // ป้องกัน colFirst/colLast ชี้ไปที่ cell เดียวกัน (กรณี "ชื่อ - สกุล" merged)
-    if(colFirst === colLast) { colFirst = colTitle + 1; colLast = colTitle + 2; }
-
-    const dataRows = rows.slice(headerIdx + 1);
-    xlImportData = [];
-    dataRows.forEach(r => {
-      if(!r || r.every(c => c===null||c===undefined||String(c).trim()==='')) return;
-      // strip trailing ".0" that Excel adds when reading numeric cells (e.g. 66001 → "66001.0")
-      const rawIdRaw = String(r[colId]||'').trim().replace(/\.0+$/, '');
-      const rawId = rawIdRaw;
-      // กรอง: รหัสต้องเป็นตัวเลขล้วน (ยอมรับทุกความยาว ≥ 1 หลัก)
-      if(!rawId || !/^\d+$/.test(rawId)) return;
-
-      const prefix = String(r[colTitle]||'').trim();
-      const firstName = String(r[colFirst]||'').trim();
-      const lastName = String(r[colLast]||'').trim();
-      const fullName = [prefix, firstName, lastName].filter(Boolean).join(' ');
-
-      // ห้อง: ใช้จากหัวเรื่อง หรือ fallback
-      const room = roomFromTitle || DB.rooms[0] || '';
-      if(!fullName) return;
-      xlImportData.push({ id: rawId, name: fullName, room });
-    });
-    renderXLPreview(filename + ' (รูปแบบรายชื่อ รร.)');
-    return;
+    renderXLPreview(filename+' (รูปแบบรายชื่อ รร.)');return;
   }
-
-  // ===== รูปแบบมาตรฐาน (auto-detect columns) =====
-  let headerIdx = 0;
-  let colMap = {id:-1, name:-1, room:-1};
-  for(let r = 0; r < Math.min(5, rows.length); r++) {
-    const row = rows[r].map(c => String(c).trim().toLowerCase());
-    row.forEach((cell, ci) => {
-      if(cell.includes('เลข') && (cell.includes('ประจำ') || cell.includes('id'))) colMap.id = ci;
-      else if(cell === 'id' || cell === 'student_id' || cell === 'รหัส') colMap.id = ci;
-      if(cell.includes('ชื่อ') || cell.includes('name')) colMap.name = ci;
-      if(cell.includes('ห้อง') || cell.includes('room') || cell.includes('class')) colMap.room = ci;
-    });
-    if(colMap.id >= 0 && colMap.name >= 0) { headerIdx = r; break; }
-  }
-  if(colMap.id < 0) colMap.id = 0;
-  if(colMap.name < 0) colMap.name = 1;
-  if(colMap.room < 0) colMap.room = 2;
-
-  const dataRows = rows.slice(headerIdx + 1).filter(r => String(r[colMap.id]).trim());
-  if(!dataRows.length) { toast('ไม่พบข้อมูลในไฟล์', 'warn'); return; }
-
-  xlImportData = dataRows.map(r => ({
-    id: String(r[colMap.id]).trim(),
-    name: String(r[colMap.name]).trim(),
-    room: String(r[colMap.room] || '').trim(),
-  })).filter(r => r.id && r.name);
-
+  let headerIdx=0,colMap={id:-1,name:-1,room:-1};
+  for(let r=0;r<Math.min(5,rows.length);r++){const row=rows[r].map(c=>String(c).trim().toLowerCase());row.forEach((cell,ci)=>{if(cell.includes('เลข')&&(cell.includes('ประจำ')||cell.includes('id')))colMap.id=ci;else if(cell==='id'||cell==='student_id'||cell==='รหัส')colMap.id=ci;if(cell.includes('ชื่อ')||cell.includes('name'))colMap.name=ci;if(cell.includes('ห้อง')||cell.includes('room')||cell.includes('class'))colMap.room=ci;});if(colMap.id>=0&&colMap.name>=0){headerIdx=r;break;}}
+  if(colMap.id<0)colMap.id=0;if(colMap.name<0)colMap.name=1;if(colMap.room<0)colMap.room=2;
+  const dataRows=rows.slice(headerIdx+1).filter(r=>String(r[colMap.id]).trim());
+  if(!dataRows.length){toast('ไม่พบข้อมูลในไฟล์','warn');return;}
+  xlImportData=dataRows.map(r=>({id:String(r[colMap.id]).trim(),name:String(r[colMap.name]).trim(),room:String(r[colMap.room]||'').trim()})).filter(r=>r.id&&r.name);
   renderXLPreview(filename);
 }
 
-function renderXLPreview(filename) {
-  const preview = document.getElementById('xl-preview');
-  const infoEl = document.getElementById('xl-preview-info');
-  const warnEl = document.getElementById('xl-preview-warn');
-  const tbody = document.getElementById('xl-preview-body');
-
-  let dupCount = 0, noRoomCount = 0, warnings = [];
-
-  const rows = xlImportData.map(s => {
-    const isDup = !!DB.students.find(x => x.id === s.id);
-    const noRoom = !s.room;
-    if(isDup) dupCount++;
-    if(noRoom) noRoomCount++;
-
-    let badge = '';
-    if(isDup) badge = '<span style="font-size:11px;background:#FEF3C7;color:#B45309;padding:2px 6px;border-radius:6px;font-weight:700;">ซ้ำ</span>';
-    else if(noRoom) badge = '<span style="font-size:11px;background:#FEE2E2;color:#B91C1C;padding:2px 6px;border-radius:6px;font-weight:700;">ไม่มีห้อง</span>';
-    else badge = '<span style="font-size:11px;background:#DCFCE7;color:#16A34A;padding:2px 6px;border-radius:6px;font-weight:700;">✓</span>';
-
-    return `<tr>
-      <td style="font-size:12px;">${s.id}</td>
-      <td>${s.name}</td>
-      <td style="font-size:12px;">${s.room || '—'}</td>
-      <td>${badge}</td>
-    </tr>`;
+function renderXLPreview(filename){
+  const preview=document.getElementById('xl-preview');
+  const infoEl=document.getElementById('xl-preview-info');
+  const warnEl=document.getElementById('xl-preview-warn');
+  const tbody=document.getElementById('xl-preview-body');
+  let dupCount=0,noRoomCount=0,warnings=[];
+  const rows=xlImportData.map(s=>{
+    const isDup=!!DB.students.find(x=>x.id===s.id);const noRoom=!s.room;
+    if(isDup)dupCount++;if(noRoom)noRoomCount++;
+    let badge='';
+    if(isDup)badge='<span style="font-size:11px;background:#FEF3C7;color:#B45309;padding:2px 6px;border-radius:6px;font-weight:700;">ซ้ำ</span>';
+    else if(noRoom)badge='<span style="font-size:11px;background:#FEE2E2;color:#B91C1C;padding:2px 6px;border-radius:6px;font-weight:700;">ไม่มีห้อง</span>';
+    else badge='<span style="font-size:11px;background:#DCFCE7;color:#16A34A;padding:2px 6px;border-radius:6px;font-weight:700;">✓</span>';
+    return `<tr><td style="font-size:12px;">${s.id}</td><td>${s.name}</td><td style="font-size:12px;">${s.room||'—'}</td><td>${badge}</td></tr>`;
   }).join('');
-
-  tbody.innerHTML = rows;
-
-  const newCount = xlImportData.length - dupCount;
-  infoEl.textContent = `📂 ${filename} · พบ ${xlImportData.length} รายการ · ใหม่ ${newCount} · ซ้ำ ${dupCount}`;
-
-  if(dupCount > 0 || noRoomCount > 0) {
-    warnings = [];
-    if(dupCount > 0) warnings.push(`⚠️ พบรหัสซ้ำ ${dupCount} คน (จะข้ามรายการที่ซ้ำ)`);
-    if(noRoomCount > 0) warnings.push(`⚠️ ไม่มีห้อง ${noRoomCount} คน (จะใช้ห้อง "${DB.rooms[0]}")`);
-    warnEl.innerHTML = warnings.join('<br>');
-    warnEl.style.display = 'block';
-  } else {
-    warnEl.style.display = 'none';
-  }
-
-  const confirmBtn = document.getElementById('xl-confirm-btn');
-  confirmBtn.textContent = `✅ นำเข้า ${newCount} รายการ`;
-  confirmBtn.disabled = newCount === 0;
-  if(newCount === 0) confirmBtn.style.opacity = '0.5';
-  else confirmBtn.style.opacity = '1';
-
-  preview.style.display = 'block';
+  tbody.innerHTML=rows;
+  const newCount=xlImportData.length-dupCount;
+  infoEl.textContent=`📂 ${filename} · พบ ${xlImportData.length} รายการ · ใหม่ ${newCount} · ซ้ำ ${dupCount}`;
+  if(dupCount>0||noRoomCount>0){warnings=[];if(dupCount>0)warnings.push(`⚠️ พบรหัสซ้ำ ${dupCount} คน`);if(noRoomCount>0)warnings.push(`⚠️ ไม่มีห้อง ${noRoomCount} คน`);warnEl.innerHTML=warnings.join('<br>');warnEl.style.display='block';}
+  else warnEl.style.display='none';
+  const confirmBtn=document.getElementById('xl-confirm-btn');
+  confirmBtn.textContent=`✅ นำเข้า ${newCount} รายการ`;confirmBtn.disabled=newCount===0;
+  confirmBtn.style.opacity=newCount===0?'0.5':'1';
+  preview.style.display='block';
 }
 
-function confirmXLImport() {
-  let added = 0, skipped = 0;
-  const newRooms = new Set();
-
-  xlImportData.forEach(s => {
-    if(DB.students.find(x => x.id === s.id)) { skipped++; return; }
-    const room = s.room || DB.rooms[0];
-    DB.students.push({ id: s.id, name: s.name, room });
-    // auto-add new room if not exists
-    if(!DB.rooms.includes(room)) { DB.rooms.push(room); newRooms.add(room); }
-    added++;
-  });
-
-  saveDB();
-  cancelXLImport();
-  renderManage();
-  toast(`✅ นำเข้าแล้ว ${added} คน${skipped ? ' (ข้าม '+skipped+' ซ้ำ)' : ''}`);
-  if(newRooms.size) toast(`เพิ่มห้องใหม่: ${[...newRooms].join(', ')}`, 'warn');
+async function confirmXLImport(){
+  const newStudents=xlImportData.filter(s=>!DB.students.find(x=>x.id===s.id)).map(s=>({...s,room:s.room||DB.rooms[0]||''}));
+  const skipped=xlImportData.length-newStudents.length;
+  try {
+    await sbImportStudents(newStudents);
+    // sync rooms
+    const newRooms=[...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
+    if(newRooms.length){
+      DB.rooms=[...new Set([...DB.rooms,...newRooms])].sort();
+      await sbSaveSettings('rooms', DB.rooms);
+    }
+    cancelXLImport();renderManage();
+    toast(`✅ นำเข้าแล้ว ${newStudents.length} คน${skipped?` (ข้าม ${skipped} ซ้ำ)`:''}`);
+  } catch(e){toast('นำเข้าไม่สำเร็จ: '+e.message,'err');}
 }
 
-function cancelXLImport() {
-  xlImportData = [];
-  document.getElementById('xl-preview').style.display = 'none';
-  document.getElementById('xl-file').value = '';
-  document.getElementById('xl-preview-body').innerHTML = '';
+function cancelXLImport(){xlImportData=[];document.getElementById('xl-preview').style.display='none';document.getElementById('xl-file').value='';document.getElementById('xl-preview-body').innerHTML='';}
+
+async function addStudent(){
+  const id=document.getElementById('ns-id').value.trim();
+  const name=document.getElementById('ns-name').value.trim();
+  const room=document.getElementById('ns-room').value;
+  if(!id||!name){toast('กรอกให้ครบ','warn');return;}
+  if(DB.students.find(s=>s.id===id)){toast('รหัสนี้มีแล้ว','warn');return;}
+  try{await sbAddStudent({id,name,room});renderManage();toast('เพิ่ม '+name+' แล้ว ✅');document.getElementById('ns-id').value='';document.getElementById('ns-name').value='';}
+  catch(e){toast('เพิ่มไม่สำเร็จ: '+e.message,'err');}
 }
 
-function addStudent() {
-  const id = document.getElementById('ns-id').value.trim();
-  const name = document.getElementById('ns-name').value.trim();
-  const room = document.getElementById('ns-room').value;
-  if(!id || !name) { toast('กรอกให้ครบ', 'warn'); return; }
-  if(DB.students.find(s => s.id === id)) { toast('รหัสนี้มีแล้ว', 'warn'); return; }
-  DB.students.push({id, name, room});
-  saveDB(); renderManage(); toast('เพิ่ม ' + name + ' แล้ว ✅');
-  document.getElementById('ns-id').value = '';
-  document.getElementById('ns-name').value = '';
+async function delStu(id){
+  if(!confirm('ลบนักเรียน '+id+'?'))return;
+  try{await sbDeleteStudent(id);renderManage();}
+  catch(e){toast('ลบไม่สำเร็จ: '+e.message,'err');}
 }
 
-function delStu(id) {
-  if(!confirm('ลบนักเรียน ' + id + '?')) return;
-  DB.students = DB.students.filter(s => s.id !== id);
-  saveDB(); renderManage();
-}
-
-function addSubject() {
-  const n = document.getElementById('n-subj').value.trim();
-  if(!n || DB.subjects.includes(n)) { toast('ชื่อซ้ำหรือว่าง', 'warn'); return; }
+async function addSubject(){
+  const n=document.getElementById('n-subj').value.trim();
+  if(!n||DB.subjects.includes(n)){toast('ชื่อซ้ำหรือว่าง','warn');return;}
   DB.subjects.push(n);
-  saveDB(); renderManage(); toast('เพิ่มวิชา ' + n);
-  document.getElementById('n-subj').value = '';
+  await sbSaveSettings('subjects',DB.subjects);
+  renderManage();toast('เพิ่มวิชา '+n);
+  document.getElementById('n-subj').value='';
 }
 
-function delSubj(n) { DB.subjects = DB.subjects.filter(s => s !== n); saveDB(); renderManage(); }
-
-function addHW() {
-  const num = parseInt(document.getElementById('n-hwnum').value);
-  const title = document.getElementById('n-hwtitle').value.trim();
-  const subject = document.getElementById('n-hwsubj').value;
-  const maxScore = parseInt(document.getElementById('n-hwmaxscore')?.value) || 100;
-  if(!num || !title) { toast('กรอกให้ครบ', 'warn'); return; }
-  if(DB.homeworks.find(h => h.num === num)) { toast('งานชิ้นที่ ' + num + ' มีแล้ว', 'warn'); return; }
-  DB.homeworks.push({num, title, subject, maxScore});
-  DB.homeworks.sort((a, b) => a.num - b.num);
-  saveDB(); renderManage(); toast('เพิ่มงานชิ้นที่ ' + num);
-  document.getElementById('n-hwnum').value = '';
-  document.getElementById('n-hwtitle').value = '';
+async function delSubj(n){
+  DB.subjects=DB.subjects.filter(s=>s!==n);
+  await sbSaveSettings('subjects',DB.subjects);
+  renderManage();
 }
 
-function delHW(num) { DB.homeworks = DB.homeworks.filter(h => h.num !== num); saveDB(); renderManage(); }
-
-function clearScans() {
-  if(!confirm('ล้างข้อมูลทั้งหมด?')) return;
-  DB.submissions = {};
-  saveDB(); toast('ล้างข้อมูลแล้ว', 'warn');
+async function addHW(){
+  const num=parseInt(document.getElementById('n-hwnum').value);
+  const title=document.getElementById('n-hwtitle').value.trim();
+  const subject=document.getElementById('n-hwsubj').value;
+  const maxScore=parseInt(document.getElementById('n-hwmaxscore')?.value)||100;
+  if(!num||!title){toast('กรอกให้ครบ','warn');return;}
+  if(DB.homeworks.find(h=>h.num===num)){toast('งานชิ้นที่ '+num+' มีแล้ว','warn');return;}
+  try{await sbAddHomework({num,title,subject,maxScore});renderManage();toast('เพิ่มงานชิ้นที่ '+num);document.getElementById('n-hwnum').value='';document.getElementById('n-hwtitle').value='';}
+  catch(e){toast('เพิ่มไม่สำเร็จ: '+e.message,'err');}
 }
 
-function clearAllStudents() {
-  const count = DB.students.length;
-  if(!confirm(`ยืนยันลบรายชื่อนักเรียนทั้งหมด ${count} คน?\n\nข้อมูลการส่งงานทั้งหมดจะถูกลบด้วย`)) return;
-  DB.students = [];
-  DB.submissions = {};
-  saveDB(); renderManage(); toast(`ลบรายชื่อนักเรียน ${count} คนแล้ว`, 'warn');
+async function delHW(num){
+  try{await sbDeleteHomework(num);renderManage();}
+  catch(e){toast('ลบไม่สำเร็จ: '+e.message,'err');}
 }
 
-// ===== EXPORT SYSTEM =====
-let exportType = 'pdf';
-let exportRoomSel = new Set();
-let exportHWSel = new Set();
+async function clearScans(){
+  if(!confirm('ล้างข้อมูลการส่งงานทั้งหมด?'))return;
+  if(USE_SUPABASE){
+    const {error}=await SB.from('submissions').delete().neq('id','00000000-0000-0000-0000-000000000000');
+    if(error){toast('ล้างไม่สำเร็จ: '+error.message,'err');return;}
+    await reloadSubmissions();
+  } else {
+    DB.submissions={};saveDB();
+  }
+  toast('ล้างข้อมูลแล้ว','warn');
+}
 
-function openExportModal(type) {
-  exportType = type;
-  document.getElementById('export-modal-title').textContent = type === 'pdf' ? '📄 Export PDF' : '📊 Export Excel';
-  document.getElementById('export-go-label').textContent = type === 'pdf' ? 'ดาวน์โหลด PDF' : 'ดาวน์โหลด Excel';
-  document.getElementById('export-go-icon').textContent = type === 'pdf' ? '📄' : '📊';
+async function clearAllStudents(){
+  const count=DB.students.length;
+  if(!confirm(`ยืนยันลบรายชื่อนักเรียนทั้งหมด ${count} คน?\n\nข้อมูลการส่งงานทั้งหมดจะถูกลบด้วย`))return;
+  if(USE_SUPABASE){
+    await SB.from('submissions').delete().neq('id','00000000-0000-0000-0000-000000000000');
+    const {error}=await SB.from('students').delete().neq('id','');
+    if(error){toast('ลบไม่สำเร็จ: '+error.message,'err');return;}
+    await reloadStudents();await reloadSubmissions();
+  } else {
+    DB.students=[];DB.submissions=[];saveDB();
+  }
+  renderManage();toast(`ลบรายชื่อนักเรียน ${count} คนแล้ว`,'warn');
+}
 
-  // Build room checkboxes
-  const rooms = [...new Set(DB.students.map(s => s.room))].sort();
-  exportRoomSel = new Set(rooms);
-  const rg = document.getElementById('export-room-grid');
-  rg.innerHTML = rooms.map(r => `
-    <button class="room-cb checked" data-room="${r}" onclick="toggleExportRoom(this,'${r}')">
-      <span>✓</span> ${r}
-    </button>`).join('');
-
-  // Build homework checkboxes
-  exportHWSel = new Set(DB.homeworks.map(h => h.num));
-  const hf = document.getElementById('export-hw-filter');
-  hf.innerHTML = `<button class="hw-cb checked" data-hw="all" onclick="toggleAllHW(this)">ทุกชิ้น</button>` +
-    DB.homeworks.map(h => `
-      <button class="hw-cb checked" data-hw="${h.num}" onclick="toggleExportHW(this,${h.num})">
-        ชิ้นที่ ${h.num}
-      </button>`).join('');
-
+// ===== EXPORT =====
+let exportType='pdf',exportRoomSel=new Set(),exportHWSel=new Set();
+function openExportModal(type){
+  exportType=type;
+  document.getElementById('export-modal-title').textContent=type==='pdf'?'📄 Export PDF':'📊 Export Excel';
+  document.getElementById('export-go-label').textContent=type==='pdf'?'ดาวน์โหลด PDF':'ดาวน์โหลด Excel';
+  document.getElementById('export-go-icon').textContent=type==='pdf'?'📄':'📊';
+  const rooms=[...new Set(DB.students.map(s=>s.room))].sort();
+  exportRoomSel=new Set(rooms);
+  const rg=document.getElementById('export-room-grid');
+  rg.innerHTML=rooms.map(r=>`<button class="room-cb checked" data-room="${r}" onclick="toggleExportRoom(this,'${r}')"><span>✓</span> ${r}</button>`).join('');
+  exportHWSel=new Set(DB.homeworks.map(h=>h.num));
+  const hf=document.getElementById('export-hw-filter');
+  hf.innerHTML=`<button class="hw-cb checked" data-hw="all" onclick="toggleAllHW(this)">ทุกชิ้น</button>`+DB.homeworks.map(h=>`<button class="hw-cb checked" data-hw="${h.num}" onclick="toggleExportHW(this,${h.num})">ชิ้นที่ ${h.num}</button>`).join('');
   document.getElementById('export-progress-bar').classList.remove('on');
-  document.getElementById('export-progress-fill').style.width = '0%';
-  document.getElementById('export-go-btn').disabled = false;
+  document.getElementById('export-progress-fill').style.width='0%';
+  document.getElementById('export-go-btn').disabled=false;
   document.getElementById('export-modal').classList.add('on');
 }
-
-function closeExportModal() {
-  document.getElementById('export-modal').classList.remove('on');
-}
-
-function toggleExportRoom(btn, room) {
-  if(exportRoomSel.has(room)) {
-    exportRoomSel.delete(room);
-    btn.classList.remove('checked');
-    btn.querySelector('span').textContent = '';
-  } else {
-    exportRoomSel.add(room);
-    btn.classList.add('checked');
-    btn.querySelector('span').textContent = '✓';
-  }
-}
-
-function toggleExportHW(btn, num) {
-  if(exportHWSel.has(num)) {
-    exportHWSel.delete(num);
-    btn.classList.remove('checked');
-  } else {
-    exportHWSel.add(num);
-    btn.classList.add('checked');
-  }
-  // update "all" button
-  const allBtn = document.querySelector('#export-hw-filter [data-hw="all"]');
-  if(allBtn) allBtn.classList.toggle('checked', exportHWSel.size === DB.homeworks.length);
-}
-
-function toggleAllHW(btn) {
-  const allSelected = exportHWSel.size === DB.homeworks.length;
-  document.querySelectorAll('#export-hw-filter [data-hw]:not([data-hw="all"])').forEach(b => {
-    const n = parseInt(b.dataset.hw);
-    if(allSelected) { exportHWSel.delete(n); b.classList.remove('checked'); }
-    else { exportHWSel.add(n); b.classList.add('checked'); }
-  });
-  btn.classList.toggle('checked', !allSelected);
-}
-
-function exportSelectAll(sel) {
-  document.querySelectorAll('#export-room-grid .room-cb').forEach(btn => {
-    const room = btn.dataset.room;
-    if(sel) { exportRoomSel.add(room); btn.classList.add('checked'); btn.querySelector('span').textContent = '✓'; }
-    else { exportRoomSel.delete(room); btn.classList.remove('checked'); btn.querySelector('span').textContent = ''; }
-  });
-}
-
-function getStudentNum(student, room) {
-  // เลขที่ในห้อง = ลำดับที่ในห้องนั้น (sort by id)
-  const roomStudents = DB.students.filter(s => s.room === room).sort((a,b) => a.id.localeCompare(b.id));
-  return roomStudents.findIndex(s => s.id === student.id) + 1;
-}
-
-function buildExportData() {
-  const selectedRooms = [...exportRoomSel].sort();
-  const selectedHWs = DB.homeworks.filter(h => exportHWSel.has(h.num)).sort((a,b) => a.num - b.num);
-
-  return selectedRooms.map(room => {
-    const students = DB.students
-      .filter(s => s.room === room)
-      .sort((a, b) => a.id.localeCompare(b.id));
-    const rows = students.map((s, idx) => {
-      const row = {
-        เลขที่: idx + 1,
-        เลขประจำตัว: s.id,
-        'ชื่อ-นามสกุล': s.name,
-        ห้อง: s.room,
-      };
-      let totalScore = 0, totalMax = 0, doneCount = 0;
-      selectedHWs.forEach(h => {
-        const sub = DB.submissions[s.id + '_' + h.num];
-        const maxScore = sub?.maxScore || h.maxScore || 100;
-        if(sub) {
-          doneCount++;
-          const sc = (sub.score !== null && sub.score !== undefined) ? sub.score : maxScore;
-          totalScore += sc;
-          totalMax += maxScore;
-          row['งานครั้งที่ ' + h.num] = (sub.score !== null && sub.score !== undefined) ? sub.score : '✓';
-        } else {
-          totalMax += maxScore;
-          row['งานครั้งที่ ' + h.num] = '—';
-        }
-      });
-      row['ส่งแล้ว'] = doneCount + '/' + selectedHWs.length;
-      row['คะแนนรวม'] = totalScore;
-      row['คะแนนเต็ม'] = totalMax;
-      row['%คะแนน'] = totalMax > 0 ? Math.round(totalScore / totalMax * 100) + '%' : '0%';
+function closeExportModal(){document.getElementById('export-modal').classList.remove('on');}
+function toggleExportRoom(btn,room){if(exportRoomSel.has(room)){exportRoomSel.delete(room);btn.classList.remove('checked');btn.querySelector('span').textContent='';}else{exportRoomSel.add(room);btn.classList.add('checked');btn.querySelector('span').textContent='✓';}}
+function toggleExportHW(btn,num){if(exportHWSel.has(num)){exportHWSel.delete(num);btn.classList.remove('checked');}else{exportHWSel.add(num);btn.classList.add('checked');}const allBtn=document.querySelector('#export-hw-filter [data-hw="all"]');if(allBtn)allBtn.classList.toggle('checked',exportHWSel.size===DB.homeworks.length);}
+function toggleAllHW(btn){const allSelected=exportHWSel.size===DB.homeworks.length;document.querySelectorAll('#export-hw-filter [data-hw]:not([data-hw="all"])').forEach(b=>{const n=parseInt(b.dataset.hw);if(allSelected){exportHWSel.delete(n);b.classList.remove('checked');}else{exportHWSel.add(n);b.classList.add('checked');}});btn.classList.toggle('checked',!allSelected);}
+function exportSelectAll(sel){document.querySelectorAll('#export-room-grid .room-cb').forEach(btn=>{const room=btn.dataset.room;if(sel){exportRoomSel.add(room);btn.classList.add('checked');btn.querySelector('span').textContent='✓';}else{exportRoomSel.delete(room);btn.classList.remove('checked');btn.querySelector('span').textContent='';}}); }
+function buildExportData(){
+  const selectedRooms=[...exportRoomSel].sort();
+  const selectedHWs=DB.homeworks.filter(h=>exportHWSel.has(h.num)).sort((a,b)=>a.num-b.num);
+  return selectedRooms.map(room=>{
+    const students=DB.students.filter(s=>s.room===room).sort((a,b)=>a.id.localeCompare(b.id));
+    const rows=students.map((s,idx)=>{
+      const row={เลขที่:idx+1,เลขประจำตัว:s.id,'ชื่อ-นามสกุล':s.name,ห้อง:s.room};
+      let totalScore=0,totalMax=0,doneCount=0;
+      selectedHWs.forEach(h=>{const sub=DB.submissions[s.id+'_'+h.num];const maxScore=sub?.maxScore||h.maxScore||100;if(sub){doneCount++;const sc=(sub.score!==null&&sub.score!==undefined)?sub.score:maxScore;totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:'✓';}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
+      row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;row['คะแนนรวม']=totalScore;row['คะแนนเต็ม']=totalMax;row['%คะแนน']=totalMax>0?Math.round(totalScore/totalMax*100)+'%':'0%';
       return row;
     });
-    return { room, students, rows, homeworks: selectedHWs };
+    return{room,students,rows,homeworks:selectedHWs};
   });
 }
-
-async function doExport() {
-  if(exportRoomSel.size === 0) { toast('เลือกห้องอย่างน้อย 1 ห้อง', 'warn'); return; }
-  if(exportHWSel.size === 0) { toast('เลือกงานอย่างน้อย 1 ชิ้น', 'warn'); return; }
-
-  const btn = document.getElementById('export-go-btn');
-  const pb = document.getElementById('export-progress-bar');
-  const pf = document.getElementById('export-progress-fill');
-  btn.disabled = true;
-  pb.classList.add('on');
-  pf.style.width = '10%';
-
-  try {
-    const data = buildExportData();
-    pf.style.width = '40%';
-
-    if(exportType === 'excel') {
-      await exportExcel(data, pf);
-    } else {
-      await exportPDF(data, pf);
-    }
-    pf.style.width = '100%';
-    setTimeout(() => { pb.classList.remove('on'); pf.style.width = '0%'; closeExportModal(); }, 800);
+async function doExport(){
+  if(exportRoomSel.size===0){toast('เลือกห้องอย่างน้อย 1 ห้อง','warn');return;}
+  if(exportHWSel.size===0){toast('เลือกงานอย่างน้อย 1 ชิ้น','warn');return;}
+  const btn=document.getElementById('export-go-btn');const pb=document.getElementById('export-progress-bar');const pf=document.getElementById('export-progress-fill');
+  btn.disabled=true;pb.classList.add('on');pf.style.width='10%';
+  try{
+    const data=buildExportData();pf.style.width='40%';
+    if(exportType==='excel'){await exportExcel(data,pf);}else{await exportPDF(data,pf);}
+    pf.style.width='100%';setTimeout(()=>{pb.classList.remove('on');pf.style.width='0%';closeExportModal();},800);
     toast('ดาวน์โหลดเสร็จแล้ว ✅');
-  } catch(e) {
-    console.error(e);
-    toast('เกิดข้อผิดพลาด: ' + e.message, 'err');
-  }
-  btn.disabled = false;
+  }catch(e){console.error(e);toast('เกิดข้อผิดพลาด: '+e.message,'err');}
+  btn.disabled=false;
 }
+function exportExcel(data,pf){return new Promise(resolve=>{const wb=XLSX.utils.book_new();data.forEach((roomData,i)=>{const{room,rows,homeworks}=roomData;const sheetName=room.replace(/[\\\/\?\*\[\]]/g,'').substring(0,31);const wsData=[];wsData.push([`รายงานการส่งงาน - ${room}`]);wsData.push([`งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' '+h.title).join(', ')}`]);wsData.push([`วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}`]);wsData.push([]);const header=['เลขที่','เลขประจำตัว','ชื่อ-นามสกุล'];homeworks.forEach(h=>header.push('งานครั้งที่ '+h.num+'\n'+h.title.substring(0,15)+'\n(เต็ม '+(h.maxScore||100)+')'));header.push('ส่งแล้ว','คะแนนรวม','คะแนนเต็ม','%คะแนน');wsData.push(header);rows.forEach(r=>{const row=[r['เลขที่'],r['เลขประจำตัว'],r['ชื่อ-นามสกุล']];homeworks.forEach(h=>row.push(r['งานครั้งที่ '+h.num]));row.push(r['ส่งแล้ว'],r['คะแนนรวม'],r['คะแนนเต็ม'],r['%คะแนน']);wsData.push(row);});const ws=XLSX.utils.aoa_to_sheet(wsData);ws['!cols']=[{wch:6},{wch:14},{wch:26},...homeworks.map(()=>({wch:14})),{wch:10},{wch:10},{wch:10},{wch:8}];const totalCols=3+homeworks.length+4-1;ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:totalCols}},{s:{r:1,c:0},e:{r:1,c:totalCols}},{s:{r:2,c:0},e:{r:2,c:totalCols}}];XLSX.utils.book_append_sheet(wb,ws,sheetName);pf.style.width=(40+(i+1)/data.length*50)+'%';});const date=new Date().toISOString().slice(0,10);XLSX.writeFile(wb,`รายงานส่งงาน_${date}.xlsx`);resolve();});}
+async function exportPDF(data,pf){const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});let html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"><style>*{font-family:'Sarabun',sans-serif;box-sizing:border-box;margin:0;padding:0;}body{font-size:11pt;color:#1E293B;}.page{padding:12mm 15mm;page-break-after:always;}.page:last-child{page-break-after:avoid;}.page-title{font-size:16pt;font-weight:700;color:#2563EB;margin-bottom:4px;}.page-meta{font-size:9pt;color:#64748B;margin-bottom:12px;border-bottom:2px solid #E2E8F0;padding-bottom:8px;}table{width:100%;border-collapse:collapse;font-size:10pt;}th{background:linear-gradient(135deg,#EBF2FF,#DBEAFE);color:#1E40AF;font-weight:700;padding:7px 6px;border:1px solid #BFDBFE;font-size:9pt;text-align:center;}td{padding:6px;border:1px solid #E2E8F0;vertical-align:middle;}tr:nth-child(even) td{background:#F8FAFF;}.num{text-align:center;color:#64748B;}.ok{text-align:center;color:#16A34A;font-weight:700;background:#DCFCE7!important;font-size:9pt;}.no{text-align:center;color:#94A3B8;font-size:9pt;}.pct-col{text-align:center;font-weight:700;}.footer{margin-top:8px;font-size:8pt;color:#94A3B8;text-align:right;}</style></head><body>`;data.forEach((roomData,i)=>{const{room,rows,homeworks}=roomData;const dateStr=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});html+=`<div class="page"><div class="page-title">📋 รายงานการส่งงาน — ${room}</div><div class="page-meta">งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' ('+h.title+')').join(' · ')} &nbsp;|&nbsp; วันที่พิมพ์: ${dateStr} &nbsp;|&nbsp; นักเรียน ${rows.length} คน</div><table><thead><tr><th style="width:40px;">เลขที่</th><th style="width:90px;">เลขประจำตัว</th><th>ชื่อ-นามสกุล</th>${homeworks.map(h=>`<th style="width:65px;">งานครั้งที่ ${h.num}<br><span style="font-size:8pt;font-weight:400;">(/${h.maxScore||100})</span></th>`).join('')}<th style="width:55px;">ส่งแล้ว</th><th style="width:60px;">คะแนนรวม</th><th style="width:45px;">%</th></tr></thead><tbody>${rows.map(r=>{const hwCells=homeworks.map(h=>{const v=r['งานครั้งที่ '+h.num];const isOk=v!==undefined&&v!=='—';const display=isOk?(typeof v==='number'?v:'✓'):'—';return `<td class="${isOk?'ok':'no'}">${display}</td>`;}).join('');const pct=parseInt(r['%คะแนน']);const pctColor=pct===100?'#16A34A':pct>=60?'#2563EB':'#EF4444';const totalScore=r['คะแนนรวม'];const totalMax=r['คะแนนเต็ม'];return `<tr><td class="num">${r['เลขที่']}</td><td class="num">${r['เลขประจำตัว']}</td><td>${r['ชื่อ-นามสกุล']}</td>${hwCells}<td class="pct-col">${r['ส่งแล้ว']}</td><td class="pct-col" style="color:#6D28D9;font-weight:700;">${totalScore}<span style="font-size:8pt;color:#94A3B8;">/${totalMax}</span></td><td class="pct-col" style="color:${pctColor};">${r['%คะแนน']}</td></tr>`;}).join('')}</tbody></table><div class="footer">ระบบตรวจส่งงานนักเรียน · พิมพ์วันที่ ${dateStr}</div></div>`;pf.style.width=(40+(i+1)/data.length*50)+'%';});html+='</body></html>';const win=window.open('','_blank','width=900,height=700');if(!win){toast('กรุณาอนุญาต Popup เพื่อ Export PDF','warn');return;}win.document.write(html);win.document.close();win.onload=()=>{setTimeout(()=>{win.focus();win.print();},800);};}
 
-function exportExcel(data, pf) {
-  return new Promise(resolve => {
-    const wb = XLSX.utils.book_new();
-    data.forEach((roomData, i) => {
-      const { room, rows, homeworks } = roomData;
-      // Sheet name max 31 chars, sanitize
-      const sheetName = room.replace(/[\\\/\?\*\[\]]/g, '').substring(0, 31);
-
-      const wsData = [];
-      // Title row
-      wsData.push([`รายงานการส่งงาน - ${room}`]);
-      wsData.push([`งานที่รายงาน: ${homeworks.map(h => 'ครั้งที่ ' + h.num + ' ' + h.title).join(', ')}`]);
-      wsData.push([`วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH', {year:'numeric',month:'long',day:'numeric'})}`]);
-      wsData.push([]);
-
-      // Header
-      const header = ['เลขที่', 'เลขประจำตัว', 'ชื่อ-นามสกุล'];
-      homeworks.forEach(h => header.push('งานครั้งที่ ' + h.num + '\n' + h.title.substring(0,15) + '\n(เต็ม '+(h.maxScore||100)+')'));
-      header.push('ส่งแล้ว', 'คะแนนรวม', 'คะแนนเต็ม', '%คะแนน');
-      wsData.push(header);
-
-      // Data rows
-      rows.forEach(r => {
-        const row = [r['เลขที่'], r['เลขประจำตัว'], r['ชื่อ-นามสกุล']];
-        homeworks.forEach(h => row.push(r['งานครั้งที่ ' + h.num]));
-        row.push(r['ส่งแล้ว'], r['คะแนนรวม'], r['คะแนนเต็ม'], r['%คะแนน']);
-        wsData.push(row);
-      });
-
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-      // Column widths
-      ws['!cols'] = [
-        {wch: 6}, {wch: 14}, {wch: 26},
-        ...homeworks.map(() => ({wch: 14})),
-        {wch: 10}, {wch: 10}, {wch: 10}, {wch: 8}
-      ];
-
-      // Merge title cells
-      const totalCols = 3 + homeworks.length + 4 - 1;
-      ws['!merges'] = [
-        {s:{r:0,c:0}, e:{r:0,c:totalCols}},
-        {s:{r:1,c:0}, e:{r:1,c:totalCols}},
-        {s:{r:2,c:0}, e:{r:2,c:totalCols}},
-      ];
-
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
-      pf.style.width = (40 + (i+1)/data.length*50) + '%';
-    });
-
-    const date = new Date().toISOString().slice(0,10);
-    XLSX.writeFile(wb, `รายงานส่งงาน_${date}.xlsx`);
-    resolve();
-  });
-}
-
-async function exportPDF(data, pf) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-
-  // Load Thai font via base64 (Sarabun from Google)
-  // Since jsPDF doesn't include Thai font, we'll use a workaround with HTML rendering approach
-  // Actually use autoTable with UTF-8 and rely on browser embedding for thai
-  // We'll use a custom approach: generate HTML → print as PDF
-
-  // Build HTML pages
-  let html = `<!DOCTYPE html><html><head>
-  <meta charset="UTF-8">
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    * { font-family: 'Sarabun', sans-serif; box-sizing: border-box; margin:0; padding:0; }
-    body { font-size: 11pt; color:#1E293B; }
-    .page { padding: 12mm 15mm; page-break-after: always; }
-    .page:last-child { page-break-after: avoid; }
-    .page-title { font-size: 16pt; font-weight: 700; color: #2563EB; margin-bottom: 4px; }
-    .page-meta { font-size: 9pt; color: #64748B; margin-bottom: 12px; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px; }
-    table { width:100%; border-collapse:collapse; font-size: 10pt; }
-    th { background: linear-gradient(135deg,#EBF2FF,#DBEAFE); color:#1E40AF; 
-         font-weight:700; padding:7px 6px; border:1px solid #BFDBFE; font-size:9pt; text-align:center; }
-    td { padding:6px; border:1px solid #E2E8F0; vertical-align:middle; }
-    tr:nth-child(even) td { background:#F8FAFF; }
-    .num { text-align:center; color:#64748B; }
-    .ok  { text-align:center; color:#16A34A; font-weight:700; background:#DCFCE7!important; font-size:9pt; }
-    .no  { text-align:center; color:#94A3B8; font-size:9pt; }
-    .pct-col { text-align:center; font-weight:700; }
-    .footer { margin-top:8px; font-size:8pt; color:#94A3B8; text-align:right; }
-  </style></head><body>`;
-
-  data.forEach((roomData, i) => {
-    const { room, rows, homeworks } = roomData;
-    const dateStr = new Date().toLocaleDateString('th-TH', {year:'numeric',month:'long',day:'numeric'});
-    html += `<div class="page">
-      <div class="page-title">📋 รายงานการส่งงาน — ${room}</div>
-      <div class="page-meta">
-        งานที่รายงาน: ${homeworks.map(h => 'ครั้งที่ ' + h.num + ' (' + h.title + ')').join(' · ')} &nbsp;|&nbsp;
-        วันที่พิมพ์: ${dateStr} &nbsp;|&nbsp; นักเรียน ${rows.length} คน
-      </div>
-      <table>
-        <thead><tr>
-          <th style="width:40px;">เลขที่</th>
-          <th style="width:90px;">เลขประจำตัว</th>
-          <th>ชื่อ-นามสกุล</th>
-          ${homeworks.map(h => `<th style="width:65px;">งานครั้งที่ ${h.num}<br><span style="font-size:8pt;font-weight:400;">(/${h.maxScore||100})</span></th>`).join('')}
-          <th style="width:55px;">ส่งแล้ว</th>
-          <th style="width:60px;">คะแนนรวม</th>
-          <th style="width:45px;">%</th>
-        </tr></thead>
-        <tbody>
-          ${rows.map(r => {
-            const hwCells = homeworks.map(h => {
-              const v = r['งานครั้งที่ ' + h.num];
-              const isOk = v !== undefined && v !== '—';
-              const display = isOk ? (typeof v === 'number' ? v : '✓') : '—';
-              return `<td class="${isOk ? 'ok' : 'no'}">${display}</td>`;
-            }).join('');
-            const pct = parseInt(r['%คะแนน']);
-            const pctColor = pct === 100 ? '#16A34A' : pct >= 60 ? '#2563EB' : '#EF4444';
-            const totalScore = r['คะแนนรวม'];
-            const totalMax = r['คะแนนเต็ม'];
-            return `<tr>
-              <td class="num">${r['เลขที่']}</td>
-              <td class="num">${r['เลขประจำตัว']}</td>
-              <td>${r['ชื่อ-นามสกุล']}</td>
-              ${hwCells}
-              <td class="pct-col">${r['ส่งแล้ว']}</td>
-              <td class="pct-col" style="color:var(--purple-dark,#6D28D9);font-weight:700;">${totalScore}<span style="font-size:8pt;color:#94A3B8;">/${totalMax}</span></td>
-              <td class="pct-col" style="color:${pctColor};">${r['%คะแนน']}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-      <div class="footer">ระบบตรวจส่งงานนักเรียน · พิมพ์วันที่ ${dateStr}</div>
-    </div>`;
-    pf.style.width = (40 + (i+1)/data.length*50) + '%';
-  });
-
-  html += '</body></html>';
-
-  // Open print window
-  const win = window.open('', '_blank', 'width=900,height=700');
-  if(!win) { toast('กรุณาอนุญาต Popup เพื่อ Export PDF', 'warn'); return; }
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => {
-    setTimeout(() => {
-      win.focus();
-      win.print();
-    }, 800);
-  };
-}
-
+// ---- INIT ----
+window.addEventListener('load', () => {
+  checkSetupOnLoad();
+});
 </script>
 </html>
