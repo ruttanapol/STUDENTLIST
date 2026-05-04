@@ -977,6 +977,16 @@ ALTER TABLE settings DISABLE ROW LEVEL SECURITY;</div>
         </div>
       </div>
     </div>
+    <!-- Room Management Card -->
+    <div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#FAF5FF,#EDE9FE);">
+      <div class="card-title" style="color:var(--purple);">🏫 จัดการห้องเรียน</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="n-room" placeholder="เช่น ม.1/1, ม.2/3" style="flex:1;margin:0;">
+        <button class="mini-btn" onclick="addRoom()" style="border-color:var(--purple);color:var(--purple);background:var(--purple-light);">+ เพิ่ม</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;" id="room-chips"></div>
+    </div>
+
     <div class="card">
       <div class="card-title">👤 เพิ่มนักเรียนรายคน</div>
       <label class="lbl">รหัส</label>
@@ -986,12 +996,21 @@ ALTER TABLE settings DISABLE ROW LEVEL SECURITY;</div>
       <label class="lbl">ห้อง</label>
       <select id="ns-room"></select>
       <button class="add-btn" onclick="addStudent()">+ เพิ่มนักเรียน</button>
+      <div class="srch-wrap" style="margin-top:12px;margin-bottom:0;">
+        <span class="srch-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+        </span>
+        <input type="search" id="manage-srch" placeholder="ค้นหาชื่อหรือรหัส..." oninput="renderManage()" style="font-size:14px;">
+      </div>
       <div class="tbl-wrap">
         <table class="mini-tbl">
-          <thead><tr><th style="width:70px;">รหัส</th><th>ชื่อ</th><th style="width:60px;">ห้อง</th><th style="width:40px;"></th></tr></thead>
+          <thead><tr><th style="width:70px;">รหัส</th><th>ชื่อ</th><th style="width:60px;">ห้อง</th><th style="width:76px;"></th></tr></thead>
           <tbody id="sl-manage"></tbody>
         </table>
       </div>
+      <div id="manage-stu-count" style="font-size:12px;color:var(--text3);text-align:right;margin-top:6px;"></div>
     </div>
     <div class="card">
       <div class="card-title">📖 วิชา</div>
@@ -1835,8 +1854,19 @@ function showDetail(sid){
 }
 
 function renderManage(){
-  document.getElementById('ns-room').innerHTML=DB.rooms.map(r=>`<option>${r}</option>`).join('');
-  document.getElementById('sl-manage').innerHTML=DB.students.map(s=>
+  // Rooms chips
+  const roomSel=document.getElementById('ns-room');
+  if(roomSel)roomSel.innerHTML=DB.rooms.map(r=>`<option>${r}</option>`).join('');
+  const editRoomSel=document.getElementById('edit-stu-room');
+  const chips=document.getElementById('room-chips');
+  if(chips)chips.innerHTML=DB.rooms.length?DB.rooms.map(r=>`<div style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #C4B5FD;border-radius:20px;padding:5px 12px;font-size:13px;font-weight:600;color:var(--purple);">${r}<button onclick="delRoom('${r}')" style="background:none;border:none;cursor:pointer;color:#94A3B8;font-size:16px;padding:0;line-height:1;">×</button></div>`).join(''):'<div style="font-size:13px;color:var(--text3);">ยังไม่มีห้องเรียน — เพิ่มก่อนเลย</div>';
+  // Students with search filter
+  const q=(document.getElementById('manage-srch')?.value||'').toLowerCase();
+  let stuList=DB.students;
+  if(q)stuList=stuList.filter(s=>s.id.includes(q)||s.name.toLowerCase().includes(q));
+  const countEl=document.getElementById('manage-stu-count');
+  if(countEl)countEl.textContent=q?`พบ ${stuList.length} จาก ${DB.students.length} คน`:`ทั้งหมด ${DB.students.length} คน`;
+  document.getElementById('sl-manage').innerHTML=stuList.map(s=>
     `<tr><td style="font-size:12px;">${s.id}</td><td style="font-size:13px;">${s.name}</td><td style="font-size:12px;">${s.room}</td>
     <td style="white-space:nowrap;">
       <button class="del-btn" style="background:var(--blue-light);color:var(--blue-dark);border-color:var(--blue-light);margin-right:4px;" onclick="openEditStu('${s.id}')">แก้ไข</button>
@@ -2031,6 +2061,24 @@ async function confirmXLImport(){
 }
 
 function cancelXLImport(){xlImportData=[];document.getElementById('xl-preview').style.display='none';document.getElementById('xl-file').value='';document.getElementById('xl-preview-body').innerHTML='';}
+
+async function addRoom(){
+  const n=document.getElementById('n-room').value.trim();
+  if(!n){toast('กรอกชื่อห้อง','warn');return;}
+  if(DB.rooms.includes(n)){toast('ห้องนี้มีอยู่แล้ว','warn');return;}
+  DB.rooms=[...DB.rooms,n].sort();
+  await sbSaveSettings('rooms',DB.rooms);
+  renderManage();toast('เพิ่มห้อง '+n+' แล้ว');
+  document.getElementById('n-room').value='';
+}
+
+async function delRoom(n){
+  const stuInRoom=DB.students.filter(s=>s.room===n).length;
+  if(stuInRoom>0&&!confirm('ห้อง "'+n+'" มีนักเรียน '+stuInRoom+' คน\nยืนยันลบห้องนี้?'))return;
+  DB.rooms=DB.rooms.filter(r=>r!==n);
+  await sbSaveSettings('rooms',DB.rooms);
+  renderManage();toast('ลบห้อง '+n+' แล้ว','warn');
+}
 
 async function addStudent(){
   const id=document.getElementById('ns-id').value.trim();
