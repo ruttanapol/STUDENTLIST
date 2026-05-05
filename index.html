@@ -1952,7 +1952,7 @@ async function reloadSubmissions() {
   (data||[]).forEach(r => {
     const key = r.student_id + '_' + r.hw_num;
     subs[key] = {sid:r.student_id,hwNum:r.hw_num,hwTitle:r.hw_title,room:r.room,
-      score:r.score,maxScore:r.max_score||100,
+      score: r.score !== null && r.score !== undefined ? Number(r.score) : null ,maxScore:r.max_score||100,
       ts:r.submitted_at?new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}):''};
   });
   DB.submissions = subs;
@@ -2089,7 +2089,8 @@ async function sbRecordSubmission(sub) {
       room: sub.room, score: sub.score, max_score: sub.maxScore, teacher_id: tid
     });
     if(error) throw error;
-    await reloadSubmissions();
+await reloadSubmissions();
+renderDashboard();
   } else {
     const key = sub.sid + '_' + sub.hwNum;
     DB.submissions[key] = {...sub, ts: ts()};
@@ -2818,7 +2819,7 @@ async function refreshStudentView(){
   (subRes.data||[]).forEach(r => {
     subs[r.student_id+'_'+r.hw_num] = {
       sid:r.student_id, hwNum:r.hw_num, hwTitle:r.hw_title,
-      room:r.room, score:r.score, maxScore:r.max_score||100,
+      room:r.room, score: r.score !== null && r.score !== undefined ? Number(r.score) : null, maxScore:r.max_score||100,
       ts:r.submitted_at ? new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : ''
     };
   });
@@ -2924,9 +2925,8 @@ async function recordScan(sid, scoreOverride){
       item.innerHTML=`<div class="log-main"><div style="font-weight:700;">${stu.name} <span class="room-pill">${stu.room}</span></div><div class="log-sub">ชิ้นที่ ${hwNum}: ${hwTitle}${scoreBadge} · ${now}</div></div><span class="badge b-ok">✓ บันทึก</span>`;
       log.prepend(item);
       toast('บันทึก '+stu.name+(scoreText!==null?' ('+scoreText+'/'+maxScore+')':'')+'✅');
-      playScanSuccess();
+playScanSuccess();
       showScanSuccessPopup(stu.name, hwNum, hwTitle, scoreText, maxScore);
-      renderDashboard(); 
       stopScan();
     } catch(e) {
       item.innerHTML=`<div class="log-main"><div style="font-weight:700;">${stu.name}</div><div class="log-sub">บันทึกไม่สำเร็จ: ${e.message}</div></div><span class="badge b-err">Error</span>`;
