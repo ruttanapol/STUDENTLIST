@@ -2,7 +2,11 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#4F8EF7">
 <title>ระบบตรวจส่งงานนักเรียน</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -30,10 +34,19 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;font-family:Sarabun,sans-serif;}
 
-body { background: var(--bg); min-height: 100vh; }
+body { background: var(--bg); min-height: 100vh; overscroll-behavior: none; }
 
+/* ===== MOBILE SAFE AREAS ===== */
 .screen{display:none;}.screen.on{display:block;}
-.app{max-width:440px;margin:0 auto;min-height:100vh;}
+.app{max-width:440px;margin:0 auto;min-height:100vh;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ===== TOUCH IMPROVEMENTS ===== */
+button, [onclick] { cursor: pointer; touch-action: manipulation; }
+input, select, textarea { touch-action: manipulation; }
+/* Prevent text selection on tap */
+.bnav-btn, .logout-btn, .mini-btn, .login-btn, .add-btn { user-select: none; -webkit-user-select: none; }
 
 /* ===== LOGIN ===== */
 .login-wrap {
@@ -80,7 +93,7 @@ body { background: var(--bg); min-height: 100vh; }
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255,255,255,0.6);
   border-radius: 20px;
-  padding: 20px;
+  padding: 22px 20px;
   margin-bottom: 14px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.12);
 }
@@ -101,10 +114,12 @@ body { background: var(--bg); min-height: 100vh; }
 label {font-size:14px;color:var(--text2);display:block;margin-bottom:6px;font-weight:500;}
 input, select, button, textarea {font-family:Sarabun,sans-serif;}
 input, select {
-  width:100%; font-size:16px; padding:11px 14px;
+  width:100%; font-size:16px; padding:13px 14px;
   border: 1.5px solid var(--border); border-radius:10px;
   background:#fff; color:var(--text); outline:none;
   transition: border-color .2s, box-shadow .2s;
+  min-height: 48px;
+  -webkit-appearance: none;
 }
 input:focus, select:focus {
   border-color: var(--blue);
@@ -112,9 +127,10 @@ input:focus, select:focus {
 }
 .err-msg {font-size:13px;color:var(--red);margin-top:6px;min-height:18px;}
 .login-btn {
-  width:100%; padding:14px; font-size:17px; font-weight:700;
-  border-radius:12px; border:none; cursor:pointer;
-  margin-top:12px; transition: all .2s; letter-spacing:.3px;
+  width:100%; padding:16px; font-size:17px; font-weight:700;
+  border-radius:14px; border:none; cursor:pointer;
+  margin-top:14px; transition: all .15s; letter-spacing:.3px;
+  min-height: 52px;
 }
 .btn-admin {
   background: linear-gradient(135deg, var(--blue), var(--blue-dark));
@@ -137,7 +153,8 @@ input:focus, select:focus {
 /* ===== TOPBAR ===== */
 .topbar {
   display:flex; align-items:center; justify-content:space-between;
-  padding:12px 16px;
+  padding:14px 16px;
+  padding-top: calc(14px + env(safe-area-inset-top));
   background: linear-gradient(135deg, var(--blue), #7C3AED);
   box-shadow: 0 2px 12px rgba(79,142,247,0.3);
 }
@@ -152,10 +169,10 @@ input:focus, select:focus {
 .tb-name {font-size:15px;font-weight:700;color:#fff;}
 .tb-role {font-size:12px;color:rgba(255,255,255,0.75);margin-top:1px;}
 .logout-btn {
-  padding:7px 14px; font-size:13px; font-weight:600;
+  padding:9px 16px; font-size:14px; font-weight:600;
   border-radius:20px; border:1.5px solid rgba(255,255,255,0.4);
   background:rgba(255,255,255,0.15); color:#fff; cursor:pointer;
-  transition: all .2s;
+  transition: all .15s; min-height:40px;
 }
 .logout-btn:active { background:rgba(255,255,255,0.25); }
 
@@ -163,17 +180,19 @@ input:focus, select:focus {
 .bnav {
   display:flex; border-top:none;
   background: #fff;
-  padding:4px 0 8px;
+  padding:6px 0 calc(8px + env(safe-area-inset-bottom));
   box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
   position: sticky; bottom:0; z-index:10;
 }
 .bnav-btn {
   flex:1; display:flex; flex-direction:column;
-  align-items:center; gap:3px; padding:8px 4px 4px;
+  align-items:center; gap:3px; padding:10px 4px 6px;
   background:none; border:none; cursor:pointer;
-  color:var(--text3); font-size:11px; font-weight:600;
-  transition: color .2s;
+  color:var(--text3); font-size:12px; font-weight:600;
+  transition: color .15s; min-height:56px;
+  -webkit-tap-highlight-color: transparent;
 }
+.bnav-btn:active { opacity:0.7; }
 .bnav-btn.on { color:var(--blue); }
 .bnav-btn .bnav-dot {
   width:4px;height:4px;border-radius:50%;background:var(--blue);
@@ -182,7 +201,7 @@ input:focus, select:focus {
 .bnav-btn.on .bnav-dot { display:block; }
 
 /* ===== PAGES ===== */
-.page {display:none;padding:16px 16px 100px;}.page.on{display:block;}
+.page {display:none;padding:16px 16px calc(100px + env(safe-area-inset-bottom));}.page.on{display:block;}
 
 /* ===== CARDS ===== */
 .card {
@@ -202,8 +221,9 @@ input:focus, select:focus {
 
 /* ===== SCAN BUTTONS ===== */
 .btn-lg {
-  width:100%; padding:14px; font-size:17px; font-weight:700;
-  border-radius:12px; cursor:pointer; margin-top:10px; transition: all .2s;
+  width:100%; padding:18px; font-size:18px; font-weight:700;
+  border-radius:14px; cursor:pointer; margin-top:10px; transition: all .15s;
+  min-height: 56px; letter-spacing:.3px;
 }
 .btn-scan-go {
   background: linear-gradient(135deg, var(--green), var(--green-dark));
@@ -231,12 +251,12 @@ input:focus, select:focus {
   padding:0 16px; font-size:14px; font-weight:600;
   border-radius:10px; border:1.5px solid var(--border);
   background:#fff; color:var(--text); cursor:pointer;
-  transition: all .2s; white-space:nowrap;
+  transition: all .15s; white-space:nowrap; min-height:48px;
 }
-.mini-btn:active { background:var(--bg); }
+.mini-btn:active { background:var(--bg); transform:scale(0.97); }
 
 /* ===== LOG ===== */
-.log-wrap { max-height:200px; overflow-y:auto; }
+.log-wrap { max-height:260px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
 .log-item {
   display:flex; justify-content:space-between; align-items:flex-start;
   padding:10px 0; border-bottom:1px solid var(--border); gap:8px;
@@ -272,11 +292,11 @@ input:focus, select:focus {
 }
 .rscroll::-webkit-scrollbar { display:none; }
 .rtab {
-  padding:7px 16px; border-radius:20px;
+  padding:10px 18px; border-radius:20px;
   border:1.5px solid var(--border); background:#fff;
   color:var(--text2); font-size:14px; font-weight:600;
   white-space:nowrap; flex-shrink:0; cursor:pointer;
-  transition: all .2s;
+  transition: all .15s; min-height:42px;
 }
 .rtab.on {
   background: linear-gradient(135deg, var(--blue), var(--blue-dark));
@@ -286,10 +306,10 @@ input:focus, select:focus {
 
 /* ===== STUDENT LIST ===== */
 .stu-row {
-  padding:14px 0; border-bottom:1px solid var(--border); cursor:pointer;
-  transition: opacity .2s;
+  padding:16px 0; border-bottom:1px solid var(--border); cursor:pointer;
+  transition: opacity .15s; -webkit-tap-highlight-color: transparent;
 }
-.stu-row:active { opacity:.6; }
+.stu-row:active { opacity:.5; background:var(--bg); margin:0 -4px; padding-left:4px; padding-right:4px; border-radius:8px; }
 .stu-name { font-size:15px; font-weight:700; color:var(--text); }
 .stu-meta { font-size:13px; color:var(--text2); margin-top:2px; }
 .prog-bar {
@@ -303,10 +323,12 @@ input:focus, select:focus {
 }
 .dots-row { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
 .hw-dot {
-  width:28px; height:28px; border-radius:50%;
+  width:34px; height:34px; border-radius:50%;
   font-size:12px; font-weight:700;
   display:flex; align-items:center; justify-content:center;
+  transition: transform .15s;
 }
+.hw-dot:active { transform: scale(0.88); }
 .dot-ok { background:var(--green-light); color:var(--green-dark); }
 .dot-no { background:var(--bg); color:var(--text3); border:1.5px solid var(--border); }
 
@@ -318,27 +340,27 @@ input:focus, select:focus {
 }
 .ds-row {
   display:flex; justify-content:space-between; align-items:center;
-  font-size:14px; padding:8px 0;
-  border-bottom:1px solid var(--border);
+  font-size:14px; padding:12px 0;
+  border-bottom:1px solid var(--border); gap:8px;
 }
 .ds-row:last-child { border-bottom:none; }
 
 /* ===== MANAGE ===== */
 .add-btn {
-  width:100%; padding:13px; font-size:15px; font-weight:700;
-  border-radius:10px; border:none; cursor:pointer; margin-top:10px;
+  width:100%; padding:15px; font-size:16px; font-weight:700;
+  border-radius:12px; border:none; cursor:pointer; margin-top:10px;
   background: linear-gradient(135deg, var(--green), var(--green-dark));
   color:#fff; box-shadow: 0 3px 12px rgba(34,197,94,0.3);
-  transition: all .2s;
+  transition: all .15s; min-height:52px;
 }
-.add-btn:active { opacity:.85; transform:scale(0.98); }
+.add-btn:active { opacity:.85; transform:scale(0.97); }
 .del-btn {
-  padding:5px 11px; font-size:12px; font-weight:600;
+  padding:8px 12px; font-size:13px; font-weight:600;
   border-radius:8px; border:1.5px solid var(--red-light);
   background:var(--red-light); color:var(--red); cursor:pointer;
-  transition: all .2s;
+  transition: all .15s; min-height:40px;
 }
-.del-btn:active { background:#FCA5A5; }
+.del-btn:active { background:#FCA5A5; transform:scale(0.97); }
 .mini-tbl { width:100%; border-collapse:collapse; font-size:14px; table-layout:fixed; }
 .mini-tbl th {
   text-align:left; padding:8px 8px;
@@ -349,7 +371,7 @@ input:focus, select:focus {
   padding:9px 8px; border-bottom:1px solid var(--border);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text);
 }
-.tbl-wrap { max-height:200px; overflow-y:auto; margin-top:10px; }
+.tbl-wrap { max-height:220px; overflow-y:auto; margin-top:10px; -webkit-overflow-scrolling:touch; }
 
 /* ===== STUDENT VIEW ===== */
 .my-hw-card {
@@ -404,7 +426,7 @@ input:focus, select:focus {
 }
 .srch-wrap { position:relative; margin-bottom:12px; }
 .srch-wrap input {
-  padding-left:38px; background:#fff;
+  padding-left:40px; background:#fff; font-size:16px;
 }
 .srch-icon {
   position:absolute; left:12px; top:50%; transform:translateY(-50%);
@@ -429,8 +451,8 @@ input:focus, select:focus {
 .modal-overlay.on { display:flex; }
 .modal-sheet {
   background:#fff; border-radius:24px 24px 0 0;
-  padding:24px 20px 40px; width:100%; max-width:440px;
-  max-height:90vh; overflow-y:auto;
+  padding:24px 20px calc(40px + env(safe-area-inset-bottom)); width:100%; max-width:440px;
+  max-height:92vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
   animation: slideUp .3s ease;
 }
 @keyframes slideUp {
@@ -549,7 +571,7 @@ input:focus, select:focus {
 }
 .edit-modal-sheet {
   background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:440px;
-  padding:20px 20px 32px;box-shadow:0 -8px 32px rgba(0,0,0,0.2);
+  padding:20px 20px calc(32px + env(safe-area-inset-bottom));box-shadow:0 -8px 32px rgba(0,0,0,0.2);
 }
 .edit-modal-title {font-size:17px;font-weight:700;color:var(--text);margin-bottom:16px;}
 .score-input-row {
@@ -672,13 +694,13 @@ input:focus, select:focus {
 .scan-success-detail{font-size:14px;color:var(--text2);margin-bottom:4px;}
 .scan-success-score{font-size:16px;font-weight:700;color:var(--purple);margin-bottom:20px;}
 .scan-success-close {
-  width:100%;padding:13px;font-size:16px;font-weight:700;
-  border-radius:12px;border:none;cursor:pointer;
+  width:100%;padding:16px;font-size:17px;font-weight:700;
+  border-radius:14px;border:none;cursor:pointer;
   background:linear-gradient(135deg,var(--green),var(--green-dark));
   color:#fff;box-shadow:0 4px 16px rgba(34,197,94,0.4);
-  transition:all .2s;font-family:Sarabun,sans-serif;
+  transition:all .15s;font-family:Sarabun,sans-serif; min-height:54px;
 }
-.scan-success-close:active{opacity:.85;transform:scale(0.98);}
+.scan-success-close:active{opacity:.85;transform:scale(0.97);}
 
 </style>
 
@@ -1194,10 +1216,10 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
         </div>
       </div>
       <div class="manual-row">
-        <input type="number" id="manual-id" placeholder="พิมพ์รหัสนักเรียน..." inputmode="numeric">
+        <input type="number" id="manual-id" placeholder="รหัสนักเรียน..." inputmode="numeric">
         <input type="number" id="manual-score" placeholder="คะแนน" inputmode="numeric" min="0"
           style="flex:0 0 80px;margin:0;text-align:center;font-weight:700;color:var(--purple);">
-        <button class="mini-btn" onclick="submitManual()">ยืนยัน</button>
+        <button class="mini-btn" onclick="submitManual()" style="min-height:48px;padding:0 18px;font-size:15px;border-radius:12px;">ยืนยัน</button>
       </div>
       <button id="scan-toggle" class="btn-lg btn-scan-go" onclick="toggleScan()">📷 เปิดกล้องสแกน</button>
     </div>
@@ -1361,7 +1383,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
 
   <div class="bnav">
     <button class="bnav-btn on" onclick="showAP('scan',this)">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
         <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/>
         <path d="M17 14h4v4h-3v3h-4v-3"/>
@@ -1370,7 +1392,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       <div class="bnav-dot"></div>
     </button>
     <button class="bnav-btn" onclick="showAP('dash',this)">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/>
         <rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>
       </svg>
@@ -1378,7 +1400,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       <div class="bnav-dot"></div>
     </button>
     <button class="bnav-btn" onclick="showAP('manage',this)">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="3"/>
         <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
       </svg>
@@ -2739,6 +2761,26 @@ async function recordScan(sid, scoreOverride){
 
 function submitManual(){const v=document.getElementById('manual-id').value.trim();if(v){recordScan(v);document.getElementById('manual-id').value='';}}
 
+// ===== MOBILE UX HELPERS =====
+function dismissKeyboard(){
+  // Blur active input to dismiss mobile keyboard
+  if(document.activeElement && document.activeElement.blur) {
+    document.activeElement.blur();
+  }
+}
+
+// Auto-dismiss keyboard when scrolling starts
+let _touchStartY = 0;
+document.addEventListener('touchstart', e => { _touchStartY = e.touches[0].clientY; }, {passive:true});
+document.addEventListener('touchmove', e => {
+  if(Math.abs(e.touches[0].clientY - _touchStartY) > 10) dismissKeyboard();
+}, {passive:true});
+
+// Prevent double-tap zoom on buttons
+document.addEventListener('dblclick', e => {
+  if(e.target.tagName === 'BUTTON' || e.target.closest('button')) e.preventDefault();
+});
+
 function toggleScan(){if(!scanning)startScan();else stopScan();}
 
 let _scanCooldown=false;
@@ -3272,6 +3314,27 @@ async function exportPDF(data,pf){const{jsPDF}=window.jspdf;const doc=new jsPDF(
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
+  initMobileModals();
 });
+
+function initMobileModals(){
+  // Add pull-down-to-close for bottom sheet modals
+  const sheets = document.querySelectorAll('.modal-sheet, .edit-modal-sheet');
+  sheets.forEach(sheet => {
+    let startY = 0;
+    sheet.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, {passive:true});
+    sheet.addEventListener('touchend', e => {
+      const dy = e.changedTouches[0].clientY - startY;
+      if(dy > 80) { // swipe down 80px to close
+        const overlay = sheet.closest('.modal-overlay, .edit-modal-overlay');
+        if(overlay) overlay.classList.remove('on');
+        const editOverlay = document.getElementById('edit-stu-modal');
+        if(sheet.closest('#edit-stu-modal')) closeEditStu();
+        const exportOverlay = document.getElementById('export-modal');
+        if(sheet.closest('#export-modal')) closeExportModal();
+      }
+    }, {passive:true});
+  });
+}
 </script>
 </html>
