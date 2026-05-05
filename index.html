@@ -3738,7 +3738,7 @@ async function confirmXLImport(){
     }
     cancelXLImport();renderManage();
     if(_lastImportedStudents.length>0)document.getElementById('qr-gen-card').style.display='';
-    toast(`✅ นำเข้าแล้ว ${newStudents.length} คน${skipped?` (ข้าม ${skipped} ซ้ำ)`:''}`);
+    toast('✅ นำเข้าแล้ว '+newStudents.length+' คน'+(skipped?' (ข้าม '+skipped+' ซ้ำ)':''));
   } catch(e){toast('นำเข้าไม่สำเร็จ: '+e.message,'err');}
 }
 
