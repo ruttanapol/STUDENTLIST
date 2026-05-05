@@ -1288,6 +1288,22 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       <div id="sa-approved-list"></div>
     </div>
 
+    <!-- Cleanup Orphan Data -->
+<div class="card" style="border-color:#FCA5A5;background:linear-gradient(135deg,#FFF5F5,#FEE2E2);">
+  <div class="card-title" style="color:var(--red);">🗑️ ล้างข้อมูลครูที่ถูกลบ</div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6;">
+    ล้างข้อมูลนักเรียน งาน และการส่งงานที่ไม่มีครูในระบบแล้ว
+  </div>
+  <div id="orphan-stats" style="margin-bottom:12px;"></div>
+  <div style="display:flex;gap:8px;">
+    <button onclick="checkOrphanData()" style="flex:1;padding:11px;font-size:13px;font-weight:700;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-family:Sarabun,sans-serif;">
+      🔍 ตรวจสอบ
+    </button>
+    <button onclick="cleanOrphanData()" id="clean-orphan-btn" style="flex:1;padding:11px;font-size:13px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,var(--red),#DC2626);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;display:none;">
+      🗑️ ล้างข้อมูล
+    </button>
+  </div>
+</div>
     <!-- Rejected Teachers -->
     <div class="card" style="border-color:#FCA5A5;background:linear-gradient(135deg,#FFF5F5,#FEE2E2);">
       <div class="card-title" style="color:var(--red);">❌ ปฏิเสธการเข้าถึง</div>
@@ -4412,6 +4428,91 @@ function showSlipScreen(teacher) {
   }
 }
 
+// ===== ORPHAN DATA CLEANUP =====
+async function checkOrphanData() {
+  if(!USE_SUPABASE||!SB) return;
+  const statsEl = document.getElementById('orphan-stats');
+  statsEl.innerHTML = '<div style="font-size:13px;color:var(--text3);">⏳ กำลังตรวจสอบ...</div>';
+
+  try {
+    // ดึง teacher ids ที่มีอยู่
+    const {data:teachers} = await SB.from('teachers').select('id');
+    const teacherIds = (teachers||[]).map(t => t.id);
+
+    // นับข้อมูลค้าง
+    const {data:stuData} = await SB.from('students').select('teacher_id');
+    const {data:hwData} = await SB.from('homeworks').select('teacher_id');
+    const {data:subData} = await SB.from('submissions').select('teacher_id');
+
+    const orphanStu = (stuData||[]).filter(r => !teacherIds.includes(r.teacher_id)).length;
+    const orphanHw = (hwData||[]).filter(r => !teacherIds.includes(r.teacher_id)).length;
+    const orphanSub = (subData||[]).filter(r => !teacherIds.includes(r.teacher_id)).length;
+    const total = orphanStu + orphanHw + orphanSub;
+
+    if(total === 0) {
+      statsEl.innerHTML = `
+        <div style="background:var(--green-light);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--green-dark);font-weight:600;">
+          ✅ ไม่มีข้อมูลค้างในระบบ
+        </div>`;
+      document.getElementById('clean-orphan-btn').style.display='none';
+    } else {
+      statsEl.innerHTML = `
+        <div style="background:var(--red-light);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:13px;font-weight:700;color:#B91C1C;margin-bottom:8px;">⚠️ พบข้อมูลค้าง ${total} รายการ</div>
+          <div style="font-size:12px;color:#991B1B;line-height:2;">
+            👤 นักเรียน: <b>${orphanStu} คน</b><br>
+            📝 ชิ้นงาน: <b>${orphanHw} ชิ้น</b><br>
+            ✅ การส่งงาน: <b>${orphanSub} รายการ</b>
+          </div>
+        </div>`;
+      document.getElementById('clean-orphan-btn').style.display='block';
+    }
+  } catch(e) {
+    statsEl.innerHTML = `<div style="font-size:13px;color:var(--red);">❌ เกิดข้อผิดพลาด: ${e.message}</div>`;
+  }
+}
+
+async function cleanOrphanData() {
+  if(!confirm('ยืนยันลบข้อมูลที่ไม่มีครูในระบบแล้ว?\n\nการดำเนินการนี้ไม่สามารถย้อนกลับได้')) return;
+
+  const statsEl = document.getElementById('orphan-stats');
+  statsEl.innerHTML = '<div style="font-size:13px;color:var(--text3);">⏳ กำลังล้างข้อมูล...</div>';
+
+  try {
+    const {data:teachers} = await SB.from('teachers').select('id');
+    const teacherIds = (teachers||[]).map(t => t.id);
+
+    // ดึงข้อมูลค้างแล้วลบทีละตัว
+    const {data:stuData} = await SB.from('students').select('id,teacher_id');
+    const orphanStuIds = (stuData||[]).filter(r => !teacherIds.includes(r.teacher_id)).map(r => r.id);
+
+    const {data:hwData} = await SB.from('homeworks').select('id,teacher_id');
+    const orphanHwIds = (hwData||[]).filter(r => !teacherIds.includes(r.teacher_id)).map(r => r.id);
+
+    const {data:subData} = await SB.from('submissions').select('id,teacher_id');
+    const orphanSubIds = (subData||[]).filter(r => !teacherIds.includes(r.teacher_id)).map(r => r.id);
+
+    // ลบข้อมูลค้าง
+    if(orphanSubIds.length) await SB.from('submissions').delete().in('id', orphanSubIds);
+    if(orphanHwIds.length) await SB.from('homeworks').delete().in('id', orphanHwIds);
+    if(orphanStuIds.length) await SB.from('students').delete().in('id', orphanStuIds);
+
+    statsEl.innerHTML = `
+      <div style="background:var(--green-light);border-radius:10px;padding:12px 14px;">
+        <div style="font-size:13px;font-weight:700;color:var(--green-dark);margin-bottom:6px;">✅ ล้างข้อมูลสำเร็จ</div>
+        <div style="font-size:12px;color:#166534;line-height:2;">
+          👤 นักเรียน: <b>${orphanStuIds.length} คน</b><br>
+          📝 ชิ้นงาน: <b>${orphanHwIds.length} ชิ้น</b><br>
+          ✅ การส่งงาน: <b>${orphanSubIds.length} รายการ</b>
+        </div>
+      </div>`;
+    document.getElementById('clean-orphan-btn').style.display='none';
+    toast2('ล้างข้อมูลสำเร็จ ✅');
+  } catch(e) {
+    statsEl.innerHTML = `<div style="font-size:13px;color:var(--red);">❌ เกิดข้อผิดพลาด: ${e.message}</div>`;
+    toast2('เกิดข้อผิดพลาด: '+e.message,'err');
+  }
+}
   
 window.addEventListener('load', () => {
   checkSetupOnLoad();
