@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+<link rel="icon" href="data:,">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1060,14 +1061,17 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
             <div class="panel-desc">ดูสถานะการส่งงานของตัวเอง</div>
           </div>
         </div>
-        <label for="stu-teacher-select">เลือกครูผู้สอน</label>
-        <div style="position:relative;">
-          <select id="stu-teacher-select" style="font-size:15px;padding:11px 14px;width:100%;appearance:none;"
-            onchange="onStuTeacherChange()">
-            <option value="">— กำลังโหลด... —</option>
-          </select>
-          <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text2);">▾</span>
-        </div>
+        <label for="stu-teacher-search">ค้นหาครูผู้สอน</label>
+<div style="position:relative;">
+  <input type="text" id="stu-teacher-search" placeholder="พิมพ์ชื่อครู..." autocomplete="off"
+    oninput="filterTeacherList(this.value)"
+    onfocus="document.getElementById('teacher-dropdown').style.display='block'"
+    style="font-size:15px;padding:11px 14px;width:100%;">
+  <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text2);">🔍</span>
+</div>
+<div id="teacher-dropdown" style="display:none;background:#fff;border:1.5px solid var(--border);border-radius:10px;margin-top:4px;max-height:180px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.1);z-index:100;position:relative;">
+</div>
+<input type="hidden" id="stu-teacher-select">
         <label for="stu-id" style="margin-top:10px;">เลขประจำตัวนักเรียน</label>
         <input type="text" id="stu-id" placeholder="เช่น 66001" inputmode="numeric"
           onkeydown="if(event.key==='Enter')loginStudent()">
@@ -2694,29 +2698,55 @@ function renderSATeacherData(){
 }
 
 // ครูที่ถูกเลือกโดยนักเรียน (สำหรับการเข้าดูงาน)
-let STU_SELECTED_TEACHER = null; // {id, display_name, username}
 
-function onStuTeacherChange(){
-  const sel=document.getElementById('stu-teacher-select');
-  const opt=sel.options[sel.selectedIndex];
-  if(!opt||!opt.value){STU_SELECTED_TEACHER=null;return;}
-  STU_SELECTED_TEACHER={id:opt.value, display_name:opt.dataset.name||opt.text, username:opt.dataset.username||''};
-}
+
+let _allTeachers = [];
 
 async function loadTeacherListForStudent(){
   if(!USE_SUPABASE||!SB){return;}
   try{
     const {data,error}=await SB.from('teachers').select('id,display_name,username,first_name,last_name').eq('status','approved').order('display_name');
-    const sel=document.getElementById('stu-teacher-select');
     if(error||!data||!data.length){
-      sel.innerHTML='<option value="">— ยังไม่มีครูในระบบ —</option>';
+      document.getElementById('stu-teacher-search').placeholder='— ยังไม่มีครูในระบบ —';
       return;
     }
-    sel.innerHTML='<option value="">— เลือกครูผู้สอน —</option>'+
-      data.map(t=>`<option value="${t.id}" data-name="${t.display_name}" data-username="${t.username||''}">${t.display_name}${t.username?' (@'+t.username+')':''}</option>`).join('');
+    _allTeachers = data;
+    renderTeacherDropdown(data);
   }catch(e){
-    document.getElementById('stu-teacher-select').innerHTML='<option value="">— โหลดไม่สำเร็จ —</option>';
+    document.getElementById('stu-teacher-search').placeholder='— โหลดไม่สำเร็จ —';
   }
+}
+
+function renderTeacherDropdown(teachers){
+  const dd = document.getElementById('teacher-dropdown');
+  if(!teachers.length){
+    dd.innerHTML='<div style="padding:12px;font-size:13px;color:var(--text3);text-align:center;">ไม่พบครู</div>';
+    return;
+  }
+  dd.innerHTML = teachers.map(t=>`
+    <div onclick="selectTeacher('${t.id}','${t.display_name}','${t.username||''}')"
+      style="padding:12px 14px;font-size:14px;font-weight:600;color:var(--text);cursor:pointer;border-bottom:1px solid var(--border);transition:background .15s;"
+      onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='#fff'">
+      ${t.display_name}${t.username?' <span style="color:var(--text3);font-weight:400;font-size:12px;">@'+t.username+'</span>':''}
+    </div>`).join('');
+}
+
+function filterTeacherList(q){
+  const dd = document.getElementById('teacher-dropdown');
+  dd.style.display = 'block';
+  if(!q.trim()){renderTeacherDropdown(_allTeachers);return;}
+  const filtered = _allTeachers.filter(t=>
+    t.display_name.toLowerCase().includes(q.toLowerCase()) ||
+    (t.username||'').toLowerCase().includes(q.toLowerCase())
+  );
+  renderTeacherDropdown(filtered);
+}
+
+function selectTeacher(id, name, username){
+  STU_SELECTED_TEACHER = {id, display_name:name, username};
+  document.getElementById('stu-teacher-search').value = name;
+  document.getElementById('stu-teacher-select').value = id;
+  document.getElementById('teacher-dropdown').style.display = 'none';
 }
 
 async function loginStudent(){
@@ -3710,6 +3740,13 @@ window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
   initMobileModals();
+  document.addEventListener('click', e => {
+  const search = document.getElementById('stu-teacher-search');
+  const dd = document.getElementById('teacher-dropdown');
+  if(dd && search && !search.contains(e.target) && !dd.contains(e.target)){
+    dd.style.display = 'none';
+    }
+  }
 });
 
 function initMobileModals(){
