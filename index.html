@@ -1911,6 +1911,7 @@ function setupRealtime() {
       if(document.getElementById('s-admin')?.classList.contains('on')) { renderDashboard(); renderStudentIfOpen(); }
       if(document.getElementById('s-stu')?.classList.contains('on') && _currentStuId) {
     await refreshStudentView();
+  }
     })
     .on('postgres_changes', {event:'*', schema:'public', table:'students'}, async () => {
       await reloadStudents();
