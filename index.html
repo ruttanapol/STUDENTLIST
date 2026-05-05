@@ -1907,9 +1907,11 @@ function setupRealtime() {
   const channelName = CURRENT_TEACHER ? 'db-changes-'+CURRENT_TEACHER.id : 'db-changes-global';
   realtimeChannel = SB.channel(channelName)
     .on('postgres_changes', {event:'*', schema:'public', table:'submissions'}, async () => {
-      await reloadSubmissions();
-      if(document.getElementById('s-admin')?.classList.contains('on')) { renderDashboard(); renderStudentIfOpen(); }
-      if(document.getElementById('s-stu')?.classList.contains('on') && _currentStuId) {
+  await reloadSubmissions();  // ✓ มี await แล้ว
+  if(document.getElementById('s-admin')?.classList.contains('on')) { 
+    renderDashboard();   // ✓ เรียกหลัง reload เสร็จแล้ว
+    renderStudentIfOpen(); 
+  }
     await refreshStudentView();
   }
     })
@@ -2904,6 +2906,7 @@ async function recordScan(sid, scoreOverride){
       toast('บันทึก '+stu.name+(scoreText!==null?' ('+scoreText+'/'+maxScore+')':'')+'✅');
       playScanSuccess();
       showScanSuccessPopup(stu.name, hwNum, hwTitle, scoreText, maxScore);
+      renderDashboard(); 
       stopScan();
     } catch(e) {
       item.innerHTML=`<div class="log-main"><div style="font-weight:700;">${stu.name}</div><div class="log-sub">บันทึกไม่สำเร็จ: ${e.message}</div></div><span class="badge b-err">Error</span>`;
