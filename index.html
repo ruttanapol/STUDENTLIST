@@ -3042,11 +3042,7 @@ function renderStudentView(s, stuDB){
     html += `</div></div>`;
   });
 }
-      const sub=db.submissions[s.id+'_'+h.num];
-      html+=`<div class="my-hw-row"><div><div style="font-size:15px;font-weight:700;color:var(--text);">ชิ้นที่ ${h.num}: ${h.title}</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">${h.subject}</div></div>${sub?`<div class="hw-status-ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>${sub.score!==null&&sub.score!==undefined?sub.score+'/'+(sub.maxScore||h.maxScore||100)+' คะแนน':sub.ts}</div>`:`<div class="hw-status-no"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>ยังไม่ส่ง</div>`}</div>`;
-    });
-    html+='</div>';
-  }
+      
   document.getElementById('stu-content').innerHTML=html;
 }
 async function refreshStudentView(){
