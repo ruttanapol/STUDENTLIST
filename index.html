@@ -42,6 +42,30 @@ body { background: var(--bg); min-height: 100vh; overscroll-behavior: none; }
 .app{max-width:440px;margin:0 auto;min-height:100vh;
   padding-bottom: env(safe-area-inset-bottom);
 }
+@media(min-width:600px){
+  .app{max-width:600px;}
+}
+@media(min-width:900px){
+  .app{max-width:800px;}
+  .stats2{grid-template-columns:repeat(4,1fr);}
+  .room-card-grid{grid-template-columns:repeat(3,1fr);}
+  .export-type-row{grid-template-columns:repeat(3,1fr);}
+  .room-grid{grid-template-columns:repeat(5,1fr);}
+  .dots-row .hw-dot{width:38px;height:38px;font-size:13px;}
+  .modal-sheet{max-width:600px;}
+  .edit-modal-sheet{max-width:600px;}
+  .code-modal-sheet{max-width:600px;}
+}
+@media(min-width:1200px){
+  .app{max-width:960px;}
+  .login-wrap .login-inner{max-width:500px;margin:0 auto;}
+  .page{padding:20px 24px calc(100px + env(safe-area-inset-bottom));}
+  .card{padding:20px;}
+  .bnav{max-width:960px;}
+  .topbar{max-width:960px;}
+}
+  padding-bottom: env(safe-area-inset-bottom);
+}
 
 /* ===== TOUCH IMPROVEMENTS ===== */
 button, [onclick] { cursor: pointer; touch-action: manipulation; }
