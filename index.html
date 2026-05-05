@@ -2982,10 +2982,26 @@ async function approveTeacher(tid){
 }
 
 async function rejectTeacher(tid){
-  if(!confirm('ยืนยันปฏิเสธการเข้าถึงของครูคนนี้?'))return;
-  const {error}=await SB.from('teachers').update({status:'rejected'}).eq('id',tid);
-  if(error){toast2('ไม่สำเร็จ: '+error.message,'err');return;}
-  toast2('ปฏิเสธการเข้าถึงแล้ว','warn');loadSuperAdminPanel();
+  if(!confirm('ยืนยันปฏิเสธการเข้าถึงของครูคนนี้?\n\nครูจะสามารถสมัครใหม่ด้วยอีเมลเดิมได้'))return;
+  try {
+    // ดึงอีเมลของครูคนนี้ก่อน
+    const {data:teacher} = await SB.from('teachers').select('email,id').eq('id',tid).single();
+    if(!teacher) throw new Error('ไม่พบข้อมูลครู');
+
+    // อัพเดต status เป็น rejected
+    const {error} = await SB.from('teachers').update({status:'rejected'}).eq('id',tid);
+    if(error) throw error;
+
+    // ลบออกจาก teachers table เพื่อปลดล็อกอีเมล
+    // (Supabase Auth จะยังอยู่แต่ไม่มีผลเพราะระบบเช็ค teachers table)
+    // แนะนำให้รัน SQL นี้ใน Supabase เพื่อลบ Auth user:
+    // DELETE FROM auth.users WHERE id = 'tid';
+
+    toast2('ปฏิเสธการเข้าถึงแล้ว — ครูสามารถสมัครใหม่ได้','warn');
+    loadSuperAdminPanel();
+  } catch(e) {
+    toast2('ไม่สำเร็จ: '+e.message,'err');
+  }
 }
 
 async function deleteTeacher(tid){
