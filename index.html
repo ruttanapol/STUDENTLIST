@@ -1909,6 +1909,8 @@ function setupRealtime() {
     .on('postgres_changes', {event:'*', schema:'public', table:'submissions'}, async () => {
       await reloadSubmissions();
       if(document.getElementById('s-admin')?.classList.contains('on')) { renderDashboard(); renderStudentIfOpen(); }
+      if(document.getElementById('s-stu')?.classList.contains('on') && _currentStuId) {
+    await refreshStudentView();
     })
     .on('postgres_changes', {event:'*', schema:'public', table:'students'}, async () => {
       await reloadStudents();
@@ -2786,7 +2788,20 @@ function renderStudentView(s, stuDB){
   }
   document.getElementById('stu-content').innerHTML=html;
 }
-
+async function refreshStudentView(){
+  if(!_currentStuId || !_currentStuTeacher) return;
+  const tid = _currentStuTeacher.id;
+  const {data:subData} = await SB.from('submissions').select('*')
+    .eq('student_id', _currentStuId).eq('teacher_id', tid);
+  (subData||[]).forEach(r => {
+    _currentStuDB.submissions[r.student_id+'_'+r.hw_num] = {
+      sid:r.student_id, hwNum:r.hw_num, hwTitle:r.hw_title,
+      room:r.room, score:r.score, maxScore:r.max_score||100,
+      ts:r.submitted_at ? new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : ''
+    };
+  });
+  renderStudentView(_currentStuDB.student, _currentStuDB);
+}
 function showAP(id,btn){
   document.querySelectorAll('#s-admin .page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('on'));
