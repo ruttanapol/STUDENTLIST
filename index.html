@@ -2870,7 +2870,7 @@ async function loadSuperAdminPanel(){
   try{
     // แสดง loading
     document.getElementById('sa-pending-list').innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);">⏳ กำลังโหลด...</div>';
-    const {data,error}=await SB.from('teachers').select('id,email,username,first_name,last_name,display_name,status,created_at,expires_at').order('created_at');
+    const {data,error}=await SB.from('teachers').select('id,email,username,first_name,last_name,display_name,status,created_at,expires_at,slip_url,slip_uploaded_at').order('created_at');
     if(error)throw error;
     renderTeacherList(data||[]);
     loadContactSettings();
@@ -2910,6 +2910,14 @@ const slipUploaded=teachers.filter(t=>t.status==='slip_uploaded');
         <div>
           <div style="font-size:15px;font-weight:700;color:var(--text);">${t.display_name}</div>
           <div style="font-size:12px;color:var(--text2);margin-top:2px;">📧 ${t.email||'-'}${t.username?' · @'+t.username:''}</div><div style="font-size:11px;color:var(--text3);margin-top:1px;">${t.first_name||''} ${t.last_name||''} · สมัคร: ${new Date(t.created_at).toLocaleDateString('th-TH')}</div>${renderExpireBadge(t.expires_at)}
+         ${t.slip_url?`
+<div style="margin-top:8px;">
+  <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">💳 สลิปการชำระเงิน</div>
+  <img src="${t.slip_url}" 
+    onclick="window.open('${t.slip_url}','_blank')"
+    style="width:100%;max-height:140px;object-fit:contain;border-radius:10px;border:1.5px solid var(--border);cursor:pointer;background:#f8f8f8;">
+  <div style="font-size:10px;color:var(--text3);margin-top:3px;text-align:center;">🔍 กดที่รูปเพื่อดูขนาดเต็ม</div>
+</div>`:'<div style="margin-top:6px;font-size:11px;color:var(--text3);">ยังไม่ส่งสลิป</div>'}
           <div style="margin-top:6px;">
             <span style="font-size:12px;padding:3px 10px;border-radius:20px;font-weight:700;${
               t.status==='pending'?'background:#FEF3C7;color:#B45309;':
