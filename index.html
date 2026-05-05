@@ -244,6 +244,36 @@ input:focus, select:focus {
 }
 .lbl:first-child { margin-top:0; }
 
+/* ===== PROFILEPIC ===== */  
+  .avatar-circle {
+  width:72px;height:72px;border-radius:50%;
+  object-fit:cover;border:3px solid rgba(255,255,255,0.4);
+  background:rgba(255,255,255,0.2);flex-shrink:0;
+}
+.avatar-circle-sm {
+  width:40px;height:40px;border-radius:50%;
+  object-fit:cover;border:2px solid rgba(255,255,255,0.4);
+  background:rgba(255,255,255,0.2);flex-shrink:0;
+}
+.avatar-upload-wrap {
+  position:relative;width:80px;height:80px;margin:0 auto 16px;cursor:pointer;
+}
+.avatar-upload-wrap img {
+  width:80px;height:80px;border-radius:50%;object-fit:cover;
+  border:3px solid var(--blue);
+}
+.avatar-upload-btn {
+  position:absolute;bottom:0;right:0;
+  width:26px;height:26px;border-radius:50%;
+  background:var(--blue);border:2px solid #fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;cursor:pointer;
+}
+.teacher-card-avatar {
+  width:52px;height:52px;border-radius:50%;
+  object-fit:cover;border:2px solid var(--blue-light);
+  background:var(--bg);flex-shrink:0;
+}
 /* ===== SCAN BUTTONS ===== */
 .btn-lg {
   width:100%; padding:18px; font-size:18px; font-weight:700;
@@ -1032,6 +1062,15 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
             style="padding-left:28px;" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')">
           <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;">@</span>
         </div>
+        <!-- Avatar Upload -->
+<div style="text-align:center;margin-bottom:14px;">
+  <div class="avatar-upload-wrap" onclick="document.getElementById('reg-avatar-input').click()">
+    <div id="reg-avatar-preview" style="width:80px;height:80px;border-radius:50%;background:var(--blue-light);border:3px solid var(--blue);display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--blue);">📷</div>
+    <div class="avatar-upload-btn">✏️</div>
+  </div>
+  <div style="font-size:12px;color:var(--text2);">กดเพื่อเพิ่มรูปโปรไฟล์ (ไม่บังคับ)</div>
+  <input type="file" id="reg-avatar-input" accept="image/jpeg,image/png" style="display:none;" onchange="previewRegAvatar(event)">
+</div>
         <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:3px;">ใช้ตัวอักษรภาษาอังกฤษ ตัวเลข หรือ _ เท่านั้น</div>
         <label style="margin-top:10px;">อีเมล</label>
         <input type="email" id="reg-teacher-email" placeholder="your@email.com" autocomplete="email">
@@ -1249,7 +1288,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
 <div id="s-admin" class="screen">
   <div class="topbar">
     <div class="tb-left">
-      <div class="tb-avatar av-admin">ครู</div>
+      <div id="teacher-topbar-avatar" class="tb-avatar av-admin">ครู</div>
       <div>
         <div class="tb-name" id="teacher-topbar-name">ครู</div>
         <div class="tb-role" id="teacher-topbar-email" style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:1px;">ระบบตรวจส่งงาน</div>
@@ -1596,6 +1635,15 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   <div style="background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:440px;padding:24px 20px 36px;box-shadow:0 -8px 32px rgba(0,0,0,0.2);animation:slideUp .3s ease;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
       <div style="font-size:18px;font-weight:800;color:var(--text);">👤 แก้ไขโปรไฟล์</div>
+      <!-- Avatar in Profile -->
+<div style="text-align:center;margin-bottom:16px;">
+  <div class="avatar-upload-wrap" onclick="document.getElementById('profile-avatar-input').click()">
+    <div id="profile-avatar-preview" style="width:80px;height:80px;border-radius:50%;background:var(--blue-light);border:3px solid var(--blue);display:flex;align-items:center;justify-content:center;font-size:28px;">👤</div>
+    <div class="avatar-upload-btn">✏️</div>
+  </div>
+  <div style="font-size:12px;color:var(--text2);margin-top:4px;">กดเพื่อเปลี่ยนรูปโปรไฟล์</div>
+  <input type="file" id="profile-avatar-input" accept="image/jpeg,image/png" style="display:none;" onchange="previewProfileAvatar(event)">
+</div>
       <button onclick="closeProfileModal()" style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;color:var(--text2);">✕</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:10px;">
@@ -1758,7 +1806,7 @@ async function tryRestoreSession(){
       username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||''};
     await loadFromSupabase();
     setTimeout(()=>setupRealtime(),500);
-    document.getElementById('teacher-topbar-name').textContent=teacher.display_name;
+    document.getElementById('teacher-topbar-name').textContent=teacher.display_name;if(teacher.avatar_url) updateTopbarAvatar(teacher.avatar_url);
     document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
     showScreen('s-admin');
     populateScanSelects();
@@ -2074,7 +2122,13 @@ async function sbUpdateStudent(oldId, stu) {
     saveDB();
   }
 }
-
+function updateTopbarAvatar(url) {
+  const el = document.getElementById('teacher-topbar-avatar');
+  if(!el) return;
+  if(url) {
+    el.innerHTML = `<img src="${url}" style="width:36px;height:36px;border-radius:10px;object-fit:cover;">`;
+  }
+}
 async function sbDeleteStudent(id) {
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
@@ -2286,7 +2340,7 @@ if(teacher.expires_at && new Date(teacher.expires_at) < new Date()){
     CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||''};
     await loadFromSupabase();
     setTimeout(()=>setupRealtime(),500);
-    document.getElementById('teacher-topbar-name').textContent=teacher.display_name;
+    document.getElementById('teacher-topbar-name').textContent=teacher.display_name;if(teacher.avatar_url) updateTopbarAvatar(teacher.avatar_url);
     document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
     document.getElementById('teacher-email-input').value='';
     document.getElementById('teacher-pw-input').value='';
@@ -2334,6 +2388,14 @@ async function registerTeacher(){
       display_name:displayName, status:'pending'
     });
     if(insertErr&&!insertErr.message.includes('duplicate'))throw insertErr;
+    // อัพโหลดรูปถ้ามี
+const avatarFile = document.getElementById('reg-avatar-input').files[0];
+if(avatarFile) {
+  const avatarUrl = await uploadAvatar(avatarFile, uid);
+  if(avatarUrl) {
+    await SB.from('teachers').update({avatar_url: avatarUrl}).eq('id', uid);
+  }
+}
     document.getElementById('reg-success').style.display='block';
     document.getElementById('reg-first-name').value='';
     document.getElementById('reg-last-name').value='';
@@ -2412,6 +2474,11 @@ function showProfileModal(){
     document.getElementById('profile-username').value=data.username||'';
     document.getElementById('profile-display-name').value=data.display_name||'';
     document.getElementById('profile-email').value=data.email||'';
+    // โหลดรูปโปรไฟล์
+const prev = document.getElementById('profile-avatar-preview');
+if(data.avatar_url) {
+  prev.innerHTML = `<img src="${data.avatar_url}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;">`;
+}
     document.getElementById('profile-err').textContent='';
     document.getElementById('profile-success').style.display='none';
     document.getElementById('teacher-profile-modal').style.display='flex';
@@ -2446,6 +2513,16 @@ async function saveProfile(){
     }).eq('id',CURRENT_TEACHER.id);
     if(error)throw error;
     // อัปเดต local state
+    // อัพโหลดรูปถ้ามีการเลือกใหม่
+const avatarFile = document.getElementById('profile-avatar-input').files[0];
+if(avatarFile) {
+  const avatarUrl = await uploadAvatar(avatarFile, CURRENT_TEACHER.id);
+  if(avatarUrl) {
+    await SB.from('teachers').update({avatar_url: avatarUrl}).eq('id', CURRENT_TEACHER.id);
+    CURRENT_TEACHER.avatar_url = avatarUrl;
+    updateTopbarAvatar(avatarUrl);
+  }
+}
     CURRENT_TEACHER.display_name=displayName;
     document.getElementById('teacher-topbar-name').textContent=displayName;
     document.getElementById('profile-display-name').value=displayName;
@@ -2753,7 +2830,7 @@ let _allTeachers = [];
 async function loadTeacherListForStudent(){
   if(!USE_SUPABASE||!SB){return;}
   try{
-    const {data,error}=await SB.from('teachers').select('id,display_name,username,first_name,last_name').eq('status','approved').order('display_name');
+    const {data,error}=await SB.from('teachers').select('id,display_name,username,first_name,last_name,avatar_url').eq('status','approved').order('display_name');
     if(error||!data||!data.length){
       document.getElementById('stu-teacher-search').placeholder='— ยังไม่มีครูในระบบ —';
       return;
@@ -2775,7 +2852,20 @@ function renderTeacherDropdown(teachers){
   teachers.forEach(function(t){
     const div = document.createElement('div');
     div.style.cssText='padding:12px 14px;font-size:14px;font-weight:600;color:var(--text);cursor:pointer;border-bottom:1px solid var(--border);transition:background .15s;';
-    div.textContent = t.display_name + (t.username ? ' (@'+t.username+')' : '');
+    div.style.display = 'flex';
+div.style.alignItems = 'center';
+div.style.gap = '10px';
+const avatarEl = document.createElement('div');
+if(t.avatar_url) {
+  avatarEl.innerHTML = `<img src="${t.avatar_url}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">`;
+} else {
+  avatarEl.style.cssText = 'width:36px;height:36px;border-radius:50%;background:var(--blue-light);color:var(--blue-dark);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;';
+  avatarEl.textContent = (t.display_name||'?').substring(0,2);
+}
+const nameEl = document.createElement('div');
+nameEl.innerHTML = `<div style="font-size:14px;font-weight:700;color:var(--text);">${t.display_name}</div>${t.username?`<div style="font-size:12px;color:var(--text3);">@${t.username}</div>`:''}`;
+div.appendChild(avatarEl);
+div.appendChild(nameEl);
     div.addEventListener('mouseover', function(){ this.style.background='var(--bg)'; });
     div.addEventListener('mouseout', function(){ this.style.background='#fff'; });
     div.addEventListener('click', function(){
@@ -3881,6 +3971,69 @@ async function saveTeacherExpiry(tid, expiresAt) {
   if(error){toast2('บันทึกไม่สำเร็จ: '+error.message,'err');return;}
   toast2('บันทึกอายุการใช้งานแล้ว ✅');
   loadSuperAdminPanel();
+}
+
+// ===== AVATAR UPLOAD =====
+const AVATAR_MAX_MB = 2;
+const AVATAR_ALLOWED = ['image/jpeg','image/png'];
+
+async function uploadAvatar(file, teacherId) {
+  if(!file) return null;
+  if(!AVATAR_ALLOWED.includes(file.type)) {
+    toast('อนุญาตเฉพาะ JPG/PNG เท่านั้น','err'); return null;
+  }
+  if(file.size > AVATAR_MAX_MB * 1024 * 1024) {
+    toast('ไฟล์ใหญ่เกิน '+AVATAR_MAX_MB+'MB','err'); return null;
+  }
+  const ext = file.type === 'image/png' ? 'png' : 'jpg';
+  const path = `${teacherId}/avatar.${ext}`;
+  const { error } = await SB.storage.from('avatars').upload(path, file, {
+    upsert: true, contentType: file.type
+  });
+  if(error) { toast('อัพโหลดไม่สำเร็จ: '+error.message,'err'); return null; }
+  const { data } = SB.storage.from('avatars').getPublicUrl(path);
+  // เพิ่ม timestamp กัน cache
+  return data.publicUrl + '?t=' + Date.now();
+}
+
+function getAvatarUrl(url, name) {
+  if(url) return url;
+  // Fallback: แสดงตัวอักษรแรก
+  return null;
+}
+
+function avatarImgOrInitial(url, name, cls) {
+  if(url) {
+    return `<img src="${url}" class="${cls}" onerror="this.style.display='none';this.nextSibling.style.display='flex';">
+    <div style="display:none;" class="${cls}" style="background:var(--blue-light);color:var(--blue-dark);font-weight:700;align-items:center;justify-content:center;font-size:16px;">${(name||'?').substring(0,2)}</div>`;
+  }
+  return `<div class="${cls}" style="background:var(--blue-light);color:var(--blue-dark);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:16px;">${(name||'?').substring(0,2)}</div>`;
+}
+
+function previewRegAvatar(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  if(!AVATAR_ALLOWED.includes(file.type)){toast('อนุญาตเฉพาะ JPG/PNG','err');return;}
+  if(file.size > AVATAR_MAX_MB*1024*1024){toast('ไฟล์ใหญ่เกิน 2MB','err');return;}
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const prev = document.getElementById('reg-avatar-preview');
+    prev.innerHTML = `<img src="${ev.target.result}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+  function previewProfileAvatar(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  if(!AVATAR_ALLOWED.includes(file.type)){toast('อนุญาตเฉพาะ JPG/PNG','err');return;}
+  if(file.size > AVATAR_MAX_MB*1024*1024){toast('ไฟล์ใหญ่เกิน 2MB','err');return;}
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const prev = document.getElementById('profile-avatar-preview');
+    prev.innerHTML = `<img src="${ev.target.result}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;">`;
+  };
+  reader.readAsDataURL(file);
 }
 window.addEventListener('load', () => {
   checkSetupOnLoad();
