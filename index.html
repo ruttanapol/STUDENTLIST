@@ -3664,11 +3664,22 @@ function _printCodesWindow(students,type){
 }
 
 // Patch confirmXLImport to show QR card after import
-const _baseConfirmXL=confirmXLImport;
 async function confirmXLImport(){
-  _lastImportedStudents=typeof xlImportData!=='undefined'?[...xlImportData]:[];
-  await _baseConfirmXL();
-  if(_lastImportedStudents.length>0)document.getElementById('qr-gen-card').style.display='';
+  _lastImportedStudents=[...xlImportData];
+  const newStudents=xlImportData.filter(s=>!DB.students.find(x=>x.id===s.id)).map(s=>({...s,room:s.room||DB.rooms[0]||''}));
+  const skipped=xlImportData.length-newStudents.length;
+  try {
+    await sbImportStudents(newStudents);
+    const newRooms=[...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
+    if(newRooms.length){
+      DB.rooms=[...new Set([...DB.rooms,...newRooms])].sort();
+      await sbSaveSettings('rooms', DB.rooms);
+    }
+    cancelXLImport();renderManage();
+    if(_lastImportedStudents.length>0)document.getElementById('qr-gen-card').style.display='';
+    toast(`✅ นำเข้าแล้ว ${newStudents.length} คน${skipped?` (ข้าม ${skipped} ซ้ำ)`:''}`);
+  } catch(e){toast('นำเข้าไม่สำเร็จ: '+e.message,'err');}
+}
 }
 
 // deadline support in sbAddHomework
