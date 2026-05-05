@@ -2499,8 +2499,8 @@ async function addContactChannel(){
   const label = document.getElementById('contact-label').value.trim();
   const value = document.getElementById('contact-value').value.trim();
   if(!label||!value){toast2('กรอกชื่อและข้อมูลติดต่อด้วย','warn');return;}
-  const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').single();
-  const contacts = (data&&data.value) ? [...data.value] : [];
+  const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').maybeSingle();
+const contacts = (data&&data.value) ? data.value : [];
   contacts.push({type,label,value});
   const {error} = await SB.from('settings').upsert({key:'admin_contacts',value:contacts},{onConflict:'key'});
   if(error){toast2('บันทึกไม่สำเร็จ: '+error.message,'err');return;}
@@ -2512,8 +2512,8 @@ async function addContactChannel(){
 }
 
 async function removeContact(idx){
-  const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').single();
-  const contacts = (data&&data.value) ? [...data.value] : [];
+  const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').maybeSingle();
+const contacts = (data&&data.value) ? data.value : [];
   contacts.splice(idx,1);
   await SB.from('settings').upsert({key:'admin_contacts',value:contacts},{onConflict:'key'});
   renderContactSettingsList(contacts);
