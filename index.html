@@ -2048,14 +2048,20 @@ async function sbDeleteStudent(id) {
 async function sbAddHomework(hw) {
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
-    // delete old if exists for this teacher, then insert fresh
     await SB.from('homeworks').delete().eq('num',hw.num).eq('teacher_id',tid);
-    const {error} = await SB.from('homeworks').insert({num:hw.num,title:hw.title,subject:hw.subject||'',max_score:hw.maxScore||100,teacher_id:tid});
+    const {error} = await SB.from('homeworks').insert({
+      num: hw.num,
+      title: hw.title,
+      subject: hw.subject||'',
+      max_score: hw.maxScore||100,
+      teacher_id: tid,
+      deadline: hw.deadline||null   // ✅ เพิ่ม deadline ที่นี่เลย
+    });
     if(error) throw error;
     await reloadHomeworks();
   } else {
     const existing = DB.homeworks.find(h => h.num === hw.num);
-    if(existing) { existing.title=hw.title; existing.subject=hw.subject; existing.maxScore=hw.maxScore; }
+    if(existing) { existing.title=hw.title; existing.subject=hw.subject; existing.maxScore=hw.maxScore; existing.deadline=hw.deadline||''; }
     else { DB.homeworks.push(hw); DB.homeworks.sort((a,b)=>a.num-b.num); }
     saveDB();
   }
@@ -3734,20 +3740,6 @@ async function confirmXLImport(){
     if(_lastImportedStudents.length>0)document.getElementById('qr-gen-card').style.display='';
     toast(`✅ นำเข้าแล้ว ${newStudents.length} คน${skipped?` (ข้าม ${skipped} ซ้ำ)`:''}`);
   } catch(e){toast('นำเข้าไม่สำเร็จ: '+e.message,'err');}
-}
-
-// deadline support in sbAddHomework
-const _baseAddHW=sbAddHomework;
-async function sbAddHomework(hw){
-  if(USE_SUPABASE&&hw.deadline!==undefined){
-    const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';
-    await SB.from('homeworks').delete().eq('num',hw.num).eq('teacher_id',tid);
-    const {error}=await SB.from('homeworks').insert({num:hw.num,title:hw.title,subject:hw.subject||'',max_score:hw.maxScore||100,teacher_id:tid,deadline:hw.deadline||null});
-    if(error)throw error;
-    await reloadHomeworks();
-  }else{
-    await _baseAddHW(hw);
-  }
 }
 
 window.addEventListener('load', () => {
