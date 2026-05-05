@@ -2913,14 +2913,7 @@ function toast2(msg,type='ok'){
   t._t=setTimeout(()=>t.classList.remove('on'),2800);
 }
 
-function renderTeacherList(teachers){
-  _cachedTeachers = teachers;
-  const pending=teachers.filter(t=>t.status==='pending');
-const slipUploaded=teachers.filter(t=>t.status==='slip_uploaded');
-  const approved=teachers.filter(t=>t.status==='approved');
-  const rejected=teachers.filter(t=>t.status==='rejected');
-
-  let _teacherSearchQuery = '';
+let _teacherSearchQuery = '';
 let _cachedTeachers = [];
 
 function filterTeachers(q) {
@@ -3004,8 +2997,8 @@ function renderTeacherList(teachers){
 
   document.getElementById('sa-pending-badge').textContent=pending.length||'';
   document.getElementById('sa-pending-badge').style.display=pending.length?'':'none';
-  document.getElementById('sa-slip-badge').textContent=slipUploaded.length||'';
-  document.getElementById('sa-slip-badge').style.display=slipUploaded.length?'':'none';
+  const slipBadge=document.getElementById('sa-slip-badge');
+  if(slipBadge){slipBadge.textContent=slipUploaded.length||'';slipBadge.style.display=slipUploaded.length?'':'none';}
 }
   
 function toggleTeacherDetail(id) {
