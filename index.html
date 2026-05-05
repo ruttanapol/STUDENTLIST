@@ -3542,7 +3542,7 @@ function renderManage(){
   if(chips)chips.innerHTML=allRooms.length
     ?allRooms.map(r=>{
         const cnt=DB.students.filter(s=>s.room===r).length;
-        return `<div class="room-card"><div><div class="room-card-name">${r}</div><div class="room-card-count">${cnt} คน</div></div><button onclick="delRoom('${r}')" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบ</button></div>`;
+        return `<div class="room-card"><div><div class="room-card-name">${r}</div><div class="room-card-count">${cnt} คน</div></div><button onclick="delRoom(this.dataset.r)" data-r="${r}" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบ</button></div>`;
       }).join('')
     :'<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;grid-column:1/-1;">ยังไม่มีห้องเรียน</div>';
   // HW cards with deadline + edit button
