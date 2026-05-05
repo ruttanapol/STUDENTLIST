@@ -2992,8 +2992,56 @@ function renderStudentView(s, stuDB){
   <div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:14px;color:var(--text2);font-weight:600;">ความคืบหน้า</span><span style="font-size:16px;font-weight:700;color:${pct===100?'var(--green-dark)':'var(--blue)'};">${pct}%</span></div><div class="prog-bar" style="height:10px;"><div class="prog-fill" style="width:${pct}%;"></div></div></div>`;
   if(!db.homeworks.length){html+='<div class="empty">ยังไม่มีรายการงาน</div>';}
   else{
-    html+='<div class="my-hw-card">';
-    db.homeworks.forEach(h=>{
+  // จัดกลุ่มตามวิชา
+  const subjects = {};
+  db.homeworks.forEach(h => {
+    const subj = h.subject || 'ไม่ระบุวิชา';
+    if(!subjects[subj]) subjects[subj] = [];
+    subjects[subj].push(h);
+  });
+
+  Object.entries(subjects).forEach(([subj, hws]) => {
+    const doneInSubj = hws.filter(h => db.submissions[s.id+'_'+h.num]).length;
+    const pctSubj = Math.round(doneInSubj/hws.length*100);
+    const pctColor = pctSubj===100?'var(--green-dark)':pctSubj>=60?'var(--blue)':'var(--red)';
+
+    html += `<div style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:13px;font-weight:800;color:var(--purple);background:var(--purple-light);padding:4px 12px;border-radius:20px;">📚 ${subj}</span>
+        </div>
+        <span style="font-size:13px;font-weight:700;color:${pctColor};">${doneInSubj}/${hws.length} (${pctSubj}%)</span>
+      </div>
+      <div style="height:4px;background:var(--bg);border-radius:2px;margin-bottom:10px;overflow:hidden;">
+        <div style="height:100%;width:${pctSubj}%;background:${pctColor};border-radius:2px;transition:width .5s;"></div>
+      </div>
+      <div class="my-hw-card" style="margin-bottom:0;">`;
+
+    hws.forEach(h => {
+      const sub = db.submissions[s.id+'_'+h.num];
+      html += `<div class="my-hw-row">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--text);">ชิ้นที่ ${h.num}: ${h.title}</div>
+          ${h.deadline?`<div style="font-size:11px;color:var(--text3);margin-top:2px;">กำหนดส่ง: ${new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'})}</div>`:''}
+        </div>
+        ${sub
+          ? `<div class="hw-status-ok">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>
+              ${sub.score!==null&&sub.score!==undefined
+                ? sub.score+'/'+(sub.maxScore||h.maxScore||100)+' คะแนน'
+                : '✓ ส่งแล้ว'}
+            </div>`
+          : `<div class="hw-status-no">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+              ยังไม่ส่ง
+            </div>`
+        }
+      </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+}
       const sub=db.submissions[s.id+'_'+h.num];
       html+=`<div class="my-hw-row"><div><div style="font-size:15px;font-weight:700;color:var(--text);">ชิ้นที่ ${h.num}: ${h.title}</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">${h.subject}</div></div>${sub?`<div class="hw-status-ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>${sub.score!==null&&sub.score!==undefined?sub.score+'/'+(sub.maxScore||h.maxScore||100)+' คะแนน':sub.ts}</div>`:`<div class="hw-status-no"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>ยังไม่ส่ง</div>`}</div>`;
     });
