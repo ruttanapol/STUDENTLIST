@@ -340,6 +340,21 @@ input:focus, select:focus {
 .snum { font-size:28px; font-weight:700; color:var(--text); }
 .slbl { font-size:13px; color:var(--text2); margin-top:3px; font-weight:500; }
 
+  /* ===== SLIPS ===== */
+  .slip-upload-wrap {
+  border:2px dashed var(--blue);border-radius:14px;
+  padding:20px;text-align:center;cursor:pointer;
+  background:var(--blue-light);transition:all .2s;margin-bottom:12px;
+}
+.slip-upload-wrap:hover{border-color:var(--blue-dark);background:#DBEAFE;}
+.slip-preview-img {
+  width:100%;max-height:200px;object-fit:contain;
+  border-radius:10px;border:1.5px solid var(--border);margin-bottom:8px;
+}
+.slip-status-banner {
+  padding:14px 16px;border-radius:14px;margin-bottom:14px;
+  font-size:14px;font-weight:600;line-height:1.6;
+}
 /* ===== ROOM TABS ===== */
 .rscroll {
   display:flex; gap:6px; overflow-x:auto;
@@ -1250,6 +1265,14 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     </div>
 
     <!-- Pending Teachers -->
+    <!-- Slip Uploaded Teachers -->
+<div class="card" style="border-color:#BFDBFE;background:linear-gradient(135deg,#EFF6FF,#DBEAFE);">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+    <div class="card-title" style="margin:0;color:var(--blue-dark);">💳 รอตรวจสอบสลิป</div>
+    <span id="sa-slip-badge" style="background:var(--blue);color:#fff;border-radius:20px;font-size:12px;font-weight:700;padding:2px 8px;"></span>
+  </div>
+  <div id="sa-slip-list"></div>
+</div>
     <div class="card" style="border-color:#FCD34D;background:linear-gradient(135deg,#FFFBEB,#FEF3C7);">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
         <div class="card-title" style="margin:0;color:#B45309;">⏳ รอการอนุมัติ</div>
@@ -1273,6 +1296,19 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
 
     <!-- Contact Admin Settings -->
     <div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#FAF5FF,#EDE9FE);">
+      <!-- Payment Settings -->
+<div class="card" style="border-color:#86EFAC;background:linear-gradient(135deg,#F0FDF4,#DCFCE7);">
+  <div class="card-title" style="color:var(--green-dark);">💳 ตั้งค่าข้อมูลการชำระเงิน</div>
+  <label class="lbl">ธนาคาร</label>
+  <input type="text" id="pay-bank" placeholder="เช่น กสิกรไทย">
+  <label class="lbl">เลขบัญชี</label>
+  <input type="text" id="pay-account" placeholder="xxx-x-xxxxx-x">
+  <label class="lbl">ชื่อบัญชี</label>
+  <input type="text" id="pay-name" placeholder="ชื่อเจ้าของบัญชี">
+  <label class="lbl">ยอดชำระ</label>
+  <input type="text" id="pay-amount" placeholder="เช่น ฿299/ปี">
+  <button onclick="savePaymentInfo()" style="width:100%;padding:12px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;margin-top:10px;font-family:Sarabun,sans-serif;">💾 บันทึกข้อมูลการชำระเงิน</button>
+</div>
       <div class="card-title" style="color:var(--purple);">📩 จัดการข้อมูลติดต่อ</div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">ข้อมูลนี้จะแสดงในหน้า Login ให้ครูและนักเรียนเห็น</div>
       <div id="contact-settings-list"></div>
@@ -1730,6 +1766,57 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   </div>
 </div>
 
+<!-- ===== SLIP UPLOAD SCREEN ===== -->
+<div id="s-slip" class="screen">
+  <div class="login-wrap">
+    <div class="login-bg-circles"></div>
+    <div class="login-inner">
+      <div class="logo-block">
+        <div class="logo-ring" style="background:rgba(255,255,255,0.2);">
+          💳
+        </div>
+        <div class="logo-title">ชำระค่าบริการ</div>
+        <div class="logo-sub">อัพโหลดสลิปเพื่อรอการอนุมัติ</div>
+      </div>
+
+      <div class="login-panel">
+        <div id="slip-status-area"></div>
+
+        <!-- ข้อมูลการโอนเงิน -->
+        <div style="background:var(--blue-light);border-radius:14px;padding:16px;margin-bottom:16px;border:1.5px solid #BFDBFE;">
+          <div style="font-size:14px;font-weight:800;color:var(--blue-dark);margin-bottom:10px;">📋 ข้อมูลการชำระเงิน</div>
+          <div style="font-size:14px;color:var(--text);line-height:2;">
+            <div>🏦 ธนาคาร: <b id="payment-bank">กสิกรไทย</b></div>
+            <div>📱 เลขบัญชี: <b id="payment-account">xxx-x-xxxxx-x</b></div>
+            <div>👤 ชื่อบัญชี: <b id="payment-name">ชื่อเจ้าของระบบ</b></div>
+            <div>💰 ยอดชำระ: <b id="payment-amount" style="color:var(--green-dark);font-size:16px;">฿XXX/ปี</b></div>
+          </div>
+        </div>
+
+        <!-- อัพโหลดสลิป -->
+        <div id="slip-upload-area">
+          <div class="slip-upload-wrap" onclick="document.getElementById('slip-file-input').click()">
+            <div id="slip-preview-wrap">
+              <div style="font-size:36px;margin-bottom:8px;">📸</div>
+              <div style="font-size:14px;font-weight:700;color:var(--blue-dark);">กดเพื่อเลือกรูปสลิป</div>
+              <div style="font-size:12px;color:var(--text2);margin-top:4px;">JPG/PNG ขนาดไม่เกิน 5MB</div>
+            </div>
+          </div>
+          <input type="file" id="slip-file-input" accept="image/jpeg,image/png" style="display:none;" onchange="previewSlip(event)">
+          <div id="slip-err" class="err-msg"></div>
+          <button onclick="uploadSlip()" id="slip-submit-btn" style="width:100%;padding:16px;font-size:17px;font-weight:700;border-radius:14px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;display:none;">
+            📤 ส่งสลิปการชำระเงิน
+          </button>
+        </div>
+
+        <button onclick="logout()" style="width:100%;padding:12px;font-size:14px;font-weight:600;border-radius:12px;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;margin-top:10px;font-family:Sarabun,sans-serif;">
+          ออกจากระบบ
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+  
 </div>
 
 <script>
@@ -1797,6 +1884,29 @@ function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 const FIXED_SB_URL = 'https://yfglsapfxtredrypqjda.supabase.co';
 const FIXED_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmZ2xzYXBmeHRyZWRyeXBxamRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4ODE1NDcsImV4cCI6MjA5MzQ1NzU0N30.OJaG2eZwznl17EtObNAKfqQ2h712UmMLZIWw9jJJNzo';
 
+  // ---- ชำระเงิน ----
+  async function savePaymentInfo(){
+  const info = {
+    bank: document.getElementById('pay-bank').value.trim(),
+    account: document.getElementById('pay-account').value.trim(),
+    name: document.getElementById('pay-name').value.trim(),
+    amount: document.getElementById('pay-amount').value.trim()
+  };
+  await SB.from('settings').upsert({key:'payment_info',value:info},{onConflict:'key'});
+  toast2('บันทึกข้อมูลการชำระเงินแล้ว ✅');
+}
+
+async function loadPaymentSettings(){
+  if(!USE_SUPABASE||!SB) return;
+  const {data} = await SB.from('settings').select('value').eq('key','payment_info').maybeSingle();
+  if(data&&data.value){
+    const p = data.value;
+    if(p.bank) document.getElementById('pay-bank').value=p.bank;
+    if(p.account) document.getElementById('pay-account').value=p.account;
+    if(p.name) document.getElementById('pay-name').value=p.name;
+    if(p.amount) document.getElementById('pay-amount').value=p.amount;
+  }
+}
 // ---- ตรวจว่าเคย setup ไว้แล้วหรือยัง ----
 function checkSetupOnLoad() {
   // ลอง restore saved config ก่อน, ใช้ FIXED ถ้าไม่มี
@@ -2355,7 +2465,22 @@ async function loginTeacher(){
     // ดึงข้อมูลครูจาก teachers table
     const {data:teacher,error:tErr}=await SB.from('teachers').select('*').eq('id',uid).single();
     if(tErr||!teacher){errEl.textContent='ไม่พบข้อมูลครูในระบบ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
-    if(teacher.status==='pending'){errEl.textContent='บัญชียังรอการอนุมัติจากแอดมิน';await SB.auth.signOut();return;}
+    if(teacher.status==='pending'){
+  // ยังไม่ส่งสลิป — ไปหน้าอัพโหลดสลิป
+  CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,
+    username:teacher.username||'',slip_url:teacher.slip_url||null,
+    slip_uploaded_at:teacher.slip_uploaded_at||null,status:teacher.status};
+  showSlipScreen(CURRENT_TEACHER);
+  return;
+}
+if(teacher.status==='slip_uploaded'){
+  // ส่งสลิปแล้วแต่ยังรอ — ไปหน้าแสดงสถานะ
+  CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,
+    username:teacher.username||'',slip_url:teacher.slip_url||null,
+    slip_uploaded_at:teacher.slip_uploaded_at||null,status:teacher.status};
+  showSlipScreen(CURRENT_TEACHER);
+  return;
+}
     if(teacher.status==='rejected'){errEl.textContent='บัญชีถูกปฏิเสธ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
     if(teacher.status==='expired'){errEl.textContent='บัญชีหมดอายุ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
 // เช็ค expiry อัตโนมัติ
@@ -2632,6 +2757,7 @@ async function loadContactLinksForLogin(){
 }
 
 async function loadContactSettings(){
+  loadPaymentSettings();
   if(!USE_SUPABASE) return;
   const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').single();
   const contacts = (data&&data.value) ? data.value : [];
@@ -2761,6 +2887,7 @@ function toast2(msg,type='ok'){
 
 function renderTeacherList(teachers){
   const pending=teachers.filter(t=>t.status==='pending');
+const slipUploaded=teachers.filter(t=>t.status==='slip_uploaded');
   const approved=teachers.filter(t=>t.status==='approved');
   const rejected=teachers.filter(t=>t.status==='rejected');
 
@@ -2789,6 +2916,28 @@ function renderTeacherList(teachers){
     </div>`).join('') : `<div style="font-size:13px;color:var(--text3);padding:12px 0;text-align:center;">ไม่มี</div>`;
 
   document.getElementById('sa-pending-list').innerHTML=html(pending,'pending');
+  // Slip uploaded list
+const slipHtml = slipUploaded.length ? slipUploaded.map(t=>`
+  <div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+      <div style="flex:1;">
+        <div style="font-size:15px;font-weight:700;color:var(--text);">${t.display_name}</div>
+        <div style="font-size:12px;color:var(--text2);">📧 ${t.email||'-'}</div>
+        <div style="font-size:11px;color:var(--text3);">ส่งสลิปเมื่อ: ${t.slip_uploaded_at?new Date(t.slip_uploaded_at).toLocaleDateString('th-TH'):'ไม่ระบุ'}</div>
+        ${t.slip_url?`<img src="${t.slip_url}" onclick="window.open('${t.slip_url}','_blank')" style="margin-top:8px;width:100%;max-height:160px;object-fit:contain;border-radius:10px;border:1.5px solid var(--border);cursor:pointer;" title="คลิกเพื่อดูเต็ม">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;text-align:center;">🔍 กดที่รูปเพื่อดูขนาดเต็ม</div>`:'<div style="color:var(--text3);font-size:12px;">ไม่มีรูปสลิป</div>'}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0;">
+        <button onclick="approveTeacher('${t.id}')" style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;">✅ อนุมัติ</button>
+        <button onclick="rejectTeacher('${t.id}')" style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;">❌ ปฏิเสธ</button>
+      </div>
+    </div>
+  </div>`).join('')
+  : '<div style="font-size:13px;color:var(--text3);padding:12px 0;text-align:center;">ไม่มี</div>';
+
+document.getElementById('sa-slip-list').innerHTML = slipHtml;
+document.getElementById('sa-slip-badge').textContent = slipUploaded.length||'';
+document.getElementById('sa-slip-badge').style.display = slipUploaded.length?'':'none';
   document.getElementById('sa-approved-list').innerHTML=html(approved,'approved');
   document.getElementById('sa-rejected-list').innerHTML=html(rejected,'rejected');
 
@@ -4163,6 +4312,91 @@ function showExpiryModal(type, daysLeft, expiresAt) {
   modal.style.display = 'flex';
 }
 
+// ===== SLIP PAYMENT SYSTEM =====
+async function loadPaymentInfo() {
+  if(!USE_SUPABASE||!SB) return;
+  try {
+    const {data} = await SB.from('settings').select('value').eq('key','payment_info').maybeSingle();
+    if(data&&data.value) {
+      const p = data.value;
+      if(p.bank) document.getElementById('payment-bank').textContent = p.bank;
+      if(p.account) document.getElementById('payment-account').textContent = p.account;
+      if(p.name) document.getElementById('payment-name').textContent = p.name;
+      if(p.amount) document.getElementById('payment-amount').textContent = p.amount;
+    }
+  } catch(e) {}
+}
+
+function previewSlip(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  if(!['image/jpeg','image/png'].includes(file.type)) {
+    document.getElementById('slip-err').textContent='อนุญาตเฉพาะ JPG/PNG เท่านั้น'; return;
+  }
+  if(file.size > 5*1024*1024) {
+    document.getElementById('slip-err').textContent='ไฟล์ใหญ่เกิน 5MB'; return;
+  }
+  document.getElementById('slip-err').textContent='';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('slip-preview-wrap').innerHTML =
+      `<img src="${ev.target.result}" class="slip-preview-img">
+       <div style="font-size:13px;color:var(--green-dark);font-weight:600;">✅ เลือกรูปแล้ว — กดปุ่มด้านล่างเพื่อส่ง</div>`;
+    document.getElementById('slip-submit-btn').style.display='block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadSlip() {
+  const file = document.getElementById('slip-file-input').files[0];
+  if(!file||!CURRENT_TEACHER) return;
+  const btn = document.getElementById('slip-submit-btn');
+  btn.textContent='⏳ กำลังอัพโหลด...';
+  btn.disabled=true;
+  try {
+    const ext = file.type==='image/png'?'png':'jpg';
+    const path = `${CURRENT_TEACHER.id}/slip.${ext}`;
+    const {error:upErr} = await SB.storage.from('slips').upload(path, file, {upsert:true, contentType:file.type});
+    if(upErr) throw upErr;
+    const {data} = SB.storage.from('slips').getPublicUrl(path);
+    const slipUrl = data.publicUrl+'?t='+Date.now();
+    const {error:dbErr} = await SB.from('teachers').update({
+      slip_url: slipUrl,
+      slip_uploaded_at: new Date().toISOString(),
+      status: 'slip_uploaded'
+    }).eq('id', CURRENT_TEACHER.id);
+    if(dbErr) throw dbErr;
+    // แสดงหน้ารอการอนุมัติ
+    document.getElementById('slip-upload-area').innerHTML=`
+      <div class="slip-status-banner" style="background:#DCFCE7;border:1.5px solid #86EFAC;">
+        <div style="font-size:24px;margin-bottom:8px;">✅</div>
+        <div style="font-size:16px;font-weight:800;color:var(--green-dark);">ส่งสลิปสำเร็จ!</div>
+        <div style="font-size:13px;color:#166534;margin-top:6px;font-weight:400;">กรุณารอแอดมินตรวจสอบและอนุมัติ<br>ปกติใช้เวลาไม่เกิน 24 ชั่วโมง</div>
+      </div>`;
+    toast('ส่งสลิปเรียบร้อยแล้ว รอการอนุมัติ ✅');
+  } catch(e) {
+    document.getElementById('slip-err').textContent='เกิดข้อผิดพลาด: '+e.message;
+    btn.textContent='📤 ส่งสลิปการชำระเงิน';
+    btn.disabled=false;
+  }
+}
+
+function showSlipScreen(teacher) {
+  CURRENT_TEACHER = teacher;
+  showScreen('s-slip');
+  loadPaymentInfo();
+  // ถ้าส่งสลิปแล้ว แสดงสถานะ
+  if(teacher.status==='slip_uploaded') {
+    document.getElementById('slip-status-area').innerHTML=`
+      <div class="slip-status-banner" style="background:#FEF3C7;border:1.5px solid #FCD34D;">
+        <div style="font-size:14px;font-weight:700;color:#B45309;">⏳ รอการตรวจสอบจากแอดมิน</div>
+        <div style="font-size:12px;color:#92400E;margin-top:4px;font-weight:400;">ส่งสลิปแล้วเมื่อ: ${new Date(teacher.slip_uploaded_at).toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'})}</div>
+      </div>`;
+    if(teacher.slip_url) {
+      document.getElementById('slip-preview-wrap').innerHTML=`<img src="${teacher.slip_url}" class="slip-preview-img">`;
+    }
+  }
+}
 
   
 window.addEventListener('load', () => {
