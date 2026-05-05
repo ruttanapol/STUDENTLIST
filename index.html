@@ -3120,42 +3120,6 @@ function showDetail(sid){
   p.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-function renderManage(){
-  // Rooms chips
-  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort();
-  if(allRooms.length&&!allRooms.every(r=>DB.rooms.includes(r))){DB.rooms=allRooms;}
-  const roomSel=document.getElementById('ns-room');
-  if(roomSel)roomSel.innerHTML=allRooms.map(r=>`<option>${r}</option>`).join('');
-  const chips=document.getElementById('room-chips');
-  if(chips)chips.innerHTML=DB.rooms.length?DB.rooms.map(r=>`<div style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #C4B5FD;border-radius:20px;padding:5px 12px;font-size:13px;font-weight:600;color:var(--purple);">${r}<button onclick="delRoom('${r}')" style="background:none;border:none;cursor:pointer;color:#94A3B8;font-size:16px;padding:0;line-height:1;">×</button></div>`).join(''):'<div style="font-size:13px;color:var(--text3);">ยังไม่มีห้องเรียน — เพิ่มก่อนเลย</div>';
-  // Students with search filter
-  const q=(document.getElementById('manage-srch')?.value||'').toLowerCase();
-  let stuList=DB.students;
-  if(q)stuList=stuList.filter(s=>s.id.includes(q)||s.name.toLowerCase().includes(q));
-  const countEl=document.getElementById('manage-stu-count');
-  if(countEl)countEl.textContent=q?`พบ ${stuList.length} จาก ${DB.students.length} คน`:`ทั้งหมด ${DB.students.length} คน`;
-  document.getElementById('sl-manage').innerHTML=stuList.map(s=>
-    `<tr><td style="font-size:12px;">${s.id}</td><td style="font-size:13px;">${s.name}</td><td style="font-size:12px;">${s.room}</td>
-    <td style="white-space:nowrap;">
-      <button class="del-btn" style="background:var(--blue-light);color:var(--blue-dark);border-color:var(--blue-light);margin-right:4px;" onclick="openEditStu(this.dataset.id)" data-id="${s.id}">แก้ไข</button>
-      <button class="del-btn" onclick="delStu(this.dataset.id)" data-id="${s.id}">ลบ</button>
-    </td></tr>`
-  ).join('');
-  document.getElementById('subj-list').innerHTML=DB.subjects.map(s=>`<tr><td>${s}</td><td><button class="del-btn" onclick="delSubj('${s}')">ลบ</button></td></tr>`).join('');
-  const ss=document.getElementById('hw-subj-input');
-  if(ss)ss.innerHTML=DB.subjects.map(s=>`<option>${s}</option>`).join('');
-  const hwSubjEl=document.getElementById('n-hwsubj');
-  if(hwSubjEl)hwSubjEl.innerHTML=DB.subjects.map(s=>`<option>${s}</option>`).join('');
-  const hwList=document.getElementById('hw-manage-list');
-  if(hwList)hwList.innerHTML=DB.homeworks.map(h=>`<tr>
-    <td style="text-align:center;font-weight:700;color:var(--purple);">${h.num}</td>
-    <td style="font-size:13px;">${h.title}</td>
-    <td style="text-align:center;font-size:12px;font-weight:700;color:var(--blue);">${h.maxScore||100}</td>
-    <td style="font-size:11px;color:var(--text2);">${h.subject||''}</td>
-    <td><button class="del-btn" onclick="delHW(${h.num})">ลบ</button></td>
-  </tr>`).join('');
-}
-
 function openEditStu(id){
   const s=DB.students.find(x=>x.id===id);if(!s)return;
   // รวมห้องจาก DB.rooms + ห้องจากนักเรียนทั้งหมด เผื่อ settings ยังไม่โหลด
