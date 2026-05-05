@@ -880,10 +880,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       <div style="font-size:17px;font-weight:700;color:var(--text);">🔲 QR Code / Barcode</div>
       <button onclick="closeCodeModal()" style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;color:var(--text2);">✕</button>
     </div>
-    <div class="code-type-row">
-      <button class="code-type-btn on" id="modal-codetype-qr" onclick="setModalCodeType('qr')">🔲 QR Code</button>
-      <button class="code-type-btn" id="modal-codetype-bar" onclick="setModalCodeType('barcode')">▐▌ Barcode</button>
-    </div>
+    
     <label class="lbl">กรองห้อง</label>
     <select id="code-room-filter" onchange="" style="font-size:14px;margin-bottom:12px;"></select>
     <div style="display:flex;gap:8px;margin-bottom:12px;">
@@ -3630,6 +3627,7 @@ function previewModalCodes(){
 }
 
 function openCodeModal(){
+  _modalCodeType='barcode'; 
   const allRooms=[...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort();
   const sel=document.getElementById('code-room-filter');
   if(!sel){ toast('เกิดข้อผิดพลาด: modal ไม่พบ','err'); return; } 
