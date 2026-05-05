@@ -3007,18 +3007,6 @@ function renderTeacherList(teachers){
   document.getElementById('sa-slip-badge').textContent=slipUploaded.length||'';
   document.getElementById('sa-slip-badge').style.display=slipUploaded.length?'':'none';
 }
-function toggleTeacherDetail(id) {
-  const el = document.getElementById(id);
-  if(!el) return;
-  const btn = el.previousElementSibling.querySelector('button[onclick*="toggleTeacherDetail"]');
-  if(el.style.display === 'none') {
-    el.style.display = 'block';
-    if(btn) btn.textContent = '▴ ซ่อน';
-  } else {
-    el.style.display = 'none';
-    if(btn) btn.textContent = '▾ ดู';
-  }
-}
   
 function toggleTeacherDetail(id) {
   const el = document.getElementById(id);
