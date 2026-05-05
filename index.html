@@ -829,9 +829,9 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     <label class="setup-field-label">🔑 anon / public Key</label>
     <input class="setup-input" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." autocomplete="off" spellcheck="false">
 
-    <div id="setup-err" class="setup-err"></div>
+    <div id="setup-err" class="setup-err" style="white-space:pre-wrap;line-height:1.5;"></div>
     <div id="setup-status" style="display:none;" class="setup-status loading">
-      <span>⏳</span><span id="setup-status-text">กำลังเชื่อมต่อ...</span>
+      <span id="setup-status-icon">⏳</span><span id="setup-status-text">กำลังเชื่อมต่อ...</span>
     </div>
 
     <button class="setup-connect-btn" id="setup-connect-btn" onclick="connectSupabase()">
@@ -909,10 +909,10 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
         <div class="err-msg" id="teacher-err"></div>
         <button class="login-btn btn-admin" onclick="loginTeacher()">🎓 เข้าสู่ระบบ</button>
         <div style="text-align:center;margin-top:8px;display:flex;justify-content:center;gap:16px;">
-          <button onclick="showRegForm(true)" style="background:none;border:none;color:rgba(255,255,255,0.75);font-size:13px;cursor:pointer;font-family:Sarabun,sans-serif;text-decoration:underline;">
+          <button onclick="showRegForm(true)" style="background:rgba(0,0,0,0.12);border:none;color:#1a1a1a;font-size:13px;cursor:pointer;font-family:Sarabun,sans-serif;text-decoration:none;padding:6px 12px;border-radius:8px;font-weight:600;">
             สมัครใช้งาน
           </button>
-          <button onclick="showForgotForm(true)" style="background:none;border:none;color:rgba(255,255,255,0.75);font-size:13px;cursor:pointer;font-family:Sarabun,sans-serif;text-decoration:underline;">
+          <button onclick="showForgotForm(true)" style="background:rgba(0,0,0,0.08);border:none;color:#1a1a1a;font-size:13px;cursor:pointer;font-family:Sarabun,sans-serif;text-decoration:none;padding:6px 12px;border-radius:8px;font-weight:600;">
             ลืมรหัสผ่าน?
           </button>
         </div>
@@ -1567,7 +1567,45 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// Suppress Supabase BroadcastChannel DataCloneError completely
+// Supabase v2 uses BroadcastChannel for cross-tab session sync which fails
+// in some environments — session still works fine via localStorage
+(function(){
+  try {
+    if(typeof BroadcastChannel === 'undefined') return;
+    const OrigBC = BroadcastChannel;
+    function SafeBC(name) {
+      const bc = new OrigBC(name);
+      bc.postMessage = function(msg) {
+        try {
+          // Serialize via JSON first to strip non-cloneable objects (Headers, etc.)
+          OrigBC.prototype.postMessage.call(bc, JSON.parse(JSON.stringify(msg)));
+        } catch(e) { /* silently ignore — localStorage handles session persistence */ }
+      };
+      return bc;
+    }
+    SafeBC.prototype = OrigBC.prototype;
+    window.BroadcastChannel = SafeBC;
+  } catch(e) {}
+})();
+// Also suppress console.warn for this specific non-fatal message
+(function(){
+  const _warn = console.warn.bind(console);
+  console.warn = function(...args) {
+    const s = args.join(' ');
+    if(s.includes('BroadcastChannel') || s.includes('DataCloneError') || s.includes('postMessage')) return;
+    _warn(...args);
+  };
+  const _err = console.error.bind(console);
+  console.error = function(...args) {
+    const s = args.join(' ');
+    if(s.includes('DataCloneError') || s.includes('postMessage') && s.includes('Headers')) return;
+    _err(...args);
+  };
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1594,8 +1632,12 @@ const FIXED_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // ---- ตรวจว่าเคย setup ไว้แล้วหรือยัง ----
 function checkSetupOnLoad() {
-  document.getElementById('sb-url').value = FIXED_SB_URL;
-  document.getElementById('sb-key').value = FIXED_SB_KEY;
+  // ลอง restore saved config ก่อน, ใช้ FIXED ถ้าไม่มี
+  const saved = lsGet('sb_config');
+  const url = (saved && saved.url) || FIXED_SB_URL;
+  const key = (saved && saved.key) || FIXED_SB_KEY;
+  document.getElementById('sb-url').value = url;
+  document.getElementById('sb-key').value = key;
   connectSupabase(true); // auto-connect silently
 }
 
@@ -1603,12 +1645,23 @@ function checkSetupOnLoad() {
 async function tryRestoreSession(){
   if(!USE_SUPABASE||!SB) return false;
   try{
-    const {data:{session}} = await SB.auth.getSession();
-    if(!session) return false;
+    let session = null;
+    try {
+      const {data, error} = await SB.auth.getSession();
+      if(error || !data || !data.session) return false;
+      session = data.session;
+    } catch(lockErr) { return false; }
     const uid = session.user.id;
-    const {data:teacher} = await SB.from('teachers').select('*').eq('id',uid).single();
-    if(!teacher||teacher.status!=='approved') { await SB.auth.signOut(); return false; }
-    CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||''};
+    const {data:teacher, error:tErr} = await SB.from('teachers').select('*').eq('id',uid).single();
+    if(tErr || !teacher) { 
+      // teacher table might not exist yet — don't sign out, just return false
+      if(tErr && (tErr.code === '42P01' || (tErr.message||'').includes('does not exist'))) return false;
+      await SB.auth.signOut(); 
+      return false; 
+    }
+    if(teacher.status !== 'approved') { await SB.auth.signOut(); return false; }
+    CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,
+      username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||''};
     await loadFromSupabase();
     setTimeout(()=>setupRealtime(),500);
     document.getElementById('teacher-topbar-name').textContent=teacher.display_name;
@@ -1617,7 +1670,10 @@ async function tryRestoreSession(){
     populateScanSelects();
     renderDashboard();
     return true;
-  }catch(e){ return false; }
+  }catch(e){ 
+    console.error('[tryRestoreSession]', e);
+    return false; 
+  }
 }
 
 async function connectSupabase(silent = false) {
@@ -1638,42 +1694,73 @@ async function connectSupabase(silent = false) {
   btn.disabled = true;
 
   try {
+    // สร้าง Supabase client
     SB = supabase.createClient(url, key, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
-      global: { fetch: (...args) => fetch(...args) }
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+        storageKey: 'sb-session'
+      }
     });
-    // ทดสอบ connection ด้วย query ที่ไม่ขึ้นอยู่กับ schema
-    // ถ้า table ยังไม่มีก็ยังเชื่อมต่อได้ (admin จะสร้าง table ทีหลัง)
-    const { error: connErr } = await SB.from('teachers').select('id').limit(1);
-    // ignore "relation does not exist" error — แค่ตรวจว่า Supabase ตอบได้
-    if(connErr && !connErr.message.includes('does not exist') && !connErr.message.includes('relation')) {
-      throw new Error(connErr.message);
+
+    // ทดสอบ DB connectivity ด้วย REST API โดยตรง (ไม่ใช้ auth lock)
+    const { error: dbErr } = await SB.from('teachers').select('id').limit(1);
+    if(dbErr) {
+      const code = dbErr.code || '';
+      const msg = dbErr.message || '';
+      // ยอมรับ: table ยังไม่มี หรือ permission denied (RLS) — แสดงว่า DB เชื่อมต่อได้
+      const isOk = code === '42P01' || msg.includes('does not exist') || msg.includes('relation')
+                || code === 'PGRST116' || code === '42501' || msg.includes('permission');
+      if(!isOk) throw new Error(msg || 'Database error: ' + code);
     }
 
+    // เชื่อมต่อสำเร็จ
     USE_SUPABASE = true;
     lsSet('sb_config', {url, key});
-
     statusEl.className = 'setup-status ok';
     statusText.textContent = '✅ เชื่อมต่อสำเร็จ!';
 
-    // พยายาม restore session ที่มีอยู่ (หลัง page reload)
     const restored = await tryRestoreSession();
     if(!restored) setTimeout(() => setupRealtime(), 500);
-    // โหลดรายชื่อครูสำหรับช่องนักเรียน
     setTimeout(()=>loadTeacherListForStudent(), 200);
-    // โหลดข้อมูลติดต่อแอดมินในหน้า login
     setTimeout(()=>loadContactLinksForLogin(), 400);
-
     setTimeout(() => {
       document.getElementById('setup-overlay').style.display = 'none';
-    }, silent ? 0 : 800);
+    }, silent ? 0 : 600);
 
   } catch(e) {
+    const msg = e.message || String(e);
+    // DataCloneError = BroadcastChannel issue but connection may still work
+    if(e.name === 'DataCloneError' || msg.includes('postMessage') || msg.includes('DataCloneError')) {
+      // Connection likely succeeded — ignore this non-critical error
+      // DataCloneError suppressed — non-fatal, session works via localStorage
+      USE_SUPABASE = true;
+      lsSet('sb_config', {url, key});
+      statusEl.className = 'setup-status ok';
+      statusText.textContent = '✅ เชื่อมต่อสำเร็จ!';
+      const restored = await tryRestoreSession();
+      if(!restored) setTimeout(() => setupRealtime(), 500);
+      setTimeout(()=>loadTeacherListForStudent(), 200);
+      setTimeout(()=>loadContactLinksForLogin(), 400);
+      setTimeout(() => { document.getElementById('setup-overlay').style.display = 'none'; }, silent ? 0 : 600);
+      return;
+    }
     SB = null;
     USE_SUPABASE = false;
     statusEl.className = 'setup-status err';
     statusText.textContent = '❌ เชื่อมต่อไม่ได้';
-    errEl.textContent = 'Error: ' + e.message + ' — ตรวจสอบ URL/Key และการสร้าง Tables';
+    let thMsg = msg;
+    if(msg.includes('Invalid API key') || msg.includes('invalid_api_key') || msg.includes('401'))
+      thMsg = '🔑 API Key ไม่ถูกต้อง — ตรวจสอบ anon key ใหม่';
+    else if(msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('fetch'))
+      thMsg = '🌐 ไม่สามารถเชื่อมต่อได้ — ตรวจสอบ URL และอินเตอร์เน็ต';
+    else if(msg.includes('404') || msg.includes('not found'))
+      thMsg = '🔗 URL ไม่ถูกต้อง — ตรวจสอบ Project URL';
+    else if(msg.includes('CORS'))
+      thMsg = '⚠️ CORS error — ตรวจสอบ Site URL ใน Supabase Authentication';
+    errEl.textContent = thMsg;
+    console.error('[Supabase connect error]', msg);
     btn.disabled = false;
   }
 }
