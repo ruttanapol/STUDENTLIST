@@ -2364,7 +2364,7 @@ function showProfileModal(){
 }
 
 function closeProfileModal(){
-  document.getElementById('teacher-profile-modal').style.display='flex';
+  document.getElementById('teacher-profile-modal').style.display='none';
 }
 
 async function saveProfile(){
@@ -2790,6 +2790,7 @@ function renderStudentView(s, stuDB){
   document.getElementById('stu-content').innerHTML=html;
 }
 async function refreshStudentView(){
+  console.log('refreshStudentView called'); // debug
   if(!_currentStuId || !_currentStuTeacher) return;
   const tid = _currentStuTeacher.id;
   const {data:subData} = await SB.from('submissions').select('*')
