@@ -3009,14 +3009,15 @@ function renderTable(){
   sl.innerHTML=list.map(s=>{
     const done=DB.homeworks.filter(h=>DB.submissions[s.id+'_'+h.num]).length;
     const pct=DB.homeworks.length?Math.round(done/DB.homeworks.length*100):0;
-    const dots=DB.homeworks.map(h=>{
-      const sub=DB.submissions[s.id+'_'+h.num];
-      const scoreLabel=(sub&&sub.score!==null&&sub.score!==undefined)?sub.score:'';
-      return `<div class="hw-dot ${sub?'dot-ok':'dot-no'}" style="cursor:${sub?'pointer':'default'};"
-        onclick="${sub?`openEditScore('${s.id}',${h.num})`:''}">
-        ${scoreLabel!==''?`<span style="font-size:10px;">${scoreLabel}</span>`:h.num}
-      </div>`;
-    }).join('');
+    const dots = DB.homeworks.map(h => {
+  const sub = DB.submissions[s.id+'_'+h.num];
+  const scoreLabel = (sub && sub.score !== null && sub.score !== undefined) ? sub.score : '';
+  const tip = sub ? (scoreLabel !== '' ? `${scoreLabel}/${sub.maxScore||h.maxScore||100}` : 'ส่งแล้ว') : 'ยังไม่ส่ง'; // เพิ่มบรรทัดนี้
+  return `<div class="hw-dot ${sub?'dot-ok':'dot-no'}" title="${tip}" style="cursor:${sub?'pointer':'default'};"
+    onclick="${sub?`openEditScore('${s.id}',${h.num})`:''}">
+    ${scoreLabel!==''?`<span style="font-size:10px;">${scoreLabel}</span>`:h.num}
+  </div>`;
+}).join('');
     return `<div class="stu-row" onclick="showDetail('${s.id}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div><div class="stu-name">${s.name}</div><div class="stu-meta">${s.id} · <span class="room-pill">${s.room}</span></div></div>
@@ -3394,6 +3395,10 @@ function toggleExportRoom(btn,room){if(exportRoomSel.has(room)){exportRoomSel.de
 function toggleExportHW(btn,num){if(exportHWSel.has(num)){exportHWSel.delete(num);btn.classList.remove('checked');}else{exportHWSel.add(num);btn.classList.add('checked');}const allBtn=document.querySelector('#export-hw-filter [data-hw="all"]');if(allBtn)allBtn.classList.toggle('checked',exportHWSel.size===DB.homeworks.length);}
 function toggleAllHW(btn){const allSelected=exportHWSel.size===DB.homeworks.length;document.querySelectorAll('#export-hw-filter [data-hw]:not([data-hw="all"])').forEach(b=>{const n=parseInt(b.dataset.hw);if(allSelected){exportHWSel.delete(n);b.classList.remove('checked');}else{exportHWSel.add(n);b.classList.add('checked');}});btn.classList.toggle('checked',!allSelected);}
 function exportSelectAll(sel){document.querySelectorAll('#export-room-grid .room-cb').forEach(btn=>{const room=btn.dataset.room;if(sel){exportRoomSel.add(room);btn.classList.add('checked');btn.querySelector('span').textContent='✓';}else{exportRoomSel.delete(room);btn.classList.remove('checked');btn.querySelector('span').textContent='';}}); }
+function getStudentNum(student, room) {
+  const roomStudents = DB.students.filter(s => s.room === room).sort((a,b) => a.id.localeCompare(b.id));
+  return roomStudents.findIndex(s => s.id === student.id) + 1;
+}
 function buildExportData(){
   const selectedRooms=[...exportRoomSel].sort();
   const selectedHWs=DB.homeworks.filter(h=>exportHWSel.has(h.num)).sort((a,b)=>a.num-b.num);
