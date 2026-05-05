@@ -2549,15 +2549,28 @@ if(avatarFile) {
     await SB.from('teachers').update({avatar_url: avatarUrl}).eq('id', uid);
   }
 }
-    document.getElementById('reg-success').style.display='block';
-    document.getElementById('reg-first-name').value='';
-    document.getElementById('reg-last-name').value='';
-    document.getElementById('reg-username').value='';
-    document.getElementById('reg-teacher-email').value='';
-    document.getElementById('reg-teacher-pw').value='';
-    document.getElementById('reg-teacher-pw2').value='';
-    // sign out หลังสมัคร — รอแอดมินอนุมัติก่อน
-    await SB.auth.signOut();
+    // แสดงหน้าชำระเงินทันที
+CURRENT_TEACHER = {
+  id: uid,
+  display_name: displayName,
+  email: email,
+  username: username,
+  status: 'pending',
+  slip_url: null,
+  slip_uploaded_at: null
+};
+
+// อัพโหลดรูปโปรไฟล์ถ้ามี
+const avatarFile = document.getElementById('reg-avatar-input').files[0];
+if(avatarFile) {
+  const avatarUrl = await uploadAvatar(avatarFile, uid);
+  if(avatarUrl) {
+    await SB.from('teachers').update({avatar_url: avatarUrl}).eq('id', uid);
+  }
+}
+
+await SB.auth.signOut();
+showSlipScreen(CURRENT_TEACHER);
   }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
 }
 
