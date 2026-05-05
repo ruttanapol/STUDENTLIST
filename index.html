@@ -41,7 +41,8 @@ body { background: var(--bg); min-height: 100vh; }
   min-height: 100vh;
   background: linear-gradient(160deg, #4F8EF7 0%, #7C3AED 50%, #EC4899 100%);
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .login-bg-circles {
   position: absolute; inset: 0; pointer-events: none;
@@ -58,7 +59,8 @@ body { background: var(--bg); min-height: 100vh; }
 }
 .login-inner {
   position: relative; z-index:1;
-  padding: 48px 20px 40px;
+  padding: 48px 20px 60px;
+  overflow: visible;
 }
 .logo-block {text-align:center;margin-bottom:32px;}
 .logo-ring {
@@ -624,6 +626,24 @@ input:focus, select:focus {
 }
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 
+/* ===== ADMIN COMPACT BAR ===== */
+#admin-login-panel input::placeholder { color: rgba(255,255,255,0.35); }
+#admin-login-panel input:focus {
+  border-color: rgba(255,100,100,0.6) !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.2) !important;
+  background: rgba(255,255,255,0.15) !important;
+}
+#admin-bar-btn:focus { outline: none; }
+
+/* ===== TEACHER BADGE ===== */
+.teacher-badge {
+  display:inline-flex;align-items:center;gap:6px;
+  background:linear-gradient(135deg,var(--blue-light),#EDE9FE);
+  border:1.5px solid #C4B5FD;border-radius:20px;
+  padding:4px 12px;font-size:12px;font-weight:700;color:var(--purple);
+  margin-bottom:8px;
+}
+
 /* ===== SCAN SUCCESS POPUP ===== */
 .scan-success-overlay {
   position:fixed;inset:0;background:rgba(0,0,0,0.55);
@@ -690,17 +710,33 @@ input:focus, select:focus {
       </div>
       <button class="copy-sql-btn" onclick="copySQL()">📋 คัดลอก SQL</button>
       <div class="sql-block" id="sql-block">-- วางใน SQL Editor แล้วกด Run
+
+-- ตาราง teachers (ระบบ multi-teacher + Supabase Auth)
+CREATE TABLE IF NOT EXISTS teachers (
+  id UUID PRIMARY KEY,  -- ใช้ auth.users.id จาก Supabase Auth
+  email TEXT NOT NULL UNIQUE,
+  username TEXT UNIQUE,
+  first_name TEXT NOT NULL DEFAULT '',
+  last_name TEXT NOT NULL DEFAULT '',
+  display_name TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS students (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  room TEXT NOT NULL
+  room TEXT NOT NULL,
+  teacher_id TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS homeworks (
-  num INTEGER PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
+  num INTEGER NOT NULL,
   title TEXT NOT NULL,
   subject TEXT DEFAULT '',
-  max_score INTEGER DEFAULT 100
+  max_score INTEGER DEFAULT 100,
+  teacher_id TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS submissions (
@@ -711,8 +747,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   room TEXT,
   score NUMERIC,
   max_score INTEGER DEFAULT 100,
-  submitted_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(student_id, hw_num)
+  teacher_id TEXT NOT NULL DEFAULT '',
+  submitted_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -724,16 +760,41 @@ CREATE TABLE IF NOT EXISTS settings (
 ALTER PUBLICATION supabase_realtime ADD TABLE submissions;
 ALTER PUBLICATION supabase_realtime ADD TABLE students;
 ALTER PUBLICATION supabase_realtime ADD TABLE homeworks;
+ALTER PUBLICATION supabase_realtime ADD TABLE teachers;
 
 -- ปิด RLS (สำหรับใช้ภายในโรงเรียน)
 ALTER TABLE students DISABLE ROW LEVEL SECURITY;
 ALTER TABLE homeworks DISABLE ROW LEVEL SECURITY;
 ALTER TABLE submissions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE settings DISABLE ROW LEVEL SECURITY;</div>
+ALTER TABLE settings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
+
+-- (ทางเลือก) Trigger auto-insert teachers เมื่อ signUp ผ่าน Auth
+-- หากต้องการให้ teachers table อัปเดตอัตโนมัติจาก Auth ให้รันด้วย:
+-- CREATE OR REPLACE FUNCTION handle_new_teacher()
+-- RETURNS TRIGGER AS $$
+-- BEGIN
+--   INSERT INTO public.teachers(id, email, display_name, status)
+--   VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'display_name',''), 'pending')
+--   ON CONFLICT (id) DO NOTHING;
+--   RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql SECURITY DEFINER;
+-- CREATE TRIGGER on_auth_teacher_created AFTER INSERT ON auth.users
+--   FOR EACH ROW EXECUTE FUNCTION handle_new_teacher();</div>
     </div>
 
     <div class="setup-step" style="border-color:#F59E0B;">
-      <div class="setup-step-num" style="color:#B45309;">ขั้นที่ 3 — คัดลอก Keys</div>
+      <div class="setup-step-num" style="color:#B45309;">ขั้นที่ 3 — เปิด Email Auth</div>
+      <div class="setup-step-text">
+        ไปที่ <b>Authentication</b> → <b>Providers</b> → เปิด <b>Email</b><br>
+        ✅ เปิด <b>Enable Email provider</b><br>
+        ⚙️ ตั้ง <b>Site URL</b> ใน Authentication → URL Configuration ให้ตรงกับ URL ของไฟล์นี้
+      </div>
+    </div>
+
+    <div class="setup-step" style="border-color:#EC4899;">
+      <div class="setup-step-num" style="color:#BE185D;">ขั้นที่ 4 — คัดลอก Keys</div>
       <div class="setup-step-text">
         ไปที่ <b>Project Settings</b> (ไอคอนเฟือง ซ้ายล่าง) → <b>API</b><br>
         → คัดลอก <b>Project URL</b> และ <b>anon public</b> key ด้านล่างนี้
@@ -755,9 +816,12 @@ ALTER TABLE settings DISABLE ROW LEVEL SECURITY;</div>
       🚀 เชื่อมต่อและเริ่มใช้งาน
     </button>
 
-    <div style="text-align:center;margin-top:14px;">
+    <div style="text-align:center;margin-top:14px;display:flex;flex-direction:column;gap:6px;">
       <button onclick="useLocalMode()" style="background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer;text-decoration:underline;font-family:'Sarabun',sans-serif;">
         ใช้แบบออฟไลน์ (localStorage เดิม)
+      </button>
+      <button onclick="skipToAdminLogin()" style="background:none;border:none;color:var(--blue-dark);font-size:13px;cursor:pointer;text-decoration:underline;font-family:'Sarabun',sans-serif;">
+        ผู้ดูแลระบบ — ข้ามการตั้งค่า
       </button>
     </div>
   </div>
@@ -798,32 +862,125 @@ ALTER TABLE settings DISABLE ROW LEVEL SECURITY;</div>
         <div class="logo-sub">สำหรับครูและนักเรียน</div>
       </div>
 
-      <div class="login-panel">
+      <!-- Teacher Login Panel -->
+      <div class="login-panel" id="teacher-login-form">
         <div class="panel-header">
           <div class="panel-icon pi-admin">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4F8EF7" stroke-width="2">
               <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-              <path d="M18 14l2 2 4-4" stroke-width="2"/>
             </svg>
           </div>
           <div>
-            <div class="panel-title">สำหรับครู / แอดมิน</div>
-            <div class="panel-desc">จัดการและตรวจสอบงานทั้งระบบ</div>
+            <div class="panel-title">สำหรับครู</div>
+            <div class="panel-desc">เข้าสู่ระบบด้วยอีเมล</div>
           </div>
         </div>
-        <label for="admin-pw">รหัสผ่านแอดมิน</label>
+        <label>อีเมล</label>
+        <input type="email" id="teacher-email-input" placeholder="your@email.com" autocomplete="username"
+          onkeydown="if(event.key==='Enter')document.getElementById('teacher-pw-input').focus()">
+        <label style="margin-top:10px;">รหัสผ่าน</label>
         <div class="pw-wrap">
-          <input type="password" id="admin-pw" placeholder="กรอกรหัสผ่าน..." autocomplete="current-password"
-            onkeydown="if(event.key==='Enter')loginAdmin()">
-          <button class="pw-toggle" onclick="togglePw('admin-pw',this)" tabindex="-1">แสดง</button>
+          <input type="password" id="teacher-pw-input" placeholder="รหัสผ่าน..." autocomplete="current-password"
+            onkeydown="if(event.key==='Enter')loginTeacher()">
+          <button class="pw-toggle" onclick="togglePw('teacher-pw-input',this)" tabindex="-1">แสดง</button>
         </div>
-        <div class="err-msg" id="admin-err"></div>
-        <button class="login-btn btn-admin" onclick="loginAdmin()">🎓 เข้าสู่ระบบครู</button>
+        <div class="err-msg" id="teacher-err"></div>
+        <button class="login-btn btn-admin" onclick="loginTeacher()">🎓 เข้าสู่ระบบ</button>
+        <div style="text-align:center;margin-top:8px;display:flex;justify-content:center;gap:16px;">
+          <button onclick="showRegForm(true)" style="background:none;border:none;color:rgba(255,255,255,0.75);font-size:13px;cursor:pointer;font-family:'Sarabun',sans-serif;text-decoration:underline;">
+            สมัครใช้งาน
+          </button>
+          <button onclick="showForgotForm(true)" style="background:none;border:none;color:rgba(255,255,255,0.75);font-size:13px;cursor:pointer;font-family:'Sarabun',sans-serif;text-decoration:underline;">
+            ลืมรหัสผ่าน?
+          </button>
+        </div>
+      </div>
+
+      <!-- Teacher Register Panel -->
+      <div class="login-panel" id="teacher-reg-form" style="display:none;">
+        <div class="panel-header">
+          <div class="panel-icon" style="background:#FEF3C7;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2">
+              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/>
+            </svg>
+          </div>
+          <div>
+            <div class="panel-title">สมัครบัญชีครู</div>
+            <div class="panel-desc">รอแอดมินอนุมัติก่อนใช้งาน</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <div style="flex:1;">
+            <label>ชื่อจริง</label>
+            <input type="text" id="reg-first-name" placeholder="สมชาย">
+          </div>
+          <div style="flex:1;">
+            <label>นามสกุล</label>
+            <input type="text" id="reg-last-name" placeholder="ใจดี">
+          </div>
+        </div>
+        <label style="margin-top:10px;">ชื่อผู้ใช้ (username)</label>
+        <div style="position:relative;">
+          <input type="text" id="reg-username" placeholder="เช่น teacher_somsak" autocomplete="username"
+            style="padding-left:28px;" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')">
+          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;">@</span>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:3px;">ใช้ตัวอักษรภาษาอังกฤษ ตัวเลข หรือ _ เท่านั้น</div>
+        <label style="margin-top:10px;">อีเมล</label>
+        <input type="email" id="reg-teacher-email" placeholder="your@email.com" autocomplete="email">
+        <label style="margin-top:10px;">รหัสผ่าน</label>
+        <div class="pw-wrap">
+          <input type="password" id="reg-teacher-pw" placeholder="อย่างน้อย 6 ตัวอักษร">
+          <button class="pw-toggle" onclick="togglePw('reg-teacher-pw',this)" tabindex="-1">แสดง</button>
+        </div>
+        <label style="margin-top:10px;">ยืนยันรหัสผ่าน</label>
+        <input type="password" id="reg-teacher-pw2" placeholder="พิมพ์รหัสผ่านอีกครั้ง"
+          onkeydown="if(event.key==='Enter')registerTeacher()">
+        <div class="err-msg" id="reg-err"></div>
+        <div id="reg-success" style="display:none;background:#DCFCE7;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;color:#16A34A;margin-top:8px;line-height:1.6;">
+          ✅ สมัครสำเร็จ!<br>
+          <span style="font-weight:400;font-size:13px;">กรุณาตรวจสอบอีเมลเพื่อยืนยัน จากนั้นรอแอดมินอนุมัติ</span>
+        </div>
+        <button class="login-btn btn-admin" style="margin-top:10px;" onclick="registerTeacher()">📝 ส่งคำขอสมัคร</button>
+        <div style="text-align:center;margin-top:10px;">
+          <button onclick="showRegForm(false)" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:13px;cursor:pointer;font-family:'Sarabun',sans-serif;text-decoration:underline;">
+            ← กลับไปเข้าสู่ระบบ
+          </button>
+        </div>
+      </div>
+
+      <!-- Forgot Password Panel -->
+      <div class="login-panel" id="teacher-forgot-form" style="display:none;">
+        <div class="panel-header">
+          <div class="panel-icon" style="background:#EDE9FE;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </div>
+          <div>
+            <div class="panel-title">ลืมรหัสผ่าน</div>
+            <div class="panel-desc">รับลิงก์รีเซ็ตผ่านอีเมล</div>
+          </div>
+        </div>
+        <label>อีเมลที่สมัคร</label>
+        <input type="email" id="forgot-email" placeholder="your@email.com"
+          onkeydown="if(event.key==='Enter')sendResetPassword()">
+        <div class="err-msg" id="forgot-err"></div>
+        <div id="forgot-success" style="display:none;background:#DCFCE7;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;color:#16A34A;margin-top:8px;line-height:1.6;">
+          ✅ ส่งอีเมลแล้ว!<br>
+          <span style="font-weight:400;font-size:13px;">กรุณาตรวจสอบกล่องจดหมาย</span>
+        </div>
+        <button class="login-btn" style="background:linear-gradient(135deg,#7C3AED,#5B21B6);color:#fff;box-shadow:0 4px 16px rgba(124,58,237,0.4);margin-top:10px;" onclick="sendResetPassword()">📧 ส่งอีเมลรีเซ็ต</button>
+        <div style="text-align:center;margin-top:10px;">
+          <button onclick="showForgotForm(false)" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:13px;cursor:pointer;font-family:'Sarabun',sans-serif;text-decoration:underline;">
+            ← กลับไปเข้าสู่ระบบ
+          </button>
+        </div>
       </div>
 
       <div class="divider">— หรือ —</div>
 
-      <div class="login-panel">
+      <div class="login-panel" style="background:rgba(255,255,255,0.92);">
         <div class="panel-header">
           <div class="panel-icon pi-stu">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2">
@@ -835,11 +992,143 @@ ALTER TABLE settings DISABLE ROW LEVEL SECURITY;</div>
             <div class="panel-desc">ดูสถานะการส่งงานของตัวเอง</div>
           </div>
         </div>
-        <label for="stu-id">เลขประจำตัวนักเรียน</label>
+        <label for="stu-teacher-select">เลือกครูผู้สอน</label>
+        <div style="position:relative;">
+          <select id="stu-teacher-select" style="font-size:15px;padding:11px 14px;width:100%;appearance:none;"
+            onchange="onStuTeacherChange()">
+            <option value="">— กำลังโหลด... —</option>
+          </select>
+          <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text2);">▾</span>
+        </div>
+        <label for="stu-id" style="margin-top:10px;">เลขประจำตัวนักเรียน</label>
         <input type="text" id="stu-id" placeholder="เช่น 66001" inputmode="numeric"
           onkeydown="if(event.key==='Enter')loginStudent()">
         <div class="err-msg" id="stu-err"></div>
         <button class="login-btn btn-stu" onclick="loginStudent()">📚 ตรวจสอบงานของฉัน</button>
+      </div>
+
+      <!-- ===== CONTACT ADMIN BANNER ===== -->
+      <div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:16px;padding:14px 16px;margin-top:4px;">
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:8px;">📩 ติดต่อแอดมิน</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.85);line-height:1.7;margin-bottom:10px;">
+          หากพบปัญหา หรือต้องการสอบถามเกี่ยวกับระบบ กรุณาติดต่อผ่านช่องทางด้านล่าง
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;" id="contact-admin-links">
+          <!-- filled by JS from settings -->
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);text-align:center;">กำลังโหลด...</div>
+        </div>
+      </div>
+
+      <!-- ===== COMPACT ADMIN BAR ===== -->
+      <div style="margin-top:14px;text-align:center;">
+        <button id="admin-bar-btn" onclick="toggleAdminBar()"
+          style="background:none;border:none;color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif;letter-spacing:.5px;padding:4px 12px;border-radius:20px;transition:all .2s;"
+          onmouseover="this.style.color='rgba(255,255,255,0.65)'" onmouseout="this.style.color='rgba(255,255,255,0.35)'">
+          ⬡ ผู้ดูแลระบบ
+        </button>
+      </div>
+
+      <!-- Super Admin Login (hidden by default) -->
+      <div id="admin-login-panel" style="display:none;overflow:hidden;transition:all .3s ease;">
+        <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,100,100,0.35);border-radius:16px;padding:16px;margin-top:8px;backdrop-filter:blur(10px);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <div style="width:34px;height:34px;border-radius:10px;background:rgba(239,68,68,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" stroke-width="2">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            </div>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#fff;">Super Admin</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.55);">จัดการบัญชีครูทั้งระบบ</div>
+            </div>
+            <button onclick="toggleAdminBar()" style="margin-left:auto;background:none;border:none;color:rgba(255,255,255,0.4);font-size:18px;cursor:pointer;line-height:1;">✕</button>
+          </div>
+          <label style="font-size:13px;color:rgba(255,255,255,0.7);display:block;margin-bottom:6px;font-weight:500;">รหัสผ่าน Super Admin</label>
+          <div class="pw-wrap">
+            <input type="password" id="admin-pw" placeholder="รหัสผ่าน..." autocomplete="current-password"
+              style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);color:#fff;font-size:16px;"
+              onkeydown="if(event.key==='Enter')loginAdmin()">
+            <button class="pw-toggle" onclick="togglePw('admin-pw',this)" tabindex="-1" style="color:rgba(255,255,255,0.6);">แสดง</button>
+          </div>
+          <div class="err-msg" id="admin-err" style="color:#FCA5A5;"></div>
+          <button style="width:100%;padding:13px;font-size:16px;font-weight:700;border-radius:12px;border:none;cursor:pointer;margin-top:12px;background:linear-gradient(135deg,#EF4444,#DC2626);color:#fff;box-shadow:0 4px 16px rgba(239,68,68,0.4);font-family:'Sarabun',sans-serif;" onclick="loginAdmin()">🔐 เข้าสู่ระบบแอดมิน</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===== SUPER ADMIN ===== -->
+<div id="s-superadmin" class="screen">
+  <div class="topbar" style="background:linear-gradient(135deg,#EF4444,#991B1B);">
+    <div class="tb-left">
+      <div class="tb-avatar" style="background:rgba(255,255,255,0.25);color:#fff;border:1.5px solid rgba(255,255,255,0.4);">SA</div>
+      <div>
+        <div class="tb-name" id="sa-name">Super Admin</div>
+        <div class="tb-role">จัดการบัญชีครูทั้งระบบ</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button class="logout-btn" onclick="document.getElementById('setup-overlay').style.display='flex'" style="padding:7px 10px;font-size:13px;">⚙️ DB</button>
+      <button class="logout-btn" onclick="logout()">ออก</button>
+    </div>
+  </div>
+  <div class="toast-slot"><div id="toast-sa" class="tbar"></div></div>
+
+  <div style="padding:16px 16px 100px;">
+    <!-- Teacher View Panel (shown when viewing teacher data) -->
+    <div id="sa-teacher-view-panel" style="display:none;background:#fff;border:1.5px solid var(--blue);border-radius:16px;padding:16px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:16px;font-weight:700;color:var(--blue);" id="sa-teacher-view-name">ดูข้อมูลครู</div>
+        <button onclick="closeSATeacherView()" style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:#fff;font-size:13px;font-weight:600;cursor:pointer;color:var(--text2);">✕ ปิด</button>
+      </div>
+      <div id="sa-tv-stats"></div>
+      <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;margin-top:4px;">รายชื่อนักเรียน</div>
+      <div class="tbl-wrap" id="sa-tv-students" style="max-height:220px;"></div>
+    </div>
+
+    <!-- Pending Teachers -->
+    <div class="card" style="border-color:#FCD34D;background:linear-gradient(135deg,#FFFBEB,#FEF3C7);">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <div class="card-title" style="margin:0;color:#B45309;">⏳ รอการอนุมัติ</div>
+        <span id="sa-pending-badge" style="background:#F59E0B;color:#fff;border-radius:20px;font-size:12px;font-weight:700;padding:2px 8px;"></span>
+        <button onclick="loadSuperAdminPanel()" style="margin-left:auto;padding:5px 12px;font-size:12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;">🔄 รีเฟรช</button>
+      </div>
+      <div id="sa-pending-list"></div>
+    </div>
+
+    <!-- Approved Teachers -->
+    <div class="card" style="border-color:#86EFAC;background:linear-gradient(135deg,#F0FDF4,#DCFCE7);">
+      <div class="card-title" style="color:var(--green-dark);">✅ อนุมัติแล้ว</div>
+      <div id="sa-approved-list"></div>
+    </div>
+
+    <!-- Rejected Teachers -->
+    <div class="card" style="border-color:#FCA5A5;background:linear-gradient(135deg,#FFF5F5,#FEE2E2);">
+      <div class="card-title" style="color:var(--red);">❌ ปฏิเสธการเข้าถึง</div>
+      <div id="sa-rejected-list"></div>
+    </div>
+
+    <!-- Contact Admin Settings -->
+    <div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#FAF5FF,#EDE9FE);">
+      <div class="card-title" style="color:var(--purple);">📩 จัดการข้อมูลติดต่อ</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">ข้อมูลนี้จะแสดงในหน้า Login ให้ครูและนักเรียนเห็น</div>
+      <div id="contact-settings-list"></div>
+      <div style="margin-top:12px;border-top:1.5px solid var(--border);padding-top:12px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">➕ เพิ่มช่องทางติดต่อ</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <select id="contact-type" style="flex:0 0 100px;font-size:13px;padding:8px 8px;">
+            <option value="line">Line</option>
+            <option value="facebook">Facebook</option>
+            <option value="email">อีเมล</option>
+            <option value="phone">โทรศัพท์</option>
+            <option value="other">อื่นๆ</option>
+          </select>
+          <input type="text" id="contact-label" placeholder="ชื่อที่แสดง เช่น Line: admin" style="flex:1;font-size:13px;">
+        </div>
+        <input type="text" id="contact-value" placeholder="ลิงก์หรือข้อมูลติดต่อ เช่น https://line.me/ti/p/..." style="font-size:13px;margin-bottom:8px;">
+        <button onclick="addContactChannel()" style="width:100%;padding:11px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,var(--purple),#5B21B6);color:#fff;cursor:pointer;font-family:'Sarabun',sans-serif;">+ เพิ่มช่องทาง</button>
       </div>
     </div>
   </div>
@@ -851,11 +1140,15 @@ ALTER TABLE settings DISABLE ROW LEVEL SECURITY;</div>
     <div class="tb-left">
       <div class="tb-avatar av-admin">ครู</div>
       <div>
-        <div class="tb-name">แอดมิน</div>
-        <div class="tb-role">สิทธิ์จัดการระบบ</div>
+        <div class="tb-name" id="teacher-topbar-name">ครู</div>
+        <div class="tb-role" id="teacher-topbar-email" style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:1px;">ระบบตรวจส่งงาน</div>
       </div>
     </div>
-    <button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button class="logout-btn" onclick="showProfileModal()" style="padding:7px 10px;font-size:15px;" title="แก้ไขโปรไฟล์">👤</button>
+      <button class="logout-btn" onclick="showChangePwModal()" style="padding:7px 10px;font-size:15px;" title="เปลี่ยนรหัสผ่าน">🔑</button>
+      <button class="logout-btn" onclick="logout()">ออก</button>
+    </div>
   </div>
   <div class="toast-slot"><div id="toast-a" class="tbar"></div></div>
 
@@ -1153,19 +1446,112 @@ ALTER TABLE settings DISABLE ROW LEVEL SECURITY;</div>
     </div>
     <button class="logout-btn" onclick="logout()">ออก</button>
   </div>
+  <div class="toast-slot"><div id="toast-stu" class="tbar"></div></div>
   <div style="padding:16px 16px 80px;" id="stu-content"></div>
 </div>
 
+<!-- ===== RESET PASSWORD MODAL ===== -->
+<div id="reset-pw-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+  <div style="background:#fff;border-radius:24px;padding:28px 24px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#7C3AED,#4F8EF7);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div style="font-size:18px;font-weight:800;color:var(--text);">ตั้งรหัสผ่านใหม่</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:4px;">กรอกรหัสผ่านใหม่สำหรับบัญชีของคุณ</div>
+    </div>
+    <label class="lbl">รหัสผ่านใหม่</label>
+    <div class="pw-wrap">
+      <input type="password" id="reset-new-pw" placeholder="อย่างน้อย 6 ตัวอักษร">
+      <button class="pw-toggle" onclick="togglePw('reset-new-pw',this)" tabindex="-1">แสดง</button>
+    </div>
+    <label class="lbl" style="margin-top:10px;">ยืนยันรหัสผ่านใหม่</label>
+    <input type="password" id="reset-new-pw2" placeholder="พิมพ์รหัสผ่านอีกครั้ง"
+      onkeydown="if(event.key==='Enter')doResetPassword()">
+    <div class="err-msg" id="reset-pw-err"></div>
+    <div id="reset-pw-success" style="display:none;background:#DCFCE7;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;color:#16A34A;margin-top:8px;">✅ เปลี่ยนรหัสผ่านสำเร็จ!</div>
+    <button onclick="doResetPassword()" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;margin-top:14px;font-family:'Sarabun',sans-serif;">🔑 บันทึกรหัสผ่านใหม่</button>
+    <button onclick="closeResetPwModal()" style="width:100%;padding:11px;font-size:14px;font-weight:600;border-radius:12px;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;margin-top:8px;font-family:'Sarabun',sans-serif;">ยกเลิก</button>
+  </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- ===== TEACHER PROFILE MODAL ===== -->
+<div id="teacher-profile-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9000;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)closeProfileModal()">
+  <div style="background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:440px;padding:24px 20px 36px;box-shadow:0 -8px 32px rgba(0,0,0,0.2);animation:slideUp .3s ease;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div style="font-size:18px;font-weight:800;color:var(--text);">👤 แก้ไขโปรไฟล์</div>
+      <button onclick="closeProfileModal()" style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;color:var(--text2);">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <div style="flex:1;">
+        <label class="lbl">ชื่อจริง</label>
+        <input type="text" id="profile-first-name" placeholder="สมชาย">
+      </div>
+      <div style="flex:1;">
+        <label class="lbl">นามสกุล</label>
+        <input type="text" id="profile-last-name" placeholder="ใจดี">
+      </div>
+    </div>
+    <label class="lbl">Username</label>
+    <div style="position:relative;">
+      <input type="text" id="profile-username" placeholder="teacher_somsak" style="padding-left:28px;"
+        oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')">
+      <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;">@</span>
+    </div>
+    <label class="lbl" style="margin-top:10px;">ชื่อที่แสดง (อัปเดตอัตโนมัติ)</label>
+    <input type="text" id="profile-display-name" placeholder="ครูสมชาย ใจดี" readonly
+      style="background:var(--bg);color:var(--text2);">
+    <label class="lbl" style="margin-top:10px;">อีเมล (เปลี่ยนไม่ได้)</label>
+    <input type="text" id="profile-email" disabled style="background:var(--bg);color:var(--text3);">
+    <div class="err-msg" id="profile-err"></div>
+    <div id="profile-success" style="display:none;background:#DCFCE7;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;color:#16A34A;margin-top:8px;">✅ บันทึกสำเร็จ!</div>
+    <button onclick="saveProfile()" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--blue),#7C3AED);color:#fff;cursor:pointer;margin-top:16px;font-family:'Sarabun',sans-serif;">💾 บันทึกโปรไฟล์</button>
+  </div>
+</div>
+
+
+<!-- ===== CHANGE PASSWORD MODAL (for logged-in teacher) ===== -->
+<div id="change-pw-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(8px);" onclick="if(event.target===this)closeChangePwModal()">
+  <div style="background:#fff;border-radius:24px;padding:28px 24px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#4F8EF7,#7C3AED);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div style="font-size:18px;font-weight:800;color:var(--text);">เปลี่ยนรหัสผ่าน</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:4px;" id="change-pw-email-display"></div>
+    </div>
+    <label class="lbl">รหัสผ่านปัจจุบัน</label>
+    <div class="pw-wrap">
+      <input type="password" id="change-current-pw" placeholder="รหัสผ่านปัจจุบัน">
+      <button class="pw-toggle" onclick="togglePw('change-current-pw',this)" tabindex="-1">แสดง</button>
+    </div>
+    <label class="lbl" style="margin-top:10px;">รหัสผ่านใหม่</label>
+    <div class="pw-wrap">
+      <input type="password" id="change-new-pw" placeholder="อย่างน้อย 6 ตัวอักษร">
+      <button class="pw-toggle" onclick="togglePw('change-new-pw',this)" tabindex="-1">แสดง</button>
+    </div>
+    <label class="lbl" style="margin-top:10px;">ยืนยันรหัสผ่านใหม่</label>
+    <input type="password" id="change-new-pw2" placeholder="พิมพ์รหัสผ่านอีกครั้ง"
+      onkeydown="if(event.key==='Enter')doChangePassword()">
+    <div class="err-msg" id="change-pw-err"></div>
+    <div id="change-pw-success" style="display:none;background:#DCFCE7;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;color:#16A34A;margin-top:8px;">✅ เปลี่ยนรหัสผ่านสำเร็จ!</div>
+    <button onclick="doChangePassword()" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,#4F8EF7,#7C3AED);color:#fff;cursor:pointer;margin-top:14px;font-family:'Sarabun',sans-serif;">💾 บันทึกรหัสผ่านใหม่</button>
+    <button onclick="closeChangePwModal()" style="width:100%;padding:11px;font-size:14px;font-weight:600;border-radius:12px;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;margin-top:8px;font-family:'Sarabun',sans-serif;">ยกเลิก</button>
+  </div>
+</div>
+
+
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 <script>
-const ADMIN_PW = 'teacher123';
+const SUPER_ADMIN_PW = 'superadmin999';  // รหัสแอดมินกลาง (เปลี่ยนได้)
+const ADMIN_PW = 'teacher123';  // เหลือไว้ compatibility (ไม่ใช้แล้ว)
 
 // ============================================================
 //  SUPABASE + LOCAL FALLBACK LAYER
@@ -1173,6 +1559,7 @@ const ADMIN_PW = 'teacher123';
 let SB = null;          // Supabase client
 let USE_SUPABASE = false;
 let realtimeChannel = null;
+let CURRENT_TEACHER = null;  // { id, display_name } or null if superadmin
 
 // LocalStorage helpers (fallback)
 function lsGet(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
@@ -1187,6 +1574,27 @@ function checkSetupOnLoad() {
   document.getElementById('sb-url').value = FIXED_SB_URL;
   document.getElementById('sb-key').value = FIXED_SB_KEY;
   connectSupabase(true); // auto-connect silently
+}
+
+// Auto restore session หลัง page reload (ถ้าครูเคย login อยู่)
+async function tryRestoreSession(){
+  if(!USE_SUPABASE||!SB) return false;
+  try{
+    const {data:{session}} = await SB.auth.getSession();
+    if(!session) return false;
+    const uid = session.user.id;
+    const {data:teacher} = await SB.from('teachers').select('*').eq('id',uid).single();
+    if(!teacher||teacher.status!=='approved') { await SB.auth.signOut(); return false; }
+    CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||''};
+    await loadFromSupabase();
+    setTimeout(()=>setupRealtime(),500);
+    document.getElementById('teacher-topbar-name').textContent=teacher.display_name;
+    document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
+    showScreen('s-admin');
+    populateScanSelects();
+    renderDashboard();
+    return true;
+  }catch(e){ return false; }
 }
 
 async function connectSupabase(silent = false) {
@@ -1208,12 +1616,16 @@ async function connectSupabase(silent = false) {
 
   try {
     SB = supabase.createClient(url, key, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
       global: { fetch: (...args) => fetch(...args) }
     });
-    // ทดสอบ connection
-    const { data, error } = await SB.from('students').select('id').limit(1);
-    if(error) throw new Error(error.message);
+    // ทดสอบ connection ด้วย query ที่ไม่ขึ้นอยู่กับ schema
+    // ถ้า table ยังไม่มีก็ยังเชื่อมต่อได้ (admin จะสร้าง table ทีหลัง)
+    const { error: connErr } = await SB.from('teachers').select('id').limit(1);
+    // ignore "relation does not exist" error — แค่ตรวจว่า Supabase ตอบได้
+    if(connErr && !connErr.message.includes('does not exist') && !connErr.message.includes('relation')) {
+      throw new Error(connErr.message);
+    }
 
     USE_SUPABASE = true;
     lsSet('sb_config', {url, key});
@@ -1221,8 +1633,13 @@ async function connectSupabase(silent = false) {
     statusEl.className = 'setup-status ok';
     statusText.textContent = '✅ เชื่อมต่อสำเร็จ!';
 
-    await loadFromSupabase();
-    setTimeout(() => setupRealtime(), 500);
+    // พยายาม restore session ที่มีอยู่ (หลัง page reload)
+    const restored = await tryRestoreSession();
+    if(!restored) setTimeout(() => setupRealtime(), 500);
+    // โหลดรายชื่อครูสำหรับช่องนักเรียน
+    setTimeout(()=>loadTeacherListForStudent(), 200);
+    // โหลดข้อมูลติดต่อแอดมินในหน้า login
+    setTimeout(()=>loadContactLinksForLogin(), 400);
 
     setTimeout(() => {
       document.getElementById('setup-overlay').style.display = 'none';
@@ -1236,6 +1653,17 @@ async function connectSupabase(silent = false) {
     errEl.textContent = 'Error: ' + e.message + ' — ตรวจสอบ URL/Key และการสร้าง Tables';
     btn.disabled = false;
   }
+}
+
+function skipToAdminLogin(){
+  // ปิด setup overlay แล้วเปิดหน้า login ปกติ
+  document.getElementById('setup-overlay').style.display='none';
+  showScreen('s-login');
+  // scroll ลงไปที่ admin bar
+  setTimeout(()=>{
+    const btn=document.getElementById('admin-bar-btn');
+    if(btn){btn.scrollIntoView({behavior:'smooth'});setTimeout(()=>toggleAdminBar(),300);}
+  },400);
 }
 
 function useLocalMode() {
@@ -1277,12 +1705,14 @@ function saveDB(){if(!USE_SUPABASE)lsSet('hwdb5',DB);}
 
 async function loadFromSupabase() {
   if(!SB) return;
-  const [stuRes, hwRes, subRes, setRes] = await Promise.all([
-    SB.from('students').select('*'),
-    SB.from('homeworks').select('*').order('num'),
-    SB.from('submissions').select('*'),
-    SB.from('settings').select('*')
-  ]);
+  // filter by teacher_id if logged in as teacher
+  const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : null;
+  let stuQ = SB.from('students').select('*');
+  let hwQ = SB.from('homeworks').select('*').order('num');
+  let subQ = SB.from('submissions').select('*');
+  if(tid) { stuQ=stuQ.eq('teacher_id',tid); hwQ=hwQ.eq('teacher_id',tid); subQ=subQ.eq('teacher_id',tid); }
+
+  const [stuRes, hwRes, subRes, setRes] = await Promise.all([stuQ, hwQ, subQ, SB.from('settings').select('*')]);
 
   DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room}));
   DB.rooms = [...new Set(DB.students.map(s => s.room))].sort();
@@ -1299,37 +1729,43 @@ async function loadFromSupabase() {
   });
   DB.submissions = subs;
 
-  // settings: subjects, rooms
+  // settings: subjects, rooms (per teacher or global)
+  const settingsKey = tid ? 'subjects_'+tid : 'subjects';
+  const roomsKey = tid ? 'rooms_'+tid : 'rooms';
   const settingsMap = {};
   (setRes.data || []).forEach(r => { settingsMap[r.key] = r.value; });
-  if(settingsMap['subjects']) DB.subjects = settingsMap['subjects'];
-  if(settingsMap['rooms']) DB.rooms = settingsMap['rooms'];
+  if(settingsMap[settingsKey]) DB.subjects = settingsMap[settingsKey];
+  else if(settingsMap['subjects']) DB.subjects = settingsMap['subjects'];
+  if(settingsMap[roomsKey]) DB.rooms = settingsMap[roomsKey];
 }
 
 // ---- Realtime subscription ----
 function setupRealtime() {
-  if(!SB || realtimeChannel) return;
-  realtimeChannel = SB.channel('db-changes')
+  if(!SB) return;
+  if(realtimeChannel) { try{SB.removeChannel(realtimeChannel);}catch(e){} realtimeChannel=null; }
+  const channelName = CURRENT_TEACHER ? 'db-changes-'+CURRENT_TEACHER.id : 'db-changes-global';
+  realtimeChannel = SB.channel(channelName)
     .on('postgres_changes', {event:'*', schema:'public', table:'submissions'}, async () => {
       await reloadSubmissions();
-      renderDashboard();
-      renderStudentIfOpen();
+      if(document.getElementById('s-admin')?.classList.contains('on')) { renderDashboard(); renderStudentIfOpen(); }
     })
     .on('postgres_changes', {event:'*', schema:'public', table:'students'}, async () => {
       await reloadStudents();
-      renderDashboard();
-      if(document.getElementById('ap-manage')?.classList.contains('on')) renderManage();
+      if(document.getElementById('s-admin')?.classList.contains('on')) { renderDashboard(); if(document.getElementById('ap-manage')?.classList.contains('on')) renderManage(); }
     })
     .on('postgres_changes', {event:'*', schema:'public', table:'homeworks'}, async () => {
       await reloadHomeworks();
-      renderDashboard();
+      if(document.getElementById('s-admin')?.classList.contains('on')) renderDashboard();
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'teachers'}, async () => {
+      if(document.getElementById('s-superadmin')?.classList.contains('on')) loadSuperAdminPanel();
     })
     .subscribe();
   showRealtimeDot();
 }
 
 function showRealtimeDot() {
-  const tb = document.getElementById('admin-topbar-name');
+  const tb = document.getElementById('teacher-topbar-name');
   if(tb && !document.getElementById('rt-dot')) {
     const dot = document.createElement('span');
     dot.id = 'rt-dot';
@@ -1341,7 +1777,10 @@ function showRealtimeDot() {
 
 async function reloadSubmissions() {
   if(!SB) return;
-  const {data} = await SB.from('submissions').select('*');
+  const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : null;
+  let q = SB.from('submissions').select('*');
+  if(tid) q = q.eq('teacher_id', tid);
+  const {data} = await q;
   const subs = {};
   (data||[]).forEach(r => {
     const key = r.student_id + '_' + r.hw_num;
@@ -1354,14 +1793,20 @@ async function reloadSubmissions() {
 
 async function reloadStudents() {
   if(!SB) return;
-  const {data} = await SB.from('students').select('*');
+  const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : null;
+  let q = SB.from('students').select('*');
+  if(tid) q = q.eq('teacher_id', tid);
+  const {data} = await q;
   DB.students = (data||[]).map(r=>({id:r.id,name:r.name,room:r.room}));
   DB.rooms = [...new Set(DB.students.map(s=>s.room))].sort();
 }
 
 async function reloadHomeworks() {
   if(!SB) return;
-  const {data} = await SB.from('homeworks').select('*').order('num');
+  const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : null;
+  let q = SB.from('homeworks').select('*').order('num');
+  if(tid) q = q.eq('teacher_id', tid);
+  const {data} = await q;
   DB.homeworks = (data||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100}));
 }
 
@@ -1369,8 +1814,8 @@ let _currentStuId = null; // track which student is viewing
 
 function renderStudentIfOpen() {
   if(_currentStuId) {
-    const s = DB.students.find(x => x.id === _currentStuId);
-    if(s) renderStudentView(s);
+    const s = (_currentStuDB&&_currentStuDB.student) || DB.students.find(x => x.id === _currentStuId);
+    if(s) renderStudentView(s, _currentStuDB||null);
   }
 }
 
@@ -1379,7 +1824,8 @@ function renderStudentIfOpen() {
 // ============================================================
 async function sbAddStudent(stu) {
   if(USE_SUPABASE) {
-    const {error} = await SB.from('students').insert({id:stu.id,name:stu.name,room:stu.room});
+    const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+    const {error} = await SB.from('students').insert({id:stu.id,name:stu.name,room:stu.room,teacher_id:tid});
     if(error) throw error;
     await reloadStudents();
   } else {
@@ -1395,7 +1841,10 @@ async function sbUpdateStudent(oldId, stu) {
     if(error) throw error;
     // ถ้า id เปลี่ยน ต้องย้าย submissions
     if(oldId !== stu.id) {
-      const {data: subs} = await SB.from('submissions').select('*').eq('student_id', oldId);
+      const tid2 = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+      let subQ = SB.from('submissions').select('*').eq('student_id', oldId);
+      if(tid2) subQ = subQ.eq('teacher_id', tid2);
+      const {data: subs} = await subQ;
       for(const s of (subs||[])) {
         await SB.from('submissions').update({student_id: stu.id}).eq('id', s.id);
       }
@@ -1418,7 +1867,8 @@ async function sbUpdateStudent(oldId, stu) {
 
 async function sbDeleteStudent(id) {
   if(USE_SUPABASE) {
-    await SB.from('submissions').delete().eq('student_id', id);
+    const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+    await SB.from('submissions').delete().eq('student_id', id).eq('teacher_id', tid);
     const {error} = await SB.from('students').delete().eq('id', id);
     if(error) throw error;
     await reloadStudents();
@@ -1430,7 +1880,10 @@ async function sbDeleteStudent(id) {
 
 async function sbAddHomework(hw) {
   if(USE_SUPABASE) {
-    const {error} = await SB.from('homeworks').upsert({num:hw.num,title:hw.title,subject:hw.subject||'',max_score:hw.maxScore||100});
+    const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+    // delete old if exists for this teacher, then insert fresh
+    await SB.from('homeworks').delete().eq('num',hw.num).eq('teacher_id',tid);
+    const {error} = await SB.from('homeworks').insert({num:hw.num,title:hw.title,subject:hw.subject||'',max_score:hw.maxScore||100,teacher_id:tid});
     if(error) throw error;
     await reloadHomeworks();
   } else {
@@ -1443,7 +1896,8 @@ async function sbAddHomework(hw) {
 
 async function sbDeleteHomework(num) {
   if(USE_SUPABASE) {
-    const {error} = await SB.from('homeworks').delete().eq('num', num);
+    const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+    const {error} = await SB.from('homeworks').delete().eq('num', num).eq('teacher_id', tid);
     if(error) throw error;
     await reloadHomeworks();
   } else {
@@ -1455,10 +1909,12 @@ async function sbDeleteHomework(num) {
 async function sbRecordSubmission(sub) {
   // sub = {sid, hwNum, hwTitle, room, score, maxScore}
   if(USE_SUPABASE) {
-    const {error} = await SB.from('submissions').upsert({
+    const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+    await SB.from('submissions').delete().eq('student_id',sub.sid).eq('hw_num',sub.hwNum).eq('teacher_id',tid);
+    const {error} = await SB.from('submissions').insert({
       student_id: sub.sid, hw_num: sub.hwNum, hw_title: sub.hwTitle,
-      room: sub.room, score: sub.score, max_score: sub.maxScore
-    }, {onConflict: 'student_id,hw_num'});
+      room: sub.room, score: sub.score, max_score: sub.maxScore, teacher_id: tid
+    });
     if(error) throw error;
     await reloadSubmissions();
   } else {
@@ -1470,7 +1926,10 @@ async function sbRecordSubmission(sub) {
 
 async function sbUpdateScore(sid, hwNum, score) {
   if(USE_SUPABASE) {
-    const {error} = await SB.from('submissions').update({score}).eq('student_id', sid).eq('hw_num', hwNum);
+    const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+    let q = SB.from('submissions').update({score}).eq('student_id', sid).eq('hw_num', hwNum);
+    if(tid) q = q.eq('teacher_id', tid);
+    const {error} = await q;
     if(error) throw error;
     await reloadSubmissions();
   } else {
@@ -1482,7 +1941,9 @@ async function sbUpdateScore(sid, hwNum, score) {
 
 async function sbSaveSettings(key, value) {
   if(USE_SUPABASE) {
-    await SB.from('settings').upsert({key, value}, {onConflict: 'key'});
+    const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+    const scopedKey = tid ? key+'_'+tid : key;
+    await SB.from('settings').upsert({key:scopedKey, value}, {onConflict: 'key'});
   } else {
     saveDB();
   }
@@ -1490,9 +1951,12 @@ async function sbSaveSettings(key, value) {
 
 async function sbImportStudents(students) {
   if(USE_SUPABASE) {
-    const rows = students.map(s => ({id:s.id,name:s.name,room:s.room}));
-    const {error} = await SB.from('students').upsert(rows, {onConflict:'id', ignoreDuplicates:true});
-    if(error) throw error;
+    const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+    const rows = students.map(s => ({id:s.id,name:s.name,room:s.room,teacher_id:tid}));
+    // insert only new ones for this teacher
+    for(const row of rows){
+      await SB.from('students').upsert(row, {onConflict:'id', ignoreDuplicates:true});
+    }
     await reloadStudents();
   } else {
     let added = 0;
@@ -1514,10 +1978,31 @@ async function sbImportStudents(students) {
 // ============================================================
 let qr = null, scanning = false, curRoom = 'all';
 
+function toggleAdminBar(forceClose){
+  const panel = document.getElementById('admin-login-panel');
+  const btn = document.getElementById('admin-bar-btn');
+  const isOpen = panel.style.display !== 'none';
+  if(isOpen || forceClose){
+    panel.style.display = 'none';
+    btn.textContent = '⬡ ผู้ดูแลระบบ';
+    document.getElementById('admin-pw').value = '';
+    document.getElementById('admin-err').textContent = '';
+  } else {
+    panel.style.display = 'block';
+    btn.textContent = '✕ ปิด';
+    setTimeout(()=>{
+      document.getElementById('admin-pw').focus();
+      panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+    }, 100);
+  }
+}
+
 function togglePw(id,btn){const el=document.getElementById(id);if(el.type==='password'){el.type='text';btn.textContent='ซ่อน';}else{el.type='password';btn.textContent='แสดง';}}
 
 function toast(msg,type='ok'){
-  const t=document.getElementById('toast-a');
+  // Route to whichever toast bar is in the active screen
+  const screenOn = document.querySelector('.screen.on');
+  const t = screenOn ? screenOn.querySelector('.tbar') : null;
   if(!t)return;
   t.textContent=msg;
   t.className='tbar on t-'+type;
@@ -1531,50 +2016,610 @@ function showScreen(id){
 }
 
 function loginAdmin(){
-  const pw=document.getElementById('admin-pw').value;
-  document.getElementById('admin-err').textContent='';
-  if(pw===ADMIN_PW){
+  const input = document.getElementById('admin-pw');
+  const pw = input ? input.value : '';
+  const errEl = document.getElementById('admin-err');
+  if(errEl) errEl.textContent = '';
+  if(!pw){ if(errEl) errEl.textContent='กรุณากรอกรหัสผ่าน'; return; }
+  if(pw === SUPER_ADMIN_PW){
+    CURRENT_TEACHER = null;
+    if(input) input.value = '';
+    toggleAdminBar(true);
+    showScreen('s-superadmin');
+    loadSuperAdminPanel();
+  } else {
+    if(errEl) errEl.textContent = 'รหัสผ่านไม่ถูกต้อง';
+    if(input) input.select();
+  }
+}
+
+// ===== SUPABASE AUTH — Email-based login =====
+
+async function loginTeacher(){
+  const email=document.getElementById('teacher-email-input').value.trim();
+  const pw=document.getElementById('teacher-pw-input').value;
+  const errEl=document.getElementById('teacher-err');
+  errEl.textContent='';
+  if(!email||!pw){errEl.textContent='กรุณากรอกอีเมลและรหัสผ่าน';return;}
+  if(!USE_SUPABASE){errEl.textContent='ต้องเชื่อมต่อ Supabase';return;}
+  try{
+    const {data:authData,error:authErr}=await SB.auth.signInWithPassword({email,password:pw});
+    if(authErr){
+      if(authErr.message.includes('Invalid login')||authErr.message.includes('invalid_credentials'))
+        errEl.textContent='อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+      else if(authErr.message.includes('Email not confirmed'))
+        errEl.textContent='กรุณายืนยันอีเมลก่อน (ตรวจสอบกล่องจดหมาย)';
+      else errEl.textContent='เกิดข้อผิดพลาด: '+authErr.message;
+      return;
+    }
+    const uid=authData.user.id;
+    // ดึงข้อมูลครูจาก teachers table
+    const {data:teacher,error:tErr}=await SB.from('teachers').select('*').eq('id',uid).single();
+    if(tErr||!teacher){errEl.textContent='ไม่พบข้อมูลครูในระบบ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
+    if(teacher.status==='pending'){errEl.textContent='บัญชียังรอการอนุมัติจากแอดมิน';await SB.auth.signOut();return;}
+    if(teacher.status==='rejected'){errEl.textContent='บัญชีถูกปฏิเสธ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
+    // เข้าสู่ระบบสำเร็จ
+    CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||''};
+    await loadFromSupabase();
+    setTimeout(()=>setupRealtime(),500);
+    document.getElementById('teacher-topbar-name').textContent=teacher.display_name;
+    document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
+    document.getElementById('teacher-email-input').value='';
+    document.getElementById('teacher-pw-input').value='';
     showScreen('s-admin');
     populateScanSelects();
-    document.getElementById('admin-pw').value='';
-  } else {
-    document.getElementById('admin-err').textContent='รหัสผ่านไม่ถูกต้อง ลองอีกครั้ง';
+    renderDashboard();
+  }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
+}
+
+async function registerTeacher(){
+  const firstName=document.getElementById('reg-first-name').value.trim();
+  const lastName=document.getElementById('reg-last-name').value.trim();
+  const username=document.getElementById('reg-username').value.trim();
+  const email=document.getElementById('reg-teacher-email').value.trim();
+  const pw=document.getElementById('reg-teacher-pw').value;
+  const pw2=document.getElementById('reg-teacher-pw2').value;
+  const errEl=document.getElementById('reg-err');
+  errEl.textContent='';
+  if(!firstName||!lastName||!username||!email||!pw){errEl.textContent='กรอกให้ครบทุกช่อง';return;}
+  if(username.length<3){errEl.textContent='Username ต้องมีอย่างน้อย 3 ตัวอักษร';return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){errEl.textContent='รูปแบบอีเมลไม่ถูกต้อง';return;}
+  if(pw!==pw2){errEl.textContent='รหัสผ่านไม่ตรงกัน';return;}
+  if(pw.length<6){errEl.textContent='รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';return;}
+  if(!USE_SUPABASE){errEl.textContent='ต้องเชื่อมต่อ Supabase';return;}
+  try{
+    // ตรวจ username ซ้ำ
+    const {data:existing}=await SB.from('teachers').select('id').eq('username',username);
+    if(existing&&existing.length>0){errEl.textContent='Username นี้ถูกใช้แล้ว';return;}
+    const displayName='ครู'+firstName+' '+lastName;
+    // สร้าง user ใน Supabase Auth
+    const {data:authData,error:authErr}=await SB.auth.signUp({
+      email, password:pw,
+      options:{data:{display_name:displayName,username,first_name:firstName,last_name:lastName}}
+    });
+    if(authErr){
+      if(authErr.message.includes('already registered'))errEl.textContent='อีเมลนี้ถูกใช้แล้ว';
+      else errEl.textContent='เกิดข้อผิดพลาด: '+authErr.message;
+      return;
+    }
+    // บันทึกลง teachers table (status=pending)
+    const uid=authData.user.id;
+    const {error:insertErr}=await SB.from('teachers').insert({
+      id:uid, email, username, first_name:firstName, last_name:lastName,
+      display_name:displayName, status:'pending'
+    });
+    if(insertErr&&!insertErr.message.includes('duplicate'))throw insertErr;
+    document.getElementById('reg-success').style.display='block';
+    document.getElementById('reg-first-name').value='';
+    document.getElementById('reg-last-name').value='';
+    document.getElementById('reg-username').value='';
+    document.getElementById('reg-teacher-email').value='';
+    document.getElementById('reg-teacher-pw').value='';
+    document.getElementById('reg-teacher-pw2').value='';
+    // sign out หลังสมัคร — รอแอดมินอนุมัติก่อน
+    await SB.auth.signOut();
+  }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
+}
+
+async function sendResetPassword(){
+  const email=document.getElementById('forgot-email').value.trim();
+  const errEl=document.getElementById('forgot-err');
+  errEl.textContent='';
+  if(!email){errEl.textContent='กรุณากรอกอีเมล';return;}
+  if(!USE_SUPABASE){errEl.textContent='ต้องเชื่อมต่อ Supabase';return;}
+  try{
+    const {error}=await SB.auth.resetPasswordForEmail(email,{
+      redirectTo: window.location.href.split('?')[0]+'?reset=1'
+    });
+    if(error)throw error;
+    document.getElementById('forgot-success').style.display='block';
+    document.getElementById('forgot-email').value='';
+  }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
+}
+
+// ตรวจสอบ password reset redirect
+async function checkResetRedirect(){
+  // Supabase v2: ตรวจสอบ URL hash หรือ query param สำหรับ password reset
+  const hash=window.location.hash;
+  const params=new URLSearchParams(window.location.search);
+  const isReset=(hash&&hash.includes('type=recovery'))||(params.get('type')==='recovery');
+  if(isReset){
+    // รอให้ Supabase Auth โหลด session จาก hash ก่อน
+    setTimeout(async()=>{
+      const {data:{session}}=await SB.auth.getSession();
+      if(session) showResetPasswordModal();
+    }, 1000);
+  }
+}
+
+function showResetPasswordModal(){
+  document.getElementById('reset-pw-modal').style.display='flex';
+}
+function closeResetPwModal(){
+  document.getElementById('reset-pw-modal').style.display='none';
+  // clear hash
+  history.replaceState(null,'',window.location.pathname);
+}
+async function doResetPassword(){
+  const pw=document.getElementById('reset-new-pw').value;
+  const pw2=document.getElementById('reset-new-pw2').value;
+  const errEl=document.getElementById('reset-pw-err');
+  errEl.textContent='';
+  if(pw!==pw2){errEl.textContent='รหัสผ่านไม่ตรงกัน';return;}
+  if(pw.length<6){errEl.textContent='อย่างน้อย 6 ตัวอักษร';return;}
+  try{
+    const {error}=await SB.auth.updateUser({password:pw});
+    if(error)throw error;
+    document.getElementById('reset-pw-success').style.display='block';
+    document.getElementById('reset-new-pw').value='';
+    document.getElementById('reset-new-pw2').value='';
+    await SB.auth.signOut();
+    setTimeout(()=>closeResetPwModal(),2000);
+  }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
+}
+
+function showProfileModal(){
+  if(!CURRENT_TEACHER||!USE_SUPABASE) return;
+  SB.from('teachers').select('*').eq('id',CURRENT_TEACHER.id).single().then(({data})=>{
+    if(!data) return;
+    document.getElementById('profile-first-name').value=data.first_name||'';
+    document.getElementById('profile-last-name').value=data.last_name||'';
+    document.getElementById('profile-username').value=data.username||'';
+    document.getElementById('profile-display-name').value=data.display_name||'';
+    document.getElementById('profile-email').value=data.email||'';
+    document.getElementById('profile-err').textContent='';
+    document.getElementById('profile-success').style.display='none';
+    document.getElementById('teacher-profile-modal').style.display='flex';
+    // auto-update display name preview
+    const fn=document.getElementById('profile-first-name');
+    const ln=document.getElementById('profile-last-name');
+    const dn=document.getElementById('profile-display-name');
+    const updateDN=()=>{if(fn.value.trim()||ln.value.trim())dn.value='ครู'+fn.value.trim()+' '+ln.value.trim();};
+    fn.oninput=updateDN; ln.oninput=updateDN;
+  });
+}
+
+function closeProfileModal(){
+  document.getElementById('teacher-profile-modal').style.display='flex';
+}
+
+async function saveProfile(){
+  const firstName=document.getElementById('profile-first-name').value.trim();
+  const lastName=document.getElementById('profile-last-name').value.trim();
+  const username=document.getElementById('profile-username').value.trim();
+  const errEl=document.getElementById('profile-err');
+  errEl.textContent='';
+  if(!firstName||!lastName){errEl.textContent='กรุณากรอกชื่อและนามสกุล';return;}
+  if(!username||username.length<3){errEl.textContent='Username ต้องมีอย่างน้อย 3 ตัวอักษร';return;}
+  try{
+    // ตรวจ username ซ้ำ (ยกเว้นของตัวเอง)
+    const {data:existing}=await SB.from('teachers').select('id').eq('username',username).neq('id',CURRENT_TEACHER.id);
+    if(existing&&existing.length>0){errEl.textContent='Username นี้ถูกใช้แล้ว';return;}
+    const displayName='ครู'+firstName+' '+lastName;
+    const {error}=await SB.from('teachers').update({
+      first_name:firstName, last_name:lastName, username, display_name:displayName
+    }).eq('id',CURRENT_TEACHER.id);
+    if(error)throw error;
+    // อัปเดต local state
+    CURRENT_TEACHER.display_name=displayName;
+    document.getElementById('teacher-topbar-name').textContent=displayName;
+    document.getElementById('profile-display-name').value=displayName;
+    document.getElementById('profile-success').style.display='block';
+    setTimeout(()=>{document.getElementById('profile-success').style.display='none';},2000);
+  }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
+}
+
+function showChangePwModal(){
+  if(!CURRENT_TEACHER){return;}
+  document.getElementById('change-pw-email-display').textContent=CURRENT_TEACHER.email||'';
+  document.getElementById('change-current-pw').value='';
+  document.getElementById('change-new-pw').value='';
+  document.getElementById('change-new-pw2').value='';
+  document.getElementById('change-pw-err').textContent='';
+  document.getElementById('change-pw-success').style.display='none';
+  document.getElementById('change-pw-modal').style.display='flex';
+}
+
+function closeChangePwModal(){
+  document.getElementById('change-pw-modal').style.display='none';
+}
+
+async function doChangePassword(){
+  const currentPw=document.getElementById('change-current-pw').value;
+  const newPw=document.getElementById('change-new-pw').value;
+  const newPw2=document.getElementById('change-new-pw2').value;
+  const errEl=document.getElementById('change-pw-err');
+  errEl.textContent='';
+  if(!currentPw||!newPw){errEl.textContent='กรอกให้ครบทุกช่อง';return;}
+  if(newPw!==newPw2){errEl.textContent='รหัสผ่านใหม่ไม่ตรงกัน';return;}
+  if(newPw.length<6){errEl.textContent='รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';return;}
+  if(!USE_SUPABASE||!CURRENT_TEACHER){errEl.textContent='ไม่ได้เชื่อมต่อ';return;}
+  try{
+    // Re-authenticate ด้วย current password ก่อน
+    const {error:signInErr}=await SB.auth.signInWithPassword({
+      email:CURRENT_TEACHER.email, password:currentPw
+    });
+    if(signInErr){errEl.textContent='รหัสผ่านปัจจุบันไม่ถูกต้อง';return;}
+    // เปลี่ยนรหัสผ่าน
+    const {error:updateErr}=await SB.auth.updateUser({password:newPw});
+    if(updateErr)throw updateErr;
+    document.getElementById('change-pw-success').style.display='block';
+    document.getElementById('change-current-pw').value='';
+    document.getElementById('change-new-pw').value='';
+    document.getElementById('change-new-pw2').value='';
+    setTimeout(()=>closeChangePwModal(),2000);
+  }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
+}
+
+function showRegForm(show){
+  document.getElementById('teacher-login-form').style.display=show?'none':'block';
+  document.getElementById('teacher-reg-form').style.display=show?'block':'none';
+  document.getElementById('teacher-forgot-form').style.display='none';
+  document.getElementById('reg-success').style.display='none';
+  document.getElementById('reg-err').textContent='';
+}
+
+function showForgotForm(show){
+  document.getElementById('teacher-login-form').style.display=show?'none':'block';
+  document.getElementById('teacher-reg-form').style.display='none';
+  document.getElementById('teacher-forgot-form').style.display=show?'block':'none';
+  document.getElementById('forgot-success').style.display='none';
+  document.getElementById('forgot-err').textContent='';
+}
+
+// ===== CONTACT ADMIN MANAGEMENT =====
+const CONTACT_ICONS = {
+  line: '💬', facebook: '📘', email: '📧', phone: '📞', other: '🔗'
+};
+
+async function loadContactLinksForLogin(){
+  if(!USE_SUPABASE||!SB) return;
+  try{
+    const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').single();
+    const contacts = (data&&data.value) ? data.value : [];
+    renderContactAdminLinks(contacts);
+  }catch(e){ /* silently fail */ }
+}
+
+async function loadContactSettings(){
+  if(!USE_SUPABASE) return;
+  const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').single();
+  const contacts = (data&&data.value) ? data.value : [];
+  renderContactSettingsList(contacts);
+  renderContactAdminLinks(contacts);
+}
+
+function renderContactSettingsList(contacts){
+  const el = document.getElementById('contact-settings-list');
+  if(!el) return;
+  if(!contacts.length){
+    el.innerHTML = '<div style="font-size:13px;color:var(--text3);text-align:center;padding:8px;">ยังไม่มีข้อมูลติดต่อ</div>';
+    return;
+  }
+  el.innerHTML = contacts.map((c,i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:18px;">${CONTACT_ICONS[c.type]||'🔗'}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.label}</div>
+        <div style="font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.value}</div>
+      </div>
+      <button onclick="removeContact(${i})" style="padding:4px 10px;font-size:12px;font-weight:600;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;flex-shrink:0;">ลบ</button>
+    </div>`).join('');
+}
+
+function renderContactAdminLinks(contacts){
+  const el = document.getElementById('contact-admin-links');
+  if(!el) return;
+  if(!contacts||!contacts.length){
+    el.innerHTML = '<div style="font-size:12px;color:rgba(255,255,255,0.4);text-align:center;">ยังไม่มีข้อมูลติดต่อ</div>';
+    return;
+  }
+  el.innerHTML = contacts.map(c => {
+    const icon = CONTACT_ICONS[c.type]||'🔗';
+    const isLink = c.value.startsWith('http')||c.value.startsWith('mailto:')||c.value.startsWith('tel:');
+    const href = isLink ? c.value : (c.type==='email'?'mailto:'+c.value : c.type==='phone'?'tel:'+c.value : c.value);
+    return isLink || c.type==='email' || c.type==='phone'
+      ? `<a href="${href}" target="_blank" rel="noopener"
+           style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:10px 14px;text-decoration:none;transition:all .2s;"
+           onmouseover="this.style.background='rgba(255,255,255,0.22)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+          <span style="font-size:20px;">${icon}</span>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#fff;">${c.label}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.6);">${c.type==='email'||c.type==='phone'?c.value:'กดเพื่อเปิด'}</div>
+          </div>
+          <svg style="margin-left:auto;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>`
+      : `<div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:10px 14px;">
+          <span style="font-size:20px;">${icon}</span>
+          <div><div style="font-size:14px;font-weight:700;color:#fff;">${c.label}</div><div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">${c.value}</div></div>
+        </div>`;
+  }).join('');
+}
+
+async function addContactChannel(){
+  const type = document.getElementById('contact-type').value;
+  const label = document.getElementById('contact-label').value.trim();
+  const value = document.getElementById('contact-value').value.trim();
+  if(!label||!value){toast2('กรอกชื่อและข้อมูลติดต่อด้วย','warn');return;}
+  const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').single();
+  const contacts = (data&&data.value) ? [...data.value] : [];
+  contacts.push({type,label,value});
+  const {error} = await SB.from('settings').upsert({key:'admin_contacts',value:contacts},{onConflict:'key'});
+  if(error){toast2('บันทึกไม่สำเร็จ: '+error.message,'err');return;}
+  document.getElementById('contact-label').value='';
+  document.getElementById('contact-value').value='';
+  renderContactSettingsList(contacts);
+  renderContactAdminLinks(contacts);
+  toast2('เพิ่มช่องทางติดต่อแล้ว ✅');
+}
+
+async function removeContact(idx){
+  const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').single();
+  const contacts = (data&&data.value) ? [...data.value] : [];
+  contacts.splice(idx,1);
+  await SB.from('settings').upsert({key:'admin_contacts',value:contacts},{onConflict:'key'});
+  renderContactSettingsList(contacts);
+  renderContactAdminLinks(contacts);
+  toast2('ลบแล้ว','warn');
+}
+
+// Super Admin functions
+async function loadSuperAdminPanel(){
+  if(!USE_SUPABASE||!SB){
+    const notConn = '<div style="background:#FEF3C7;border-radius:12px;padding:20px;text-align:center;margin-bottom:12px;">'
+      +'<div style="font-size:32px;margin-bottom:8px;">⚠️</div>'
+      +'<div style="font-size:15px;font-weight:700;color:#92400E;margin-bottom:4px;">ยังไม่ได้เชื่อมต่อ Supabase</div>'
+      +'<div style="font-size:13px;color:#B45309;">กรุณากลับไปตั้งค่าก่อน หรือรีโหลดหน้าเว็บ</div>'
+      +'<button onclick="logout()" style="margin-top:12px;padding:8px 20px;border-radius:20px;border:1.5px solid #B45309;background:#FEF3C7;color:#92400E;font-size:13px;font-weight:700;cursor:pointer;font-family:'Sarabun',sans-serif;">← กลับหน้าหลัก</button>'
+      +'</div>';
+    document.getElementById('sa-pending-list').innerHTML = notConn;
+    document.getElementById('sa-approved-list').innerHTML = '';
+    document.getElementById('sa-rejected-list').innerHTML = '';
+    document.getElementById('sa-pending-badge').style.display = 'none';
+    return;
+  }
+  try{
+    // แสดง loading
+    document.getElementById('sa-pending-list').innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);">⏳ กำลังโหลด...</div>';
+    const {data,error}=await SB.from('teachers').select('id,email,username,first_name,last_name,display_name,status,created_at').order('created_at');
+    if(error)throw error;
+    renderTeacherList(data||[]);
+    loadContactSettings();
+  }catch(e){
+    const msg = e.message||String(e);
+    const isNoTable = msg.includes('does not exist')||msg.includes('relation');
+    const errHtml = isNoTable
+      ? '<div style="background:#FEE2E2;border-radius:12px;padding:20px;text-align:center;">'
+        +'<div style="font-size:28px;margin-bottom:8px;">📋</div>'
+        +'<div style="font-size:15px;font-weight:700;color:#B91C1C;margin-bottom:4px;">ยังไม่ได้สร้าง Tables</div>'
+        +'<div style="font-size:13px;color:#991B1B;">กรุณาไปรัน SQL ใน Supabase SQL Editor ก่อน</div></div>'
+      : '<div style="background:#FEE2E2;border-radius:12px;padding:16px;text-align:center;font-size:13px;color:#B91C1C;">❌ '+msg+'</div>';
+    document.getElementById('sa-pending-list').innerHTML = errHtml;
+    document.getElementById('sa-approved-list').innerHTML = '';
+    document.getElementById('sa-rejected-list').innerHTML = '';
+  }
+}
+
+function toast2(msg,type='ok'){
+  const t=document.getElementById('toast-sa');
+  if(!t)return;
+  t.textContent=msg;
+  t.className='tbar on t-'+type;
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove('on'),2800);
+}
+
+function renderTeacherList(teachers){
+  const pending=teachers.filter(t=>t.status==='pending');
+  const approved=teachers.filter(t=>t.status==='approved');
+  const rejected=teachers.filter(t=>t.status==='rejected');
+
+  const html=(list,type)=>list.length?list.map(t=>`
+    <div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--text);">${t.display_name}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px;">📧 ${t.email||'-'}${t.username?' · @'+t.username:''}</div><div style="font-size:11px;color:var(--text3);margin-top:1px;">${t.first_name||''} ${t.last_name||''} · สมัคร: ${new Date(t.created_at).toLocaleDateString('th-TH')}</div>
+          <div style="margin-top:6px;">
+            <span style="font-size:12px;padding:3px 10px;border-radius:20px;font-weight:700;${
+              t.status==='pending'?'background:#FEF3C7;color:#B45309;':
+              t.status==='approved'?'background:var(--green-light);color:var(--green-dark);':
+              'background:var(--red-light);color:var(--red);'
+            }">${t.status==='pending'?'⏳ รอการอนุมัติ':t.status==='approved'?'✅ อนุมัติแล้ว':'❌ ปฏิเสธ'}</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+          ${t.status!=='approved'?`<button onclick="approveTeacher('${t.id}')" style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;">✅ อนุมัติ</button>`:''}
+          ${t.status!=='rejected'?`<button onclick="rejectTeacher('${t.id}')" style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;">❌ ปฏิเสธ</button>`:''}
+          <button onclick="viewTeacherData('${t.id}','${t.display_name}')" style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;">👁 ดูข้อมูล</button>
+          <button onclick="deleteTeacher('${t.id}')" style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:1.5px solid #FECACA;background:#FEE2E2;color:#B91C1C;cursor:pointer;">🗑 ลบ</button>
+        </div>
+      </div>
+    </div>`).join('') : `<div style="font-size:13px;color:var(--text3);padding:12px 0;text-align:center;">ไม่มี</div>`;
+
+  document.getElementById('sa-pending-list').innerHTML=html(pending,'pending');
+  document.getElementById('sa-approved-list').innerHTML=html(approved,'approved');
+  document.getElementById('sa-rejected-list').innerHTML=html(rejected,'rejected');
+
+  document.getElementById('sa-pending-badge').textContent=pending.length||'';
+  document.getElementById('sa-pending-badge').style.display=pending.length?'':'none';
+}
+
+async function approveTeacher(tid){
+  const {error}=await SB.from('teachers').update({status:'approved'}).eq('id',tid);
+  if(error){toast2('ไม่สำเร็จ: '+error.message,'err');return;}
+  toast2('อนุมัติครูแล้ว ✅');loadSuperAdminPanel();
+}
+
+async function rejectTeacher(tid){
+  if(!confirm('ยืนยันปฏิเสธการเข้าถึงของครูคนนี้?'))return;
+  const {error}=await SB.from('teachers').update({status:'rejected'}).eq('id',tid);
+  if(error){toast2('ไม่สำเร็จ: '+error.message,'err');return;}
+  toast2('ปฏิเสธการเข้าถึงแล้ว','warn');loadSuperAdminPanel();
+}
+
+async function deleteTeacher(tid){
+  if(!confirm('ยืนยันลบบัญชีครูนี้?
+(ข้อมูลนักเรียนและงานของครูจะยังอยู่)'))return;
+  const {error}=await SB.from('teachers').delete().eq('id',tid);
+  if(error){toast2('ไม่สำเร็จ: '+error.message,'err');return;}
+  toast2('ลบบัญชีแล้ว','warn');loadSuperAdminPanel();
+}
+
+async function viewTeacherData(tid,tname){
+  if(!USE_SUPABASE)return;
+  // Switch to teacher view mode inside superadmin
+  CURRENT_TEACHER={id:tid,display_name:tname};
+  await loadFromSupabase();
+  document.getElementById('sa-teacher-view-name').textContent='ดูข้อมูลของ: '+tname;
+  document.getElementById('sa-teacher-view-panel').style.display='block';
+  renderSATeacherData();
+}
+
+function closeSATeacherView(){
+  CURRENT_TEACHER=null;
+  document.getElementById('sa-teacher-view-panel').style.display='none';
+}
+
+function renderSATeacherData(){
+  const rooms=[...new Set(DB.students.map(s=>s.room))].sort();
+  document.getElementById('sa-tv-stats').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div style="background:var(--blue-light);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:700;">${DB.students.length}</div><div style="font-size:12px;color:var(--text2);">นักเรียน</div></div>
+      <div style="background:var(--green-light);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:700;">${DB.homeworks.length}</div><div style="font-size:12px;color:var(--text2);">ชิ้นงาน</div></div>
+      <div style="background:var(--purple-light);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:700;">${Object.keys(DB.submissions).length}</div><div style="font-size:12px;color:var(--text2);">การส่งงาน</div></div>
+      <div style="background:var(--yellow-light);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:700;">${rooms.length}</div><div style="font-size:12px;color:var(--text2);">ห้องเรียน</div></div>
+    </div>`;
+
+  document.getElementById('sa-tv-students').innerHTML=DB.students.length?
+    `<table class="mini-tbl"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>ห้อง</th><th>ส่งงาน</th></tr></thead><tbody>`+
+    DB.students.map(s=>{
+      const done=DB.homeworks.filter(h=>DB.submissions[s.id+'_'+h.num]).length;
+      return `<tr><td style="font-size:12px;">${s.id}</td><td style="font-size:13px;">${s.name}</td><td style="font-size:12px;">${s.room}</td><td style="text-align:center;font-weight:700;color:var(--green-dark);">${done}/${DB.homeworks.length}</td></tr>`;
+    }).join('')+`</tbody></table>`
+    :'<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">ยังไม่มีนักเรียน</div>';
+}
+
+// ครูที่ถูกเลือกโดยนักเรียน (สำหรับการเข้าดูงาน)
+let STU_SELECTED_TEACHER = null; // {id, display_name, username}
+
+function onStuTeacherChange(){
+  const sel=document.getElementById('stu-teacher-select');
+  const opt=sel.options[sel.selectedIndex];
+  if(!opt||!opt.value){STU_SELECTED_TEACHER=null;return;}
+  STU_SELECTED_TEACHER={id:opt.value, display_name:opt.dataset.name||opt.text, username:opt.dataset.username||''};
+}
+
+async function loadTeacherListForStudent(){
+  if(!USE_SUPABASE||!SB){return;}
+  try{
+    const {data,error}=await SB.from('teachers').select('id,display_name,username,first_name,last_name').eq('status','approved').order('display_name');
+    const sel=document.getElementById('stu-teacher-select');
+    if(error||!data||!data.length){
+      sel.innerHTML='<option value="">— ยังไม่มีครูในระบบ —</option>';
+      return;
+    }
+    sel.innerHTML='<option value="">— เลือกครูผู้สอน —</option>'+
+      data.map(t=>`<option value="${t.id}" data-name="${t.display_name}" data-username="${t.username||''}">${t.display_name}${t.username?' (@'+t.username+')':''}</option>`).join('');
+  }catch(e){
+    document.getElementById('stu-teacher-select').innerHTML='<option value="">— โหลดไม่สำเร็จ —</option>';
   }
 }
 
 async function loginStudent(){
   const sid=document.getElementById('stu-id').value.trim();
-  document.getElementById('stu-err').textContent='';
-  if(!sid){document.getElementById('stu-err').textContent='กรุณากรอกเลขประจำตัว';return;}
-  // ถ้า Supabase: refresh submissions ก่อน
-  if(USE_SUPABASE) await reloadSubmissions();
-  const s=DB.students.find(x=>x.id===sid);
-  if(!s){document.getElementById('stu-err').textContent='ไม่พบเลขประจำตัวนี้ในระบบ';return;}
-  _currentStuId = sid;
-  showScreen('s-stu');
-  document.getElementById('stu-id').value='';
-  renderStudentView(s);
+  const errEl=document.getElementById('stu-err');
+  errEl.textContent='';
+  if(!sid){errEl.textContent='กรุณากรอกเลขประจำตัว';return;}
+  if(!STU_SELECTED_TEACHER){errEl.textContent='กรุณาเลือกครูผู้สอนก่อน';return;}
+  if(!USE_SUPABASE){errEl.textContent='ต้องเชื่อมต่อ Supabase';return;}
+  try{
+    // โหลดข้อมูลของครูคนที่เลือก
+    const tid=STU_SELECTED_TEACHER.id;
+    const {data:stuData,error:stuErr}=await SB.from('students').select('*').eq('id',sid).eq('teacher_id',tid).single();
+    if(stuErr||!stuData){errEl.textContent='ไม่พบรหัสนักเรียนนี้ในรายชื่อของ'+STU_SELECTED_TEACHER.display_name;return;}
+    // โหลด submissions ของนักเรียนคนนี้จากครูคนนี้
+    const {data:subData}=await SB.from('submissions').select('*').eq('student_id',sid).eq('teacher_id',tid);
+    const {data:hwData}=await SB.from('homeworks').select('*').eq('teacher_id',tid).order('num');
+    // สร้าง DB ชั่วคราวสำหรับแสดงผลนักเรียน
+    const stuDB={
+      student:{id:stuData.id,name:stuData.name,room:stuData.room},
+      homeworks:(hwData||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100})),
+      submissions:{}
+    };
+    (subData||[]).forEach(r=>{
+      stuDB.submissions[r.student_id+'_'+r.hw_num]={
+        sid:r.student_id,hwNum:r.hw_num,hwTitle:r.hw_title,room:r.room,
+        score:r.score,maxScore:r.max_score||100,
+        ts:r.submitted_at?new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}):''
+      };
+    });
+    _currentStuId=sid;
+    _currentStuDB=stuDB;
+    _currentStuTeacher=STU_SELECTED_TEACHER;
+    showScreen('s-stu');
+    document.getElementById('stu-id').value='';
+    renderStudentView(stuDB.student,stuDB);
+  }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
 }
 
-function logout(){if(scanning)stopScan();_currentStuId=null;showScreen('s-login');}
+function logout(){
+  if(scanning)stopScan();
+  _currentStuId=null;
+  _currentStuDB=null;
+  _currentStuTeacher=null;
+  STU_SELECTED_TEACHER=null;
+  CURRENT_TEACHER=null;
+  if(USE_SUPABASE&&SB){SB.auth.signOut().catch(()=>{});}
+  showScreen('s-login');
+  // Reset student teacher dropdown on logout
+  setTimeout(()=>{
+    if(USE_SUPABASE) loadTeacherListForStudent();
+  }, 300);
+}
 
-function renderStudentView(s){
+let _currentStuDB = null;   // temp DB for student view
+let _currentStuTeacher = null; // teacher info for student view
+
+function renderStudentView(s, stuDB){
+  const db = stuDB || {student:s, homeworks:db.homeworks, submissions:db.submissions};
+  const teacher = _currentStuTeacher;
   document.getElementById('stu-avatar').textContent=s.name.substring(0,2);
   document.getElementById('stu-display-name').textContent=s.name;
-  document.getElementById('stu-display-room').textContent='ห้อง '+s.room+' · รหัส '+s.id;
-  const done=DB.homeworks.filter(h=>DB.submissions[s.id+'_'+h.num]);
-  const miss=DB.homeworks.filter(h=>!DB.submissions[s.id+'_'+h.num]);
-  const pct=DB.homeworks.length?Math.round(done.length/DB.homeworks.length*100):0;
+  document.getElementById('stu-display-room').textContent='ห้อง '+s.room+' · รหัส '+s.id+(teacher?' · ครู: '+teacher.display_name:'');
+  const done=db.homeworks.filter(h=>db.submissions[s.id+'_'+h.num]);
+  const miss=db.homeworks.filter(h=>!db.submissions[s.id+'_'+h.num]);
+  const pct=db.homeworks.length?Math.round(done.length/db.homeworks.length*100):0;
   let html=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;">
     <div class="scard" style="background:linear-gradient(135deg,#DCFCE7,#BBF7D0);border:1.5px solid #86EFAC;"><div class="snum" style="color:#16A34A;">${done.length}</div><div class="slbl">✅ ส่งแล้ว</div></div>
     <div class="scard" style="background:linear-gradient(135deg,#FEE2E2,#FECACA);border:1.5px solid #FCA5A5;"><div class="snum" style="color:#B91C1C;">${miss.length}</div><div class="slbl">❌ ยังไม่ส่ง</div></div>
   </div>
   <div class="card" style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:14px;color:var(--text2);font-weight:600;">ความคืบหน้า</span><span style="font-size:16px;font-weight:700;color:${pct===100?'var(--green-dark)':'var(--blue)'};">${pct}%</span></div><div class="prog-bar" style="height:10px;"><div class="prog-fill" style="width:${pct}%;"></div></div></div>`;
-  if(!DB.homeworks.length){html+='<div class="empty">ยังไม่มีรายการงาน</div>';}
+  if(!db.homeworks.length){html+='<div class="empty">ยังไม่มีรายการงาน</div>';}
   else{
     html+='<div class="my-hw-card">';
-    DB.homeworks.forEach(h=>{
-      const sub=DB.submissions[s.id+'_'+h.num];
+    db.homeworks.forEach(h=>{
+      const sub=db.submissions[s.id+'_'+h.num];
       html+=`<div class="my-hw-row"><div><div style="font-size:15px;font-weight:700;color:var(--text);">ชิ้นที่ ${h.num}: ${h.title}</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">${h.subject}</div></div>${sub?`<div class="hw-status-ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>${sub.score!==null&&sub.score!==undefined?sub.score+'/'+(sub.maxScore||h.maxScore||100)+' คะแนน':sub.ts}</div>`:`<div class="hw-status-no"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>ยังไม่ส่ง</div>`}</div>`;
     });
     html+='</div>';
@@ -1917,7 +2962,7 @@ async function saveEditStu(){
   } catch(e){toast('แก้ไขไม่สำเร็จ: '+e.message,'err');}
 }
 
-async function openEditScore(sid,hwNum){
+async async function openEditScore(sid,hwNum){
   const key=sid+'_'+hwNum;
   const sub=DB.submissions[key];
   const hw=DB.homeworks.find(h=>h.num===parseInt(hwNum));
@@ -2137,7 +3182,10 @@ async function delHW(num){
 async function clearScans(){
   if(!confirm('ล้างข้อมูลการส่งงานทั้งหมด?'))return;
   if(USE_SUPABASE){
-    const {error}=await SB.from('submissions').delete().neq('id','00000000-0000-0000-0000-000000000000');
+    const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+    let delQ = SB.from('submissions').delete();
+    if(tid) delQ=delQ.eq('teacher_id',tid); else delQ=delQ.neq('id','00000000-0000-0000-0000-000000000000');
+    const {error}=await delQ;
     if(error){toast('ล้างไม่สำเร็จ: '+error.message,'err');return;}
     await reloadSubmissions();
   } else {
@@ -2150,8 +3198,13 @@ async function clearAllStudents(){
   const count=DB.students.length;
   if(!confirm(`ยืนยันลบรายชื่อนักเรียนทั้งหมด ${count} คน?\n\nข้อมูลการส่งงานทั้งหมดจะถูกลบด้วย`))return;
   if(USE_SUPABASE){
-    await SB.from('submissions').delete().neq('id','00000000-0000-0000-0000-000000000000');
-    const {error}=await SB.from('students').delete().neq('id','');
+    const tid2 = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+    let dq1 = SB.from('submissions').delete();
+    let dq2 = SB.from('students').delete();
+    if(tid2){dq1=dq1.eq('teacher_id',tid2);dq2=dq2.eq('teacher_id',tid2);}
+    else{dq1=dq1.neq('id','00000000-0000-0000-0000-000000000000');dq2=dq2.neq('id','');}
+    await dq1;
+    const {error}=await dq2;
     if(error){toast('ลบไม่สำเร็จ: '+error.message,'err');return;}
     await reloadStudents();await reloadSubmissions();
   } else {
@@ -2218,6 +3271,7 @@ async function exportPDF(data,pf){const{jsPDF}=window.jspdf;const doc=new jsPDF(
 // ---- INIT ----
 window.addEventListener('load', () => {
   checkSetupOnLoad();
+  checkResetRedirect();
 });
 </script>
 </html>
