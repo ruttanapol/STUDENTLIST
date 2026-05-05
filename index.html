@@ -3591,6 +3591,7 @@ function previewModalCodes(){
 function openCodeModal(){
   const allRooms=[...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort();
   const sel=document.getElementById('code-room-filter');
+  if(!sel){ toast('เกิดข้อผิดพลาด: modal ไม่พบ','err'); return; } 
   sel.innerHTML='<option value="">ทุกห้อง</option>'+allRooms.map(r=>`<option>${r}</option>`).join('');
   document.getElementById('modal-code-preview').style.display='none';
   document.getElementById('modal-code-grid').innerHTML='';
