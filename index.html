@@ -1906,15 +1906,16 @@ function setupRealtime() {
   if(realtimeChannel) { try{SB.removeChannel(realtimeChannel);}catch(e){} realtimeChannel=null; }
   const channelName = CURRENT_TEACHER ? 'db-changes-'+CURRENT_TEACHER.id : 'db-changes-global';
   realtimeChannel = SB.channel(channelName)
-    .on('postgres_changes', {event:'*', schema:'public', table:'submissions'}, async () => {
-  await reloadSubmissions();  // ✓ มี await แล้ว
-  if(document.getElementById('s-admin')?.classList.contains('on')) { 
-    renderDashboard();   // ✓ เรียกหลัง reload เสร็จแล้ว
-    renderStudentIfOpen(); 
+   .on('postgres_changes', {event:'*', schema:'public', table:'submissions'}, async () => {
+  await reloadSubmissions();
+  if(document.getElementById('s-admin')?.classList.contains('on')) {
+    renderDashboard();
+    renderStudentIfOpen();
   }
+  if(document.getElementById('s-stu')?.classList.contains('on') && _currentStuId) {
     await refreshStudentView();
   }
-    })
+})
     .on('postgres_changes', {event:'*', schema:'public', table:'students'}, async () => {
       await reloadStudents();
       if(document.getElementById('s-admin')?.classList.contains('on')) { renderDashboard(); if(document.getElementById('ap-manage')?.classList.contains('on')) renderManage(); }
