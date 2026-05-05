@@ -2792,18 +2792,31 @@ function renderStudentView(s, stuDB){
   document.getElementById('stu-content').innerHTML=html;
 }
 async function refreshStudentView(){
-  console.log('refreshStudentView called'); // debug
   if(!_currentStuId || !_currentStuTeacher) return;
   const tid = _currentStuTeacher.id;
-  const {data:subData} = await SB.from('submissions').select('*')
-    .eq('student_id', _currentStuId).eq('teacher_id', tid);
-  (subData||[]).forEach(r => {
-    _currentStuDB.submissions[r.student_id+'_'+r.hw_num] = {
+  
+  // โหลดทั้ง submissions และ homeworks
+  const [subRes, hwRes] = await Promise.all([
+    SB.from('submissions').select('*').eq('student_id', _currentStuId).eq('teacher_id', tid),
+    SB.from('homeworks').select('*').eq('teacher_id', tid).order('num')
+  ]);
+
+  // อัพเดต homeworks
+  _currentStuDB.homeworks = (hwRes.data||[]).map(r=>({
+    num:r.num, title:r.title, subject:r.subject||'', maxScore:r.max_score||100
+  }));
+
+  // อัพเดต submissions
+  const subs = {};
+  (subRes.data||[]).forEach(r => {
+    subs[r.student_id+'_'+r.hw_num] = {
       sid:r.student_id, hwNum:r.hw_num, hwTitle:r.hw_title,
       room:r.room, score:r.score, maxScore:r.max_score||100,
       ts:r.submitted_at ? new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : ''
     };
   });
+  _currentStuDB.submissions = subs;
+
   renderStudentView(_currentStuDB.student, _currentStuDB);
 }
 function showAP(id,btn){
@@ -3055,9 +3068,10 @@ function renderTable(){
     const dots = DB.homeworks.map(h => {
   const sub = DB.submissions[s.id+'_'+h.num];
   const scoreLabel = (sub && sub.score !== null && sub.score !== undefined) ? sub.score : '';
-  const tip = sub ? (scoreLabel !== '' ? `${scoreLabel}/${sub.maxScore||h.maxScore||100}` : 'ส่งแล้ว') : 'ยังไม่ส่ง'; // เพิ่มบรรทัดนี้
-  return `<div class="hw-dot ${sub?'dot-ok':'dot-no'}" title="${tip}" style="cursor:${sub?'pointer':'default'};"
-    onclick="${sub?`openEditScore('${s.id}',${h.num})`:''}">
+  const onclick = sub ? `openEditScore('${s.id}',${h.num})` : '';
+  return `<div class="hw-dot ${sub?'dot-ok':'dot-no'}"
+    style="cursor:${sub?'pointer':'default'};"
+    onclick="${onclick}">
     ${scoreLabel!==''?`<span style="font-size:10px;">${scoreLabel}</span>`:h.num}
   </div>`;
 }).join('');
