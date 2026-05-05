@@ -3680,7 +3680,6 @@ async function confirmXLImport(){
     toast(`✅ นำเข้าแล้ว ${newStudents.length} คน${skipped?` (ข้าม ${skipped} ซ้ำ)`:''}`);
   } catch(e){toast('นำเข้าไม่สำเร็จ: '+e.message,'err');}
 }
-}
 
 // deadline support in sbAddHomework
 const _baseAddHW=sbAddHomework;
