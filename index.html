@@ -872,7 +872,29 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     </div>
   </div>
 </div>
-
+<!-- ===== CODE MODAL ===== -->
+<div id="code-modal" class="code-modal-overlay" onclick="if(event.target===this)closeCodeModal()">
+  <div class="code-modal-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-size:17px;font-weight:700;color:var(--text);">🔲 QR Code / Barcode</div>
+      <button onclick="closeCodeModal()" style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;color:var(--text2);">✕</button>
+    </div>
+    <div class="code-type-row">
+      <button class="code-type-btn on" id="modal-codetype-qr" onclick="setModalCodeType('qr')">🔲 QR Code</button>
+      <button class="code-type-btn" id="modal-codetype-bar" onclick="setModalCodeType('barcode')">▐▌ Barcode</button>
+    </div>
+    <label class="lbl">กรองห้อง</label>
+    <select id="code-room-filter" onchange="" style="font-size:14px;margin-bottom:12px;"></select>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button class="mini-btn" onclick="previewModalCodes()" style="flex:1;padding:12px;font-size:13px;border-color:var(--blue);color:var(--blue-dark);">👁 ดูตัวอย่าง</button>
+      <button class="mini-btn" onclick="downloadModalCodesPDF()" style="flex:1;padding:12px;font-size:13px;border-color:var(--green);color:var(--green-dark);">📄 PDF</button>
+      <button class="mini-btn" onclick="printModalCodes()" style="flex:1;padding:12px;font-size:13px;border-color:var(--purple);color:var(--purple);">🖨️ พิมพ์</button>
+    </div>
+    <div id="modal-code-preview" style="display:none;">
+      <div class="grid" id="modal-code-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;"></div>
+    </div>
+  </div>
+</div>
 <!-- ===== SCAN SUCCESS POPUP ===== -->
 <div id="scan-success-overlay" class="scan-success-overlay" onclick="closeScanSuccess()">
   <div class="scan-success-box" onclick="event.stopPropagation()">
