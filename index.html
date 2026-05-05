@@ -657,6 +657,30 @@ input:focus, select:focus {
 }
 #admin-bar-btn:focus { outline: none; }
 
+/* ===== MANAGE TABS ===== */
+.mtab-row{display:flex;gap:0;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);margin-bottom:14px;background:#fff;}
+.mtab{flex:1;padding:11px 4px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--text3);transition:all .15s;font-family:Sarabun,sans-serif;line-height:1.3;}
+.mtab.on{background:var(--blue);color:#fff;}
+.room-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.room-card{background:#fff;border:1.5px solid #C4B5FD;border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.room-card-name{font-size:15px;font-weight:700;color:var(--purple);}
+.room-card-count{font-size:12px;color:var(--text2);}
+.hw-card-item{background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+.hw-card-num{width:36px;height:36px;border-radius:10px;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--purple);flex-shrink:0;}
+.hw-card-info{flex:1;min-width:0;}
+.hw-card-title{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hw-card-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+.code-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2000;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px);}
+.code-modal-overlay.on{display:flex;}
+.code-modal-sheet{background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:440px;padding:20px 20px calc(32px + env(safe-area-inset-bottom));max-height:92vh;overflow-y:auto;}
+.code-type-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.code-type-btn{padding:10px;border-radius:10px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:Sarabun,sans-serif;font-size:14px;font-weight:700;color:var(--text2);text-align:center;transition:all .15s;}
+.code-type-btn.on{border-color:var(--blue);background:var(--blue-light);color:var(--blue-dark);}
+.deadline-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;}
+.dl-ok{background:#DCFCE7;color:#16A34A;}
+.dl-late{background:#FEE2E2;color:#B91C1C;}
+.dl-soon{background:#FEF3C7;color:#B45309;}
+.dl-none{background:var(--bg);color:var(--text3);}
 /* ===== TEACHER BADGE ===== */
 .teacher-badge {
   display:inline-flex;align-items:center;gap:6px;
@@ -1260,126 +1284,128 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   </div>
 
   <div id="ap-manage" class="page">
-    <!-- Excel Import Card -->
+  <div class="mtab-row">
+    <button class="mtab on" onclick="switchManageTab('import',this)">📥 นำเข้า</button>
+    <button class="mtab" onclick="switchManageTab('rooms',this)">🏫 ห้อง</button>
+    <button class="mtab" onclick="switchManageTab('students',this)">👤 นักเรียน</button>
+    <button class="mtab" onclick="switchManageTab('homework',this)">📝 งาน</button>
+    <button class="mtab" onclick="switchManageTab('reset',this)">🗑️</button>
+  </div>
+
+  <div id="mtab-import" class="mtab-page">
     <div class="card" style="border-color:#BBF7D0;background:linear-gradient(135deg,#F0FDF4,#DCFCE7);">
       <div class="card-title" style="color:#16A34A;">📥 นำเข้ารายชื่อจาก Excel</div>
-      <div style="font-size:13px;color:#166534;margin-bottom:12px;line-height:1.6;">
-        อัปโหลดไฟล์ <b>.xlsx / .xls</b> ที่มีคอลัมน์:<br>
-        <span style="background:#fff;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;color:#16A34A;display:inline-block;margin-top:4px;">เลขประจำตัว &nbsp;|&nbsp; ชื่อ-สกุล &nbsp;|&nbsp; ห้อง</span>
-      </div>
+      <div style="font-size:13px;color:#166534;margin-bottom:12px;line-height:1.6;">ไฟล์ <b>.xlsx/.xls</b> ที่มี: <span style="background:#fff;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;color:#16A34A;">เลขประจำตัว | ชื่อ-สกุล | ห้อง</span></div>
       <div style="display:flex;gap:8px;margin-bottom:10px;">
-        <button class="mini-btn" onclick="downloadTemplate()" style="border-color:var(--blue);color:var(--blue-dark);background:var(--blue-light);flex:1;padding:10px;font-size:13px;">
-          ⬇️ ดาวน์โหลด Template
-        </button>
-        <label style="flex:1;margin:0;" id="xl-upload-label">
+        <button class="mini-btn" onclick="downloadTemplate()" style="border-color:var(--blue);color:var(--blue-dark);background:var(--blue-light);flex:1;padding:10px;font-size:13px;">⬇️ Template</button>
+        <label style="flex:1;margin:0;">
           <input type="file" id="xl-file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleXLUpload(event)">
-          <div style="width:100%;padding:10px;font-size:13px;font-weight:600;border-radius:10px;border:1.5px solid #86EFAC;background:#fff;color:#16A34A;cursor:pointer;text-align:center;box-sizing:border-box;">
-            📂 เลือกไฟล์ Excel
-          </div>
+          <div style="width:100%;padding:10px;font-size:13px;font-weight:700;border-radius:10px;border:1.5px solid #86EFAC;background:#fff;color:#16A34A;cursor:pointer;text-align:center;box-sizing:border-box;">📂 เลือกไฟล์</div>
         </label>
       </div>
       <div id="xl-preview" style="display:none;">
         <div id="xl-preview-info" style="font-size:13px;font-weight:600;color:#166534;margin-bottom:8px;"></div>
         <div id="xl-preview-warn" style="font-size:12px;color:#B45309;background:#FEF3C7;border-radius:8px;padding:8px 10px;margin-bottom:8px;display:none;"></div>
         <div class="tbl-wrap" style="max-height:160px;">
-          <table class="mini-tbl">
-            <thead><tr><th style="width:70px;">เลขประจำตัว</th><th>ชื่อ-สกุล</th><th style="width:60px;">ห้อง</th><th style="width:36px;">สถานะ</th></tr></thead>
-            <tbody id="xl-preview-body"></tbody>
-          </table>
+          <table class="mini-tbl"><thead><tr><th style="width:70px;">รหัส</th><th>ชื่อ-สกุล</th><th style="width:60px;">ห้อง</th><th style="width:36px;">✓</th></tr></thead><tbody id="xl-preview-body"></tbody></table>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;">
-          <button class="add-btn" onclick="confirmXLImport()" id="xl-confirm-btn" style="flex:2;margin-top:0;">✅ นำเข้าทั้งหมด</button>
+          <button class="add-btn" onclick="confirmXLImport()" id="xl-confirm-btn" style="flex:2;margin-top:0;">✅ นำเข้า</button>
           <button onclick="cancelXLImport()" style="flex:1;padding:13px;font-size:14px;font-weight:600;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;margin-top:0;">ยกเลิก</button>
         </div>
       </div>
     </div>
-    <!-- Room Management Card -->
-    <div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#FAF5FF,#EDE9FE);">
-      <div class="card-title" style="color:var(--purple);">🏫 จัดการห้องเรียน</div>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="n-room" placeholder="เช่น ม.1/1, ม.2/3" style="flex:1;margin:0;">
-        <button class="mini-btn" onclick="addRoom()" style="border-color:var(--purple);color:var(--purple);background:var(--purple-light);">+ เพิ่ม</button>
+    <div id="qr-gen-card" class="card" style="display:none;border-color:#BFDBFE;background:linear-gradient(135deg,#EFF6FF,#DBEAFE);">
+      <div class="card-title" style="color:var(--blue-dark);">🔲 สร้าง QR Code / Barcode</div>
+      <div class="code-type-row">
+        <button class="code-type-btn on" id="codetype-qr" onclick="setCodeType('qr')">🔲 QR Code</button>
+        <button class="code-type-btn" id="codetype-bar" onclick="setCodeType('barcode')">▐▌ Barcode</button>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;" id="room-chips"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="mini-btn" onclick="previewCodes()" style="flex:1;padding:12px;font-size:13px;border-color:var(--blue);color:var(--blue-dark);">👁 ดูตัวอย่าง</button>
+        <button class="mini-btn" onclick="downloadCodesPDF()" style="flex:1;padding:12px;font-size:13px;border-color:var(--green);color:var(--green-dark);">📄 PDF</button>
+        <button class="mini-btn" onclick="printCodes()" style="flex:1;padding:12px;font-size:13px;border-color:var(--purple);color:var(--purple);">🖨️ พิมพ์</button>
+      </div>
+      <div id="code-preview-area" style="display:none;margin-top:12px;"></div>
     </div>
+  </div>
 
+  <div id="mtab-rooms" class="mtab-page" style="display:none;">
+    <div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#FAF5FF,#EDE9FE);">
+      <div class="card-title" style="color:var(--purple);">🏫 ห้องเรียน</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="n-room" placeholder="เช่น ม.1/1" style="flex:1;margin:0;">
+        <button class="mini-btn" onclick="addRoom()" style="border-color:var(--purple);color:var(--purple);background:var(--purple-light);min-height:48px;padding:0 16px;">+ เพิ่ม</button>
+      </div>
+      <div class="room-card-grid" id="room-chips"></div>
+    </div>
+  </div>
+
+  <div id="mtab-students" class="mtab-page" style="display:none;">
     <div class="card">
       <div class="card-title">👤 เพิ่มนักเรียนรายคน</div>
-      <label class="lbl">รหัส</label>
-      <input type="text" id="ns-id" placeholder="เช่น 66011" inputmode="numeric">
-      <label class="lbl">ชื่อ-สกุล</label>
-      <input type="text" id="ns-name" placeholder="ชื่อ นามสกุล">
-      <label class="lbl">ห้อง</label>
-      <select id="ns-room"></select>
+      <div style="display:flex;gap:8px;">
+        <div style="flex:0 0 100px;"><label class="lbl" style="margin-top:0;">รหัส</label><input type="text" id="ns-id" placeholder="66011" inputmode="numeric"></div>
+        <div style="flex:1;"><label class="lbl" style="margin-top:0;">ชื่อ-สกุล</label><input type="text" id="ns-name" placeholder="ชื่อ นามสกุล"></div>
+      </div>
+      <label class="lbl">ห้อง</label><select id="ns-room"></select>
       <button class="add-btn" onclick="addStudent()">+ เพิ่มนักเรียน</button>
-      <div class="srch-wrap" style="margin-top:12px;margin-bottom:0;">
-        <span class="srch-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-          </svg>
-        </span>
-        <input type="search" id="manage-srch" placeholder="ค้นหาชื่อหรือรหัส..." oninput="renderManage()" style="font-size:14px;">
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="card-title" style="margin:0;">รายชื่อนักเรียน</div>
+        <button onclick="openCodeModal()" style="padding:7px 14px;font-size:12px;font-weight:700;border-radius:20px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;">🔲 QR/Barcode</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <div class="srch-wrap" style="flex:1;margin-bottom:0;">
+          <span class="srch-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span>
+          <input type="search" id="manage-srch" placeholder="ค้นหา..." oninput="renderManage()" style="font-size:14px;">
+        </div>
+        <select id="filter-room-manage" onchange="renderManage()" style="flex:0 0 100px;font-size:13px;padding:8px;margin:0;"><option value="">ทุกห้อง</option></select>
       </div>
       <div class="tbl-wrap">
-        <table class="mini-tbl">
-          <thead><tr><th style="width:70px;">รหัส</th><th>ชื่อ</th><th style="width:60px;">ห้อง</th><th style="width:76px;"></th></tr></thead>
-          <tbody id="sl-manage"></tbody>
-        </table>
+        <table class="mini-tbl"><thead><tr><th style="width:70px;">รหัส</th><th>ชื่อ</th><th style="width:60px;">ห้อง</th><th style="width:80px;"></th></tr></thead><tbody id="sl-manage"></tbody></table>
       </div>
       <div id="manage-stu-count" style="font-size:12px;color:var(--text3);text-align:right;margin-top:6px;"></div>
     </div>
+  </div>
+
+  <div id="mtab-homework" class="mtab-page" style="display:none;">
     <div class="card">
       <div class="card-title">📖 วิชา</div>
       <div style="display:flex;gap:8px;">
         <input type="text" id="n-subj" placeholder="ชื่อวิชา" style="flex:1;margin:0;">
-        <button class="mini-btn" onclick="addSubject()" style="border-color:var(--green);color:var(--green-dark);background:var(--green-light);">+ เพิ่ม</button>
+        <button class="mini-btn" onclick="addSubject()" style="border-color:var(--green);color:var(--green-dark);background:var(--green-light);min-height:48px;">+ เพิ่ม</button>
       </div>
-      <div class="tbl-wrap">
-        <table class="mini-tbl">
-          <thead><tr><th>วิชา</th><th style="width:40px;"></th></tr></thead>
-          <tbody id="subj-list"></tbody>
-        </table>
-      </div>
+      <div class="tbl-wrap" style="margin-top:8px;"><table class="mini-tbl"><thead><tr><th>วิชา</th><th style="width:40px;"></th></tr></thead><tbody id="subj-list"></tbody></table></div>
     </div>
+    <div class="card">
+      <div class="card-title">📝 เพิ่ม / แก้ไขชิ้นงาน</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <div style="flex:0 0 64px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">ครั้งที่</div><input type="number" id="n-hwnum" placeholder="1" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--purple);"></div>
+        <div style="flex:1;min-width:120px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">หัวข้องาน</div><input type="text" id="n-hwtitle" placeholder="เช่น แบบฝึกหัดบทที่ 1"></div>
+        <div style="flex:0 0 70px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">คะแนนเต็ม</div><input type="number" id="n-hwmaxscore" placeholder="100" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--blue);" value="100"></div>
+        <div style="flex:0 0 100px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">วิชา</div><select id="n-hwsubj" style="font-size:13px;padding:8px;"></select></div>
+      </div>
+      <div style="margin-top:8px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">กำหนดส่ง (ไม่บังคับ)</div><input type="date" id="n-hwdeadline" style="font-size:14px;"></div>
+      <button class="add-btn" onclick="saveHW()" style="margin-top:10px;">💾 บันทึกชิ้นงาน</button>
+      <div id="hw-card-list" style="margin-top:10px;"></div>
+    </div>
+  </div>
 
+  <div id="mtab-reset" class="mtab-page" style="display:none;">
     <div class="card">
-      <div class="card-title">📝 จัดการชิ้นงาน</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <div style="flex:0 0 58px;">
-          <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">ครั้งที่</div>
-          <input type="number" id="n-hwnum" placeholder="1" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--purple);">
-        </div>
-        <div style="flex:1;min-width:100px;">
-          <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">หัวข้องาน</div>
-          <input type="text" id="n-hwtitle" placeholder="เช่น แบบฝึกหัดบทที่ 1">
-        </div>
-        <div style="flex:0 0 70px;">
-          <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">คะแนนเต็ม</div>
-          <input type="number" id="n-hwmaxscore" placeholder="100" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--blue);" value="100">
-        </div>
-        <div style="flex:0 0 100px;">
-          <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">วิชา</div>
-          <select id="n-hwsubj" style="font-size:13px;padding:8px 8px;"></select>
-        </div>
-      </div>
-      <button class="add-btn" onclick="addHW()" style="margin-top:10px;">+ เพิ่มชิ้นงาน</button>
-      <div class="tbl-wrap">
-        <table class="mini-tbl">
-          <thead><tr><th style="width:36px;">ครั้ง</th><th>หัวข้อ</th><th style="width:50px;">เต็ม</th><th style="width:50px;">วิชา</th><th style="width:36px;"></th></tr></thead>
-          <tbody id="hw-manage-list"></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">🗑️ รีเซ็ต</div>
-      <button onclick="clearScans()" style="width:100%;padding:13px;font-size:14px;font-family:Sarabun,sans-serif;border-radius:10px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;font-weight:600;margin-bottom:8px;">
-        ล้างข้อมูลการส่งงานทั้งหมด
+      <div class="card-title">⚠️ รีเซ็ตข้อมูล</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6;">การรีเซ็ตไม่สามารถย้อนกลับได้</p>
+      <button onclick="clearScans()" style="width:100%;padding:15px;font-size:15px;font-family:Sarabun,sans-serif;border-radius:12px;border:none;background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#92400E;cursor:pointer;font-weight:700;margin-bottom:10px;text-align:left;">
+        🗑️ ล้างข้อมูลการส่งงานทั้งหมด<br><span style="font-size:12px;font-weight:400;opacity:0.8;">รายชื่อนักเรียนยังอยู่</span>
       </button>
-      <button onclick="clearAllStudents()" style="width:100%;padding:13px;font-size:14px;font-family:Sarabun,sans-serif;border-radius:10px;border:1.5px solid #FECACA;background:#FEE2E2;color:#B91C1C;cursor:pointer;font-weight:600;">
-        🗑️ ลบรายชื่อนักเรียนทั้งหมด
+      <button onclick="clearAllStudents()" style="width:100%;padding:15px;font-size:15px;font-family:Sarabun,sans-serif;border-radius:12px;border:none;background:linear-gradient(135deg,#FEE2E2,#FECACA);color:#B91C1C;cursor:pointer;font-weight:700;text-align:left;">
+        🗑️ ลบรายชื่อนักเรียนทั้งหมด<br><span style="font-size:12px;font-weight:400;opacity:0.8;">ลบข้อมูลการส่งงานด้วย</span>
       </button>
     </div>
   </div>
+
 
   <div class="bnav">
     <button class="bnav-btn on" onclick="showAP('scan',this)">
@@ -1607,6 +1633,8 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.4/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
@@ -1826,7 +1854,7 @@ async function loadFromSupabase() {
 
   DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room}));
   DB.rooms = [...new Set(DB.students.map(s => s.room))].sort();
-  DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100}));
+  DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||''}));
 
   const subs = {};
   (subRes.data || []).forEach(r => {
@@ -1917,7 +1945,7 @@ async function reloadHomeworks() {
   let q = SB.from('homeworks').select('*').order('num');
   if(tid) q = q.eq('teacher_id', tid);
   const {data} = await q;
-  DB.homeworks = (data||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100}));
+  DB.homeworks = (data||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||''}));
 }
 
 let _currentStuId = null; // track which student is viewing
@@ -3398,6 +3426,259 @@ function exportExcel(data,pf){return new Promise(resolve=>{const wb=XLSX.utils.b
 async function exportPDF(data,pf){const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});let html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"><style>*{font-family:Sarabun,sans-serif;box-sizing:border-box;margin:0;padding:0;}body{font-size:11pt;color:#1E293B;}.page{padding:12mm 15mm;page-break-after:always;}.page:last-child{page-break-after:avoid;}.page-title{font-size:16pt;font-weight:700;color:#2563EB;margin-bottom:4px;}.page-meta{font-size:9pt;color:#64748B;margin-bottom:12px;border-bottom:2px solid #E2E8F0;padding-bottom:8px;}table{width:100%;border-collapse:collapse;font-size:10pt;}th{background:linear-gradient(135deg,#EBF2FF,#DBEAFE);color:#1E40AF;font-weight:700;padding:7px 6px;border:1px solid #BFDBFE;font-size:9pt;text-align:center;}td{padding:6px;border:1px solid #E2E8F0;vertical-align:middle;}tr:nth-child(even) td{background:#F8FAFF;}.num{text-align:center;color:#64748B;}.ok{text-align:center;color:#16A34A;font-weight:700;background:#DCFCE7!important;font-size:9pt;}.no{text-align:center;color:#94A3B8;font-size:9pt;}.pct-col{text-align:center;font-weight:700;}.footer{margin-top:8px;font-size:8pt;color:#94A3B8;text-align:right;}</style></head><body>`;data.forEach((roomData,i)=>{const{room,rows,homeworks}=roomData;const dateStr=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});html+=`<div class="page"><div class="page-title">📋 รายงานการส่งงาน — ${room}</div><div class="page-meta">งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' ('+h.title+')').join(' · ')} &nbsp;|&nbsp; วันที่พิมพ์: ${dateStr} &nbsp;|&nbsp; นักเรียน ${rows.length} คน</div><table><thead><tr><th style="width:40px;">เลขที่</th><th style="width:90px;">เลขประจำตัว</th><th>ชื่อ-นามสกุล</th>${homeworks.map(h=>`<th style="width:65px;">งานครั้งที่ ${h.num}<br><span style="font-size:8pt;font-weight:400;">(/${h.maxScore||100})</span></th>`).join('')}<th style="width:55px;">ส่งแล้ว</th><th style="width:60px;">คะแนนรวม</th><th style="width:45px;">%</th></tr></thead><tbody>${rows.map(r=>{const hwCells=homeworks.map(h=>{const v=r['งานครั้งที่ '+h.num];const isOk=v!==undefined&&v!=='—';const display=isOk?(typeof v==='number'?v:'✓'):'—';return `<td class="${isOk?'ok':'no'}">${display}</td>`;}).join('');const pct=parseInt(r['%คะแนน']);const pctColor=pct===100?'#16A34A':pct>=60?'#2563EB':'#EF4444';const totalScore=r['คะแนนรวม'];const totalMax=r['คะแนนเต็ม'];return `<tr><td class="num">${r['เลขที่']}</td><td class="num">${r['เลขประจำตัว']}</td><td>${r['ชื่อ-นามสกุล']}</td>${hwCells}<td class="pct-col">${r['ส่งแล้ว']}</td><td class="pct-col" style="color:#6D28D9;font-weight:700;">${totalScore}<span style="font-size:8pt;color:#94A3B8;">/${totalMax}</span></td><td class="pct-col" style="color:${pctColor};">${r['%คะแนน']}</td></tr>`;}).join('')}</tbody></table><div class="footer">ระบบตรวจส่งงานนักเรียน · พิมพ์วันที่ ${dateStr}</div></div>`;pf.style.width=(40+(i+1)/data.length*50)+'%';});html+='</body></html>';const win=window.open('','_blank','width=900,height=700');if(!win){toast('กรุณาอนุญาต Popup เพื่อ Export PDF','warn');return;}win.document.write(html);win.document.close();win.onload=()=>{setTimeout(()=>{win.focus();win.print();},800);};}
 
 // ---- INIT ----
+// ===== MANAGE TABS =====
+function switchManageTab(tab, btn){
+  document.querySelectorAll('.mtab-page').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.mtab').forEach(b=>b.classList.remove('on'));
+  const el=document.getElementById('mtab-'+tab);
+  if(el)el.style.display='';
+  if(btn)btn.classList.add('on');
+}
+
+// ===== HW SAVE (supports edit+add) =====
+async function saveHW(){
+  const num=parseInt(document.getElementById('n-hwnum').value);
+  const title=document.getElementById('n-hwtitle').value.trim();
+  const subject=document.getElementById('n-hwsubj').value;
+  const maxScore=parseInt(document.getElementById('n-hwmaxscore').value)||100;
+  const deadline=document.getElementById('n-hwdeadline')?document.getElementById('n-hwdeadline').value:'';
+  if(!num||!title){toast('กรอกให้ครบ','warn');return;}
+  try{
+    await sbAddHomework({num,title,subject,maxScore,deadline});
+    renderManage();
+    toast('บันทึกงานชิ้นที่ '+num+' แล้ว');
+    document.getElementById('n-hwnum').value='';
+    document.getElementById('n-hwtitle').value='';
+    if(document.getElementById('n-hwdeadline'))document.getElementById('n-hwdeadline').value='';
+  }catch(e){toast('ไม่สำเร็จ: '+e.message,'err');}
+}
+
+function openEditHW(num){
+  const h=DB.homeworks.find(x=>x.num===num);
+  if(!h)return;
+  document.getElementById('n-hwnum').value=h.num;
+  document.getElementById('n-hwtitle').value=h.title;
+  document.getElementById('n-hwmaxscore').value=h.maxScore||100;
+  const subj=document.getElementById('n-hwsubj');
+  if(subj)subj.value=h.subject||'';
+  if(document.getElementById('n-hwdeadline'))document.getElementById('n-hwdeadline').value=h.deadline||'';
+  switchManageTab('homework',document.querySelectorAll('.mtab')[3]);
+  document.getElementById('n-hwtitle').focus();
+}
+
+// ===== RENDER MANAGE EXTENSIONS =====
+const _baseRenderManage=renderManage;
+function renderManage(){
+  _baseRenderManage();
+  // Room filter dropdown in student tab
+  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort();
+  const filterSel=document.getElementById('filter-room-manage');
+  if(filterSel){
+    const cur=filterSel.value;
+    filterSel.innerHTML='<option value="">ทุกห้อง</option>'+allRooms.map(r=>`<option ${r===cur?'selected':''}>${r}</option>`).join('');
+  }
+  // Room cards
+  const chips=document.getElementById('room-chips');
+  if(chips)chips.innerHTML=allRooms.length
+    ?allRooms.map(r=>{
+        const cnt=DB.students.filter(s=>s.room===r).length;
+        return `<div class="room-card"><div><div class="room-card-name">${r}</div><div class="room-card-count">${cnt} คน</div></div><button onclick="delRoom('${r}')" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบ</button></div>`;
+      }).join('')
+    :'<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;grid-column:1/-1;">ยังไม่มีห้องเรียน</div>';
+  // HW cards with deadline + edit button
+  const hwList=document.getElementById('hw-card-list');
+  if(hwList)hwList.innerHTML=DB.homeworks.length
+    ?DB.homeworks.map(h=>{
+        const now=new Date();
+        let dlBadge='<span class="deadline-badge dl-none">ไม่มีกำหนด</span>';
+        if(h.deadline){
+          const dl=new Date(h.deadline);
+          const diff=Math.round((dl-now)/86400000);
+          if(diff<0)dlBadge=`<span class="deadline-badge dl-late">เกิน ${Math.abs(diff)} วัน</span>`;
+          else if(diff<=3)dlBadge=`<span class="deadline-badge dl-soon">เหลือ ${diff} วัน</span>`;
+          else dlBadge=`<span class="deadline-badge dl-ok">${dl.toLocaleDateString('th-TH',{day:'numeric',month:'short'})}</span>`;
+        }
+        const submitted=Object.keys(DB.submissions).filter(k=>k.endsWith('_'+h.num)).length;
+        return `<div class="hw-card-item"><div class="hw-card-num">${h.num}</div><div class="hw-card-info"><div class="hw-card-title">${h.title}</div><div class="hw-card-sub">${h.subject||''} · เต็ม ${h.maxScore||100} · ส่ง ${submitted}/${DB.students.length} · ${dlBadge}</div></div><button onclick="openEditHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;margin-right:4px;white-space:nowrap;">แก้ไข</button><button onclick="delHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;">ลบ</button></div>`;
+      }).join('')
+    :'<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">ยังไม่มีชิ้นงาน</div>';
+}
+
+// ===== QR / BARCODE =====
+let _codeType='qr',_modalCodeType='qr',_lastImportedStudents=[];
+
+function setCodeType(type){
+  _codeType=type;
+  document.getElementById('codetype-qr').classList.toggle('on',type==='qr');
+  document.getElementById('codetype-bar').classList.toggle('on',type==='barcode');
+}
+function setModalCodeType(type){
+  _modalCodeType=type;
+  document.getElementById('modal-codetype-qr').classList.toggle('on',type==='qr');
+  document.getElementById('modal-codetype-bar').classList.toggle('on',type==='barcode');
+}
+
+function generateCodeEl(value,type,label,size){
+  size=size||80;
+  const wrap=document.createElement('div');
+  wrap.style.cssText='text-align:center;padding:6px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;';
+  if(type==='qr'){
+    const canvas=document.createElement('canvas');
+    wrap.appendChild(canvas);
+    try{QRCode.toCanvas(canvas,value,{width:size,margin:1,errorCorrectionLevel:'M'},function(){});}catch(e){}
+  }else{
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.style.width=size+'px';
+    wrap.appendChild(svg);
+    try{JsBarcode(svg,value,{format:'CODE128',width:1.5,height:Math.round(size*0.5),displayValue:false,margin:2});}catch(e){}
+  }
+  const lbl=document.createElement('div');
+  lbl.style.cssText='font-size:11px;margin-top:4px;font-weight:700;color:#1e293b;word-break:break-all;';
+  lbl.textContent=label;
+  wrap.appendChild(lbl);
+  return wrap;
+}
+
+function previewCodes(){
+  const students=_lastImportedStudents.length?_lastImportedStudents:DB.students;
+  const area=document.getElementById('code-preview-area');
+  if(!students.length){toast('ไม่มีนักเรียน','warn');return;}
+  area.style.display='block';area.innerHTML='';
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:8px;';
+  students.slice(0,9).forEach(function(s){grid.appendChild(generateCodeEl(s.id,_codeType,s.name.substring(0,10),72));});
+  area.appendChild(grid);
+  if(students.length>9){const more=document.createElement('div');more.style.cssText='text-align:center;font-size:12px;color:var(--text3);margin-top:8px;';more.textContent='+ '+(students.length-9)+' คนอื่น (แสดงใน PDF)';area.appendChild(more);}
+  document.getElementById('qr-gen-card').style.display='';
+}
+
+function previewModalCodes(){
+  const roomFilter=document.getElementById('code-room-filter').value;
+  const students=DB.students.filter(function(s){return !roomFilter||s.room===roomFilter;});
+  const grid=document.getElementById('modal-code-grid');
+  const preview=document.getElementById('modal-code-preview');
+  if(!students.length){toast('ไม่มีนักเรียน','warn');return;}
+  grid.innerHTML='';
+  students.slice(0,12).forEach(function(s){grid.appendChild(generateCodeEl(s.id,_modalCodeType,s.name.substring(0,12),72));});
+  preview.style.display='block';
+}
+
+function openCodeModal(){
+  const allRooms=[...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort();
+  const sel=document.getElementById('code-room-filter');
+  sel.innerHTML='<option value="">ทุกห้อง</option>'+allRooms.map(r=>`<option>${r}</option>`).join('');
+  document.getElementById('modal-code-preview').style.display='none';
+  document.getElementById('modal-code-grid').innerHTML='';
+  document.getElementById('code-modal').classList.add('on');
+}
+function closeCodeModal(){document.getElementById('code-modal').classList.remove('on');}
+
+async function downloadCodesPDF(){
+  const students=_lastImportedStudents.length?_lastImportedStudents:DB.students;
+  await _generateCodesPDF(students,_codeType,'codes');
+}
+async function downloadModalCodesPDF(){
+  const roomFilter=document.getElementById('code-room-filter').value;
+  const students=DB.students.filter(function(s){return !roomFilter||s.room===roomFilter;});
+  await _generateCodesPDF(students,_modalCodeType,'codes');
+}
+
+async function _generateCodesPDF(students,type,filename){
+  if(!students.length){toast('ไม่มีนักเรียน','warn');return;}
+  toast('กำลังสร้าง PDF...');
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const perRow=type==='qr'?4:3;
+  const cellW=type==='qr'?44:60;
+  const cellH=type==='qr'?52:38;
+  const marginX=(210-perRow*cellW)/2;
+  let row=0,col=0;
+  for(let i=0;i<students.length;i++){
+    const s=students[i];
+    const px=marginX+col*cellW;
+    const py=20+row*cellH;
+    if(type==='qr'){
+      const canvas=document.createElement('canvas');
+      await new Promise(function(res){QRCode.toCanvas(canvas,s.id,{width:120,margin:1,errorCorrectionLevel:'M'},res);});
+      doc.addImage(canvas.toDataURL('image/png'),'PNG',px+2,py+1,cellW-8,cellW-8);
+      doc.setFontSize(7);doc.setFont('helvetica','bold');
+      doc.text(s.id,px+cellW/2,py+cellW-5,{align:'center'});
+      doc.setFontSize(6);doc.setFont('helvetica','normal');
+      doc.text(s.name.length>16?s.name.substring(0,16)+'...':s.name,px+cellW/2,py+cellW-1,{align:'center'});
+    }else{
+      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      JsBarcode(svg,s.id,{format:'CODE128',width:1.5,height:35,displayValue:false,margin:2});
+      const url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml'}));
+      const canvas2=document.createElement('canvas');
+      canvas2.width=200;canvas2.height=60;
+      const ctx=canvas2.getContext('2d');
+      const img2=new Image();
+      await new Promise(function(res){img2.onload=res;img2.src=url;});
+      ctx.fillStyle='#fff';ctx.fillRect(0,0,200,60);ctx.drawImage(img2,0,0,200,60);
+      URL.revokeObjectURL(url);
+      doc.addImage(canvas2.toDataURL('image/png'),'PNG',px+2,py+2,cellW-4,cellH-12);
+      doc.setFontSize(6);doc.setFont('helvetica','bold');
+      doc.text(s.id,px+cellW/2,py+cellH-7,{align:'center'});
+      doc.setFontSize(5.5);doc.setFont('helvetica','normal');
+      doc.text(s.name.length>18?s.name.substring(0,18)+'...':s.name,px+cellW/2,py+cellH-3,{align:'center'});
+    }
+    doc.setDrawColor(220,220,220);doc.rect(px,py,cellW,cellH);
+    col++;
+    if(col>=perRow){col=0;row++;if(py+cellH+cellH>275&&i<students.length-1){doc.addPage();row=0;}}
+  }
+  doc.save(filename+'_'+type+'_'+new Date().toISOString().slice(0,10)+'.pdf');
+  toast('ดาวน์โหลด PDF แล้ว');
+}
+
+function printCodes(){_printCodesWindow(_lastImportedStudents.length?_lastImportedStudents:DB.students,_codeType);}
+function printModalCodes(){
+  const roomFilter=document.getElementById('code-room-filter').value;
+  _printCodesWindow(DB.students.filter(function(s){return !roomFilter||s.room===roomFilter;}),_modalCodeType);
+}
+
+function _printCodesWindow(students,type){
+  if(!students.length){toast('ไม่มีนักเรียน','warn');return;}
+  const itemW=type==='qr'?'23%':'30%';
+  let html='';
+  students.forEach(function(s){
+    if(type==='qr'){
+      const canvas=document.createElement('canvas');
+      QRCode.toCanvas(canvas,s.id,{width:100,margin:1},function(){});
+      html+='<div style="display:inline-block;width:'+itemW+';text-align:center;padding:6px;border:1px solid #ccc;box-sizing:border-box;margin:2px;vertical-align:top;"><img src="'+canvas.toDataURL()+'" style="width:80px;height:80px;"><br><b style="font-size:9pt;">'+s.id+'</b><br><span style="font-size:7pt;">'+s.name+'</span></div>';
+    }else{
+      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      JsBarcode(svg,s.id,{format:'CODE128',width:1.5,height:40,displayValue:false,margin:2});
+      html+='<div style="display:inline-block;width:'+itemW+';text-align:center;padding:6px;border:1px solid #ccc;box-sizing:border-box;margin:2px;vertical-align:top;"><img src="data:image/svg+xml;base64,'+btoa(new XMLSerializer().serializeToString(svg))+'" style="width:100%;height:36px;"><br><b style="font-size:9pt;">'+s.id+'</b><br><span style="font-size:7pt;">'+s.name+'</span></div>';
+    }
+  });
+  const win=window.open('','_blank','width=800,height=600');
+  if(!win){toast('กรุณาอนุญาต Popup','warn');return;}
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Codes</title><style>@page{size:A4;margin:10mm}body{font-family:sans-serif;padding:0;margin:0}</style></head><body><div style="padding:4px;">'+html+'</div><scr'+'ipt>window.onload=function(){window.print();}<\/scr'+'ipt></body></html>');
+  win.document.close();
+}
+
+// Patch confirmXLImport to show QR card after import
+const _baseConfirmXL=confirmXLImport;
+async function confirmXLImport(){
+  _lastImportedStudents=typeof xlImportData!=='undefined'?[...xlImportData]:[];
+  await _baseConfirmXL();
+  if(_lastImportedStudents.length>0)document.getElementById('qr-gen-card').style.display='';
+}
+
+// deadline support in sbAddHomework
+const _baseAddHW=sbAddHomework;
+async function sbAddHomework(hw){
+  if(USE_SUPABASE&&hw.deadline!==undefined){
+    const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';
+    await SB.from('homeworks').delete().eq('num',hw.num).eq('teacher_id',tid);
+    const {error}=await SB.from('homeworks').insert({num:hw.num,title:hw.title,subject:hw.subject||'',max_score:hw.maxScore||100,teacher_id:tid,deadline:hw.deadline||null});
+    if(error)throw error;
+    await reloadHomeworks();
+  }else{
+    await _baseAddHW(hw);
+  }
+}
+
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
