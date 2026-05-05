@@ -513,7 +513,18 @@ input:focus, select:focus {
   height:100%;border-radius:2px;
   transition:width .5s ease;
 }
-  
+/* ===== EXPIRE NOTIFICATION ===== */
+  .expiry-warning-modal {
+  position:fixed;inset:0;background:rgba(0,0,0,0.6);
+  z-index:99998;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);padding:20px;
+}
+.expiry-warning-box {
+  background:#fff;border-radius:24px;padding:28px 24px;
+  max-width:360px;width:100%;text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,0.3);
+  animation:popIn .35s cubic-bezier(0.175,0.885,0.32,1.275);
+}
 /* ===== EXPORT MODAL ===== */
 .modal-overlay {
   position:fixed; inset:0; background:rgba(0,0,0,0.5);
@@ -1703,7 +1714,21 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     <button onclick="closeChangePwModal()" style="width:100%;padding:11px;font-size:14px;font-weight:600;border-radius:12px;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;margin-top:8px;font-family:Sarabun,sans-serif;">ยกเลิก</button>
   </div>
 </div>
-
+<!-- EXPIRY WARNING MODAL -->
+<div id="expiry-warning-modal" class="expiry-warning-modal" style="display:none;">
+  <div class="expiry-warning-box">
+    <div style="font-size:48px;margin-bottom:12px;" id="expiry-warn-icon">⚠️</div>
+    <div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px;" id="expiry-warn-title">บัญชีใกล้หมดอายุ</div>
+    <div style="font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:20px;" id="expiry-warn-body">
+      บัญชีของคุณจะหมดอายุในอีก <b id="expiry-warn-days"></b> วัน<br>
+      กรุณาติดต่อแอดมินเพื่อต่ออายุการใช้งาน
+    </div>
+    <div id="expiry-warn-date" style="font-size:12px;color:var(--text3);margin-bottom:16px;"></div>
+    <button onclick="closeExpiryWarning()" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--blue),#7C3AED);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
+      รับทราบ
+    </button>
+  </div>
+</div>
 
 </div>
 
@@ -1808,9 +1833,12 @@ async function tryRestoreSession(){
     setTimeout(()=>setupRealtime(),500);
     document.getElementById('teacher-topbar-name').textContent=teacher.display_name;if(teacher.avatar_url) updateTopbarAvatar(teacher.avatar_url);
     document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
+    // เช็คและแจ้งเตือนอายุการใช้งาน
+await checkAndNotifyExpiry(teacher);
     showScreen('s-admin');
     populateScanSelects();
     renderDashboard();
+    await checkAndNotifyExpiry(teacher);
     return true;
   }catch(e){ 
     console.error('[tryRestoreSession]', e);
@@ -4035,6 +4063,64 @@ function previewRegAvatar(e) {
   };
   reader.readAsDataURL(file);
 }
+
+  // ===== EXPIRY NOTIFICATION SYSTEM =====
+function closeExpiryWarning(){
+  document.getElementById('expiry-warning-modal').style.display='none';
+}
+
+async function checkAndNotifyExpiry(teacher) {
+  if(!teacher.expires_at) return;
+  const now = new Date();
+  const exp = new Date(teacher.expires_at);
+  const daysLeft = Math.ceil((exp - now) / 86400000);
+
+  // ถ้าหมดอายุแล้ว
+  if(daysLeft <= 0) {
+    showExpiryModal('expired', daysLeft, teacher.expires_at);
+    return;
+  }
+
+  // แจ้งเตือนถ้าเหลือ <= 7 วัน
+  if(daysLeft <= 7) {
+    showExpiryModal('warning', daysLeft, teacher.expires_at);
+  }
+}
+
+function showExpiryModal(type, daysLeft, expiresAt) {
+  const modal = document.getElementById('expiry-warning-modal');
+  const icon = document.getElementById('expiry-warn-icon');
+  const title = document.getElementById('expiry-warn-title');
+  const body = document.getElementById('expiry-warn-body');
+  const daysEl = document.getElementById('expiry-warn-days');
+  const dateEl = document.getElementById('expiry-warn-date');
+
+  const expDate = new Date(expiresAt).toLocaleDateString('th-TH', {
+    year:'numeric', month:'long', day:'numeric'
+  });
+
+  if(type === 'expired') {
+    icon.textContent = '🔒';
+    title.textContent = 'บัญชีหมดอายุแล้ว';
+    body.innerHTML = 'บัญชีของคุณหมดอายุแล้ว<br>กรุณาติดต่อแอดมินเพื่อต่ออายุการใช้งาน';
+    daysEl.textContent = '';
+    dateEl.textContent = 'หมดอายุเมื่อ: ' + expDate;
+    // ล็อกบัญชีหลัง 5 วินาที
+    setTimeout(()=>logout(), 5000);
+  } else {
+    const urgency = daysLeft <= 3 ? '🚨' : '⚠️';
+    icon.textContent = urgency;
+    title.textContent = daysLeft <= 3 ? 'บัญชีใกล้หมดอายุมาก!' : 'บัญชีใกล้หมดอายุ';
+    body.innerHTML = `บัญชีของคุณจะหมดอายุในอีก <b style="color:var(--red);font-size:18px;">${daysLeft}</b> วัน<br>กรุณาติดต่อแอดมินเพื่อต่ออายุการใช้งาน`;
+    daysEl.textContent = '';
+    dateEl.textContent = 'วันหมดอายุ: ' + expDate;
+  }
+
+  modal.style.display = 'flex';
+}
+
+
+  
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
