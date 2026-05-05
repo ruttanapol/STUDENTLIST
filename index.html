@@ -442,7 +442,24 @@ input:focus, select:focus {
   padding:5px 14px; font-size:12px; font-weight:700;
   color:var(--purple); margin-bottom:12px;
 }
-
+  /* ===== expire ===== */
+.expire-badge {
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;
+}
+.expire-ok { background:#DCFCE7;color:#16A34A; }
+.expire-warn { background:#FEF3C7;color:#B45309; }
+.expire-danger { background:#FEE2E2;color:#B91C1C; }
+.expire-expired { background:#F1F5F9;color:#64748B; }
+.countdown-bar {
+  height:4px;border-radius:2px;background:var(--bg);
+  overflow:hidden;margin-top:4px;
+}
+.countdown-fill {
+  height:100%;border-radius:2px;
+  transition:width .5s ease;
+}
+  
 /* ===== EXPORT MODAL ===== */
 .modal-overlay {
   position:fixed; inset:0; background:rgba(0,0,0,0.5);
@@ -1212,6 +1229,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       <div>
         <div class="tb-name" id="teacher-topbar-name">ครู</div>
         <div class="tb-role" id="teacher-topbar-email" style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:1px;">ระบบตรวจส่งงาน</div>
+<div id="teacher-expiry-display" style="margin-top:2px;"></div>
       </div>
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
@@ -2233,6 +2251,13 @@ async function loginTeacher(){
     if(tErr||!teacher){errEl.textContent='ไม่พบข้อมูลครูในระบบ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
     if(teacher.status==='pending'){errEl.textContent='บัญชียังรอการอนุมัติจากแอดมิน';await SB.auth.signOut();return;}
     if(teacher.status==='rejected'){errEl.textContent='บัญชีถูกปฏิเสธ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
+    if(teacher.status==='expired'){errEl.textContent='บัญชีหมดอายุ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
+// เช็ค expiry อัตโนมัติ
+if(teacher.expires_at && new Date(teacher.expires_at) < new Date()){
+  await SB.from('teachers').update({status:'expired'}).eq('id',uid);
+  errEl.textContent='บัญชีหมดอายุ กรุณาติดต่อแอดมิน';
+  await SB.auth.signOut();return;
+}
     // เข้าสู่ระบบสำเร็จ
     CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||''};
     await loadFromSupabase();
@@ -2244,6 +2269,7 @@ async function loginTeacher(){
     showScreen('s-admin');
     populateScanSelects();
     renderDashboard();
+    startExpiryCountdown(teacher.expires_at);
   }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
 }
 
@@ -2576,7 +2602,7 @@ async function loadSuperAdminPanel(){
   try{
     // แสดง loading
     document.getElementById('sa-pending-list').innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);">⏳ กำลังโหลด...</div>';
-    const {data,error}=await SB.from('teachers').select('id,email,username,first_name,last_name,display_name,status,created_at').order('created_at');
+    const {data,error}=await SB.from('teachers').select('id,email,username,first_name,last_name,display_name,status,created_at,expires_at').order('created_at');
     if(error)throw error;
     renderTeacherList(data||[]);
     loadContactSettings();
@@ -2614,7 +2640,7 @@ function renderTeacherList(teachers){
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           <div style="font-size:15px;font-weight:700;color:var(--text);">${t.display_name}</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:2px;">📧 ${t.email||'-'}${t.username?' · @'+t.username:''}</div><div style="font-size:11px;color:var(--text3);margin-top:1px;">${t.first_name||''} ${t.last_name||''} · สมัคร: ${new Date(t.created_at).toLocaleDateString('th-TH')}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px;">📧 ${t.email||'-'}${t.username?' · @'+t.username:''}</div><div style="font-size:11px;color:var(--text3);margin-top:1px;">${t.first_name||''} ${t.last_name||''} · สมัคร: ${new Date(t.created_at).toLocaleDateString('th-TH')}</div>${renderExpireBadge(t.expires_at)}
           <div style="margin-top:6px;">
             <span style="font-size:12px;padding:3px 10px;border-radius:20px;font-weight:700;${
               t.status==='pending'?'background:#FEF3C7;color:#B45309;':
@@ -2627,6 +2653,7 @@ function renderTeacherList(teachers){
           ${t.status!=='approved'?`<button onclick="approveTeacher('${t.id}')" style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;">✅ อนุมัติ</button>`:''}
           ${t.status!=='rejected'?`<button onclick="rejectTeacher('${t.id}')" style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;">❌ ปฏิเสธ</button>`:''}
           <button onclick="viewTeacherData('${t.id}','${t.display_name}')" style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;">👁 ดูข้อมูล</button>
+          <button onclick="openSetExpiry('${t.id}','${t.expires_at||''}')" style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:1.5px solid var(--yellow);background:var(--yellow-light);color:#B45309;cursor:pointer;">⏱ ตั้งอายุ</button>
           <button onclick="deleteTeacher('${t.id}')" style="padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:1.5px solid #FECACA;background:#FEE2E2;color:#B91C1C;cursor:pointer;">🗑 ลบ</button>
         </div>
       </div>
@@ -3739,7 +3766,98 @@ async function confirmXLImport(){
     toast('✅ นำเข้าแล้ว '+newStudents.length+' คน'+(skipped?' (ข้าม '+skipped+' ซ้ำ)':''));
   } catch(e){toast('นำเข้าไม่สำเร็จ: '+e.message,'err');}
 }
+// ===== EXPIRY SYSTEM =====
+function getExpiryInfo(expiresAt) {
+  if(!expiresAt) return {status:'none', label:'ไม่มีกำหนด', daysLeft:null, pct:100};
+  const now = new Date();
+  const exp = new Date(expiresAt);
+  const diffMs = exp - now;
+  const daysLeft = Math.ceil(diffMs / 86400000);
+  if(daysLeft < 0) return {status:'expired', label:'หมดอายุแล้ว', daysLeft, pct:0};
+  if(daysLeft <= 7) return {status:'danger', label:'เหลือ '+daysLeft+' วัน', daysLeft, pct: Math.max(0,daysLeft/7*100)};
+  if(daysLeft <= 30) return {status:'warn', label:'เหลือ '+daysLeft+' วัน', daysLeft, pct: Math.max(0,daysLeft/30*100)};
+  return {status:'ok', label:'เหลือ '+daysLeft+' วัน', daysLeft, pct:100};
+}
 
+function renderExpireBadge(expiresAt) {
+  const info = getExpiryInfo(expiresAt);
+  const colorMap = {none:'expire-ok',ok:'expire-ok',warn:'expire-warn',danger:'expire-danger',expired:'expire-expired'};
+  const barColor = {none:'var(--green)',ok:'var(--green)',warn:'var(--yellow)',danger:'var(--red)',expired:'#CBD5E1'};
+  return `<div>
+    <span class="expire-badge ${colorMap[info.status]}">⏱ ${info.label}</span>
+    ${info.daysLeft!==null?`<div class="countdown-bar"><div class="countdown-fill" style="width:${info.pct}%;background:${barColor[info.status]};"></div></div>`:''}
+  </div>`;
+}
+
+// Auto-check expiry เมื่อ login
+async function checkTeacherExpiry(uid) {
+  if(!USE_SUPABASE||!SB) return true;
+  const {data} = await SB.from('teachers').select('expires_at,status').eq('id',uid).single();
+  if(!data) return false;
+  if(data.expires_at && new Date(data.expires_at) < new Date()) {
+    await SB.from('teachers').update({status:'expired'}).eq('id',uid);
+    return false;
+  }
+  return true;
+}
+
+// Countdown timer สำหรับครู (แสดงใน topbar)
+let _expiryTimer = null;
+function startExpiryCountdown(expiresAt) {
+  const el = document.getElementById('teacher-expiry-display');
+  if(!el || !expiresAt) return;
+  if(_expiryTimer) clearInterval(_expiryTimer);
+  function update() {
+    const info = getExpiryInfo(expiresAt);
+    const barColor = {ok:'var(--green)',warn:'var(--yellow)',danger:'var(--red)',expired:'#CBD5E1'};
+    el.innerHTML = `<span class="expire-badge ${
+      info.status==='ok'?'expire-ok':
+      info.status==='warn'?'expire-warn':
+      info.status==='danger'?'expire-danger':'expire-expired'
+    }" style="font-size:11px;padding:2px 8px;">⏱ ${info.label}</span>`;
+    if(info.status === 'expired') {
+      clearInterval(_expiryTimer);
+      toast('บัญชีของคุณหมดอายุแล้ว กรุณาติดต่อแอดมิน', 'err');
+      setTimeout(()=>logout(), 3000);
+    }
+  }
+  update();
+  _expiryTimer = setInterval(update, 60000);
+}
+  function openSetExpiry(tid, currentExpiry) {
+  const current = currentExpiry ? new Date(currentExpiry).toISOString().slice(0,10) : '';
+  const result = prompt(
+    'ตั้งอายุการใช้งานสำหรับครูคนนี้\n\n' +
+    'พิมพ์วันหมดอายุ (YYYY-MM-DD) หรือจำนวนวัน (เช่น 30, 90, 365)\n' +
+    'พิมพ์ "ไม่มี" เพื่อล้างการกำหนด\n\n' +
+    'ปัจจุบัน: ' + (current || 'ไม่มีกำหนด'),
+    current
+  );
+  if(result === null) return;
+  let expiresAt = null;
+  if(result.trim() === 'ไม่มี' || result.trim() === '') {
+    expiresAt = null;
+  } else if(/^\d+$/.test(result.trim())) {
+    const d = new Date();
+    d.setDate(d.getDate() + parseInt(result.trim()));
+    expiresAt = d.toISOString();
+  } else if(/^\d{4}-\d{2}-\d{2}$/.test(result.trim())) {
+    expiresAt = new Date(result.trim()).toISOString();
+  } else {
+    toast2('รูปแบบไม่ถูกต้อง','err'); return;
+  }
+  saveTeacherExpiry(tid, expiresAt);
+}
+
+async function saveTeacherExpiry(tid, expiresAt) {
+  const {error} = await SB.from('teachers').update({
+    expires_at: expiresAt,
+    status: expiresAt && new Date(expiresAt) < new Date() ? 'expired' : 'approved'
+  }).eq('id', tid);
+  if(error){toast2('บันทึกไม่สำเร็จ: '+error.message,'err');return;}
+  toast2('บันทึกอายุการใช้งานแล้ว ✅');
+  loadSuperAdminPanel();
+}
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
