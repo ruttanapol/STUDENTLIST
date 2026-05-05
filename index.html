@@ -1062,15 +1062,15 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
           </div>
         </div>
         <label for="stu-teacher-search">ค้นหาครูผู้สอน</label>
-<div style="position:relative;">
-  <input type="text" id="stu-teacher-search" placeholder="พิมพ์ชื่อครู..." autocomplete="off"
-    oninput="filterTeacherList(this.value)"
-    onfocus="document.getElementById('teacher-dropdown').style.display='block'"
-    style="font-size:15px;padding:11px 14px;width:100%;">
-  <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text2);">🔍</span>
-</div>
+        <div style="position:relative;">
+        <input type="text" id="stu-teacher-search" placeholder="พิมพ์ชื่อครู..." autocomplete="off"
+          oninput="filterTeacherList(this.value)"
+          onfocus="document.getElementById('teacher-dropdown').style.display='block'"
+          style="font-size:15px;padding:11px 14px;width:100%;">
+        <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text2);">🔍</span>
+    </div>
 <div id="teacher-dropdown" style="display:none;background:#fff;border:1.5px solid var(--border);border-radius:10px;margin-top:4px;max-height:180px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.1);z-index:100;position:relative;">
-</div>
+   </div>
 <input type="hidden" id="stu-teacher-select">
         <label for="stu-id" style="margin-top:10px;">เลขประจำตัวนักเรียน</label>
         <input type="text" id="stu-id" placeholder="เช่น 66001" inputmode="numeric"
