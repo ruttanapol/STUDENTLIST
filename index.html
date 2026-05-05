@@ -3747,12 +3747,12 @@ window.addEventListener('load', () => {
   checkResetRedirect();
   initMobileModals();
   document.addEventListener('click', e => {
-  const search = document.getElementById('stu-teacher-search');
-  const dd = document.getElementById('teacher-dropdown');
-  if(dd && search && !search.contains(e.target) && !dd.contains(e.target)){
-    dd.style.display = 'none';
+    const search = document.getElementById('stu-teacher-search');
+    const dd = document.getElementById('teacher-dropdown');
+    if(dd && search && !search.contains(e.target) && !dd.contains(e.target)){
+      dd.style.display = 'none';
     }
-  }
+  });
 });
 
 function initMobileModals(){
