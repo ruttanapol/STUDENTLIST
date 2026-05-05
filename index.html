@@ -2541,14 +2541,7 @@ async function registerTeacher(){
       display_name:displayName, status:'pending'
     });
     if(insertErr&&!insertErr.message.includes('duplicate'))throw insertErr;
-    // อัพโหลดรูปถ้ามี
-const avatarFile = document.getElementById('reg-avatar-input').files[0];
-if(avatarFile) {
-  const avatarUrl = await uploadAvatar(avatarFile, uid);
-  if(avatarUrl) {
-    await SB.from('teachers').update({avatar_url: avatarUrl}).eq('id', uid);
-  }
-}
+    
     // แสดงหน้าชำระเงินทันที
 CURRENT_TEACHER = {
   id: uid,
