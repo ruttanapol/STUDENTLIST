@@ -3473,10 +3473,7 @@ function openEditHW(num){
 }
 
 // ===== RENDER MANAGE EXTENSIONS =====
-const _baseRenderManage=renderManage;
 function renderManage(){
-  _baseRenderManage();
-  // Room filter dropdown in student tab
   const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort();
   const filterSel=document.getElementById('filter-room-manage');
   if(filterSel){
