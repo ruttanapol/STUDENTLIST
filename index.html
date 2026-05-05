@@ -3131,8 +3131,8 @@ function renderManage(){
   document.getElementById('sl-manage').innerHTML=stuList.map(s=>
     `<tr><td style="font-size:12px;">${s.id}</td><td style="font-size:13px;">${s.name}</td><td style="font-size:12px;">${s.room}</td>
     <td style="white-space:nowrap;">
-      <button class="del-btn" style="background:var(--blue-light);color:var(--blue-dark);border-color:var(--blue-light);margin-right:4px;" onclick="openEditStu('${s.id}')">แก้ไข</button>
-      <button class="del-btn" onclick="delStu('${s.id}')">ลบ</button>
+      <button class="del-btn" style="background:var(--blue-light);color:var(--blue-dark);border-color:var(--blue-light);margin-right:4px;" onclick="openEditStu(this.dataset.id)" data-id="${s.id}">แก้ไข</button>
+      <button class="del-btn" onclick="delStu(this.dataset.id)" data-id="${s.id}">ลบ</button>
     </td></tr>`
   ).join('');
   document.getElementById('subj-list').innerHTML=DB.subjects.map(s=>`<tr><td>${s}</td><td><button class="del-btn" onclick="delSubj('${s}')">ลบ</button></td></tr>`).join('');
