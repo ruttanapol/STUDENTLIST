@@ -1276,40 +1276,15 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       <div>
         <div class="tb-name" id="sa-name">Super Admin</div>
         <div class="tb-role">จัดการบัญชีครูทั้งระบบ</div>
-        <!-- Change Super Admin Password -->
-    <div class="card" style="border-color:#FECACA;background:linear-gradient(135deg,#FFF5F5,#FEE2E2);">
-      <div class="card-title" style="color:#B91C1C;">🔐 เปลี่ยนรหัส Super Admin</div>
-      <label class="lbl">รหัสใหม่</label>
-      <div class="pw-wrap">
-        <input type="password" id="new-sa-pw" placeholder="รหัสผ่านใหม่...">
-        <button class="pw-toggle" onclick="togglePw('new-sa-pw',this)" tabindex="-1">แสดง</button>
-      </div>
-      <label class="lbl">ยืนยันรหัสใหม่</label>
-      <input type="password" id="new-sa-pw2" placeholder="พิมพ์อีกครั้ง...">
-      <div class="err-msg" id="sa-pw-err"></div>
-      <button onclick="changeSuperAdminPw()" style="width:100%;padding:12px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,#EF4444,#DC2626);color:#fff;cursor:pointer;margin-top:10px;font-family:Sarabun,sans-serif;">
-        💾 บันทึกรหัสใหม่
-      </button>
-    </div>
-   </div>
-  </div>
- </div>
-
-<!-- ===== ADMIN ===== -->
       </div>
     </div>
     <div style="display:flex;gap:6px;">
-      <button id="maintenance-toggle-btn" class="logout-btn" 
-  onclick="toggleMaintenanceMode(this.textContent.includes('เปิด'))"
-  style="background:linear-gradient(135deg,var(--yellow),#D97706);border-color:transparent;padding:7px 12px;font-size:12px;">
-  ⚙️ เปิดโหมดปรับปรุง
-</button>
+      <button id="maintenance-toggle-btn" class="logout-btn" onclick="toggleMaintenanceMode(this.textContent.includes('เปิด'))" style="background:linear-gradient(135deg,var(--yellow),#D97706);border-color:transparent;padding:7px 12px;font-size:12px;">⚙️ เปิดโหมดปรับปรุง</button>
       <button class="logout-btn" onclick="document.getElementById('setup-overlay').style.display='flex'" style="padding:7px 10px;font-size:13px;">⚙️ DB</button>
       <button class="logout-btn" onclick="logout()">ออก</button>
     </div>
   </div>
   <div class="toast-slot"><div id="toast-sa" class="tbar"></div></div>
-
   <div style="padding:16px 16px 100px;">
     <!-- Teacher View Panel (shown when viewing teacher data) -->
     <div id="sa-teacher-view-panel" style="display:none;background:#fff;border:1.5px solid var(--blue);border-radius:16px;padding:16px;margin-bottom:16px;">
@@ -1407,6 +1382,22 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
         <input type="text" id="contact-value" placeholder="ลิงก์หรือข้อมูลติดต่อ เช่น https://line.me/ti/p/..." style="font-size:13px;margin-bottom:8px;">
         <button onclick="addContactChannel()" style="width:100%;padding:11px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,var(--purple),#5B21B6);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">+ เพิ่มช่องทาง</button>
       </div>
+    </div>
+  
+    <!-- Change Super Admin Password -->
+    <div class="card" style="border-color:#FECACA;background:linear-gradient(135deg,#FFF5F5,#FEE2E2);">
+      <div class="card-title" style="color:#B91C1C;">🔐 เปลี่ยนรหัส Super Admin</div>
+      <label class="lbl">รหัสใหม่</label>
+      <div class="pw-wrap">
+        <input type="password" id="new-sa-pw" placeholder="รหัสผ่านใหม่...">
+        <button class="pw-toggle" onclick="togglePw('new-sa-pw',this)" tabindex="-1">แสดง</button>
+      </div>
+      <label class="lbl">ยืนยันรหัสใหม่</label>
+      <input type="password" id="new-sa-pw2" placeholder="พิมพ์อีกครั้ง...">
+      <div class="err-msg" id="sa-pw-err"></div>
+      <button onclick="changeSuperAdminPw()" style="width:100%;padding:12px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,#EF4444,#DC2626);color:#fff;cursor:pointer;margin-top:10px;font-family:Sarabun,sans-serif;">
+        💾 บันทึกรหัสใหม่
+      </button>
     </div>
   </div>
 </div>
@@ -1915,7 +1906,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   </div>
 </div>
 
-//  DIV สุดท้ายของแอพ //  
+
 </div>
 
 <script>
