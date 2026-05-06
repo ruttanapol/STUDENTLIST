@@ -43,14 +43,8 @@ body { background: var(--bg); min-height: 100vh; overscroll-behavior: none; }
   padding-bottom: env(safe-area-inset-bottom);
 }@media(min-width:900px){
   .app{max-width:100%;width:100%;}
-
-  /* Topbar — ยกเลิก safe-area บน desktop */
-  .topbar{padding-top:14px !important;}
-
-  /* Pages */
+  .topbar{padding:14px 16px;}
   .page{padding:16px 28px calc(80px + env(safe-area-inset-bottom));}
-
-  /* Stats grid 4 คอลัมน์ */
   .stats2{grid-template-columns:repeat(4,1fr);}
   .room-card-grid{grid-template-columns:repeat(3,1fr);}
   .export-type-row{grid-template-columns:repeat(3,1fr);}
@@ -59,8 +53,6 @@ body { background: var(--bg); min-height: 100vh; overscroll-behavior: none; }
   .modal-sheet{max-width:700px;}
   .edit-modal-sheet{max-width:700px;}
   .code-modal-sheet{max-width:700px;}
-
-  /* Login page */
   .login-wrap{min-height:100vh;overflow-y:auto;}
   .login-inner{max-width:1200px;margin:0 auto;padding:48px 40px 60px;}
   .logo-block{text-align:center;margin-bottom:32px;}
@@ -69,7 +61,6 @@ body { background: var(--bg); min-height: 100vh; overscroll-behavior: none; }
   .login-panel{height:100%;box-sizing:border-box;}
   .login-panels-col ~ div{margin-top:24px;}
 }
-
 @media(min-width:1200px){
   .login-inner{max-width:1400px;padding:60px 60px 80px;}
   .logo-title{font-size:32px;}
@@ -191,8 +182,8 @@ input:focus, select:focus {
   background: linear-gradient(135deg, var(--blue), #7C3AED);
   box-shadow: 0 2px 12px rgba(79,142,247,0.3);
 }
-@supports(padding: env(safe-area-inset-top)) {
-  .topbar { padding-top: calc(14px + env(safe-area-inset-top)); }
+@media(max-width:899px){
+  .topbar{padding-top:calc(14px + env(safe-area-inset-top));}
 }
 .tb-left {display:flex;align-items:center;gap:10px;}
 .tb-avatar {
