@@ -42,31 +42,43 @@ body { background: var(--bg); min-height: 100vh; overscroll-behavior: none; }
 .app{max-width:440px;margin:0 auto;min-height:100vh;
   padding-bottom: env(safe-area-inset-bottom);
 }
+/* ===== RESPONSIVE LAYOUT ===== */
 @media(min-width:600px){
   .app{max-width:600px;}
+  .stats2{grid-template-columns:repeat(4,1fr);}
 }
 @media(min-width:900px){
-  .app{max-width:800px;}
+  .app{max-width:860px;}
   .stats2{grid-template-columns:repeat(4,1fr);}
-  .room-card-grid{grid-template-columns:repeat(3,1fr);}
-  .export-type-row{grid-template-columns:repeat(3,1fr);}
+  .room-card-grid{grid-template-columns:repeat(4,1fr);}
   .room-grid{grid-template-columns:repeat(5,1fr);}
-  .dots-row .hw-dot{width:38px;height:38px;font-size:13px;}
-  .modal-sheet{max-width:600px;}
-  .edit-modal-sheet{max-width:600px;}
-  .code-modal-sheet{max-width:600px;}
-}
-@media(min-width:1200px){
-  .app{max-width:960px;}
-  .login-wrap .login-inner{max-width:500px;margin:0 auto;}
+  .dots-row .hw-dot{width:38px;height:38px;}
+  .modal-sheet{max-width:700px;}
+  .edit-modal-sheet{max-width:700px;}
+  .code-modal-sheet{max-width:700px;}
+  .login-inner{max-width:560px;margin:0 auto;}
   .page{padding:20px 24px calc(100px + env(safe-area-inset-bottom));}
   .card{padding:20px;}
-  .bnav{max-width:960px;}
-  .topbar{max-width:960px;}
 }
-  padding-bottom: env(safe-area-inset-bottom);
+@media(min-width:1200px){
+  .app{max-width:1100px;}
+  .stats2{grid-template-columns:repeat(4,1fr);}
+  .room-card-grid{grid-template-columns:repeat(5,1fr);}
+  .room-grid{grid-template-columns:repeat(6,1fr);}
+  .modal-sheet{max-width:800px;}
+  .edit-modal-sheet{max-width:800px;}
+  .code-modal-sheet{max-width:800px;}
+  .login-inner{max-width:600px;margin:0 auto;}
+  .page{padding:24px 32px calc(100px + env(safe-area-inset-bottom));}
+  .card{padding:22px 24px;}
+  .snum{font-size:32px;}
+  .mini-tbl{font-size:15px;}
 }
-
+@media(min-width:1600px){
+  .app{max-width:1400px;}
+  .room-card-grid{grid-template-columns:repeat(6,1fr);}
+  .room-grid{grid-template-columns:repeat(8,1fr);}
+}
 /* ===== TOUCH IMPROVEMENTS ===== */
 button, [onclick] { cursor: pointer; touch-action: manipulation; }
 input, select, textarea { touch-action: manipulation; }
