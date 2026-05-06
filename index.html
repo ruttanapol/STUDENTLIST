@@ -227,7 +227,40 @@ input:focus, select:focus {
 
 /* ===== PAGES ===== */
 .page {display:none;padding:16px 16px calc(100px + env(safe-area-inset-bottom));}.page.on{display:block;}
-
+/* ===== FIXING ===== */
+  .maintenance-overlay {
+  position:fixed;inset:0;z-index:999999;
+  background:linear-gradient(160deg,#1E293B 0%,#0F172A 100%);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+}
+.maintenance-box {
+  text-align:center;max-width:360px;width:100%;
+}
+.maintenance-icon {
+  font-size:72px;margin-bottom:20px;
+  animation:wrench 2s ease-in-out infinite;
+}
+@keyframes wrench {
+  0%,100%{transform:rotate(-15deg);}
+  50%{transform:rotate(15deg);}
+}
+.maintenance-title {
+  font-size:24px;font-weight:800;color:#fff;margin-bottom:10px;
+}
+.maintenance-sub {
+  font-size:15px;color:rgba(255,255,255,0.6);line-height:1.7;margin-bottom:20px;
+}
+.maintenance-contact {
+  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+  border-radius:16px;padding:16px;margin-bottom:20px;
+}
+.maintenance-badge {
+  display:inline-block;font-size:11px;font-weight:700;
+  background:rgba(245,158,11,0.2);color:#FCD34D;
+  border:1px solid rgba(245,158,11,0.3);border-radius:20px;
+  padding:4px 12px;margin-bottom:16px;letter-spacing:.5px;
+}
 /* ===== CARDS ===== */
 .card {
   background:var(--card); border:1.5px solid var(--border);
@@ -1246,6 +1279,11 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       </div>
     </div>
     <div style="display:flex;gap:6px;">
+      <button id="maintenance-toggle-btn" class="logout-btn" 
+  onclick="toggleMaintenanceMode(this.textContent.includes('เปิด'))"
+  style="background:linear-gradient(135deg,var(--yellow),#D97706);border-color:transparent;padding:7px 12px;font-size:12px;">
+  ⚙️ เปิดโหมดปรับปรุง
+</button>
       <button class="logout-btn" onclick="document.getElementById('setup-overlay').style.display='flex'" style="padding:7px 10px;font-size:13px;">⚙️ DB</button>
       <button class="logout-btn" onclick="logout()">ออก</button>
     </div>
@@ -1838,7 +1876,26 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     </div>
   </div>
 </div>
-  
+<!-- ===== MAINTENANCE MODE ===== -->
+<div id="maintenance-overlay" class="maintenance-overlay" style="display:none;">
+  <div class="maintenance-box">
+    <div class="maintenance-icon">🔧</div>
+    <div class="maintenance-badge">⚙️ SYSTEM MAINTENANCE</div>
+    <div class="maintenance-title">กำลังปรับปรุงระบบ</div>
+    <div class="maintenance-sub">
+      ขออภัยในความไม่สะดวก<br>
+      ระบบกำลังได้รับการปรับปรุง<br>
+      กรุณาลองใหม่อีกครั้งในภายหลัง
+    </div>
+    <div class="maintenance-contact" id="maintenance-contact-links">
+      <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;">📩 ติดต่อแอดมิน</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.5);">กำลังโหลด...</div>
+    </div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.3);" id="maintenance-time"></div>
+  </div>
+</div>
+
+//  DIV สุดท้ายของแอพ //  
 </div>
 
 <script>
@@ -2026,7 +2083,7 @@ async function connectSupabase(silent = false) {
     const restored = await tryRestoreSession();
     if(!restored) setTimeout(() => setupRealtime(), 500);
     setTimeout(()=>loadTeacherListForStudent(), 200);
-    setTimeout(()=>loadContactLinksForLogin(), 400);
+    setTimeout(()=>loadContactLinksForLogin(), 400);setTimeout(()=>checkMaintenanceMode(), 600);
     setTimeout(() => {
       document.getElementById('setup-overlay').style.display = 'none';
     }, silent ? 0 : 600);
@@ -2044,7 +2101,7 @@ async function connectSupabase(silent = false) {
       const restored = await tryRestoreSession();
       if(!restored) setTimeout(() => setupRealtime(), 500);
       setTimeout(()=>loadTeacherListForStudent(), 200);
-      setTimeout(()=>loadContactLinksForLogin(), 400);
+      setTimeout(()=>loadContactLinksForLogin(), 400);setTimeout(()=>checkMaintenanceMode(), 600);
       setTimeout(() => { document.getElementById('setup-overlay').style.display = 'none'; }, silent ? 0 : 600);
       return;
     }
@@ -2889,6 +2946,7 @@ async function loadSuperAdminPanel(){
     if(error)throw error;
     renderTeacherList(data||[]);
     loadContactSettings();
+    loadMaintenanceStatus();
   }catch(e){
     const msg = e.message||String(e);
     const isNoTable = msg.includes('does not exist')||msg.includes('relation');
@@ -4549,6 +4607,82 @@ async function cleanOrphanData() {
     toast2('เกิดข้อผิดพลาด: '+e.message,'err');
   }
 }
+
+// ===== MAINTENANCE MODE =====
+async function checkMaintenanceMode() {
+  if(!USE_SUPABASE||!SB) return;
+  try {
+    const {data} = await SB.from('settings').select('value').eq('key','maintenance_mode').maybeSingle();
+    const isOn = data && data.value && data.value.enabled === true;
+    if(isOn) {
+      showMaintenancePage(data.value);
+    }
+  } catch(e) {}
+}
+
+function showMaintenancePage(config) {
+  const overlay = document.getElementById('maintenance-overlay');
+  if(!overlay) return;
+
+  // โหลดข้อมูลติดต่อ
+  loadContactLinksForLogin().then(() => {
+    const links = document.getElementById('contact-admin-links');
+    const mLinks = document.getElementById('maintenance-contact-links');
+    if(links && mLinks) mLinks.innerHTML = links.innerHTML;
+  });
+
+  // แสดงเวลาเริ่มปรับปรุง
+  const timeEl = document.getElementById('maintenance-time');
+  if(timeEl && config.started_at) {
+    timeEl.textContent = 'เริ่มปรับปรุงตั้งแต่: ' +
+      new Date(config.started_at).toLocaleString('th-TH');
+  }
+
+  overlay.style.display = 'flex';
+}
+
+async function toggleMaintenanceMode(enable) {
+  if(!USE_SUPABASE||!SB) return;
+  const value = enable ? {
+    enabled: true,
+    started_at: new Date().toISOString()
+  } : { enabled: false };
+
+  const {error} = await SB.from('settings').upsert(
+    {key:'maintenance_mode', value},
+    {onConflict:'key'}
+  );
+  if(error) { toast2('ไม่สำเร็จ: '+error.message,'err'); return; }
+
+  if(enable) {
+    toast2('เปิดโหมดปรับปรุงระบบแล้ว ⚙️','warn');
+  } else {
+    toast2('ปิดโหมดปรับปรุงระบบแล้ว ✅');
+    document.getElementById('maintenance-overlay').style.display='none';
+  }
+  updateMaintenanceBtn(enable);
+}
+
+function updateMaintenanceBtn(isOn) {
+  const btn = document.getElementById('maintenance-toggle-btn');
+  if(!btn) return;
+  if(isOn) {
+    btn.textContent = '✅ ปิดโหมดปรับปรุง';
+    btn.style.background = 'linear-gradient(135deg,var(--green),var(--green-dark))';
+  } else {
+    btn.textContent = '⚙️ เปิดโหมดปรับปรุง';
+    btn.style.background = 'linear-gradient(135deg,var(--yellow),#D97706)';
+  }
+}
+
+async function loadMaintenanceStatus() {
+  if(!USE_SUPABASE||!SB) return;
+  try {
+    const {data} = await SB.from('settings').select('value').eq('key','maintenance_mode').maybeSingle();
+    const isOn = data && data.value && data.value.enabled === true;
+    updateMaintenanceBtn(isOn);
+  } catch(e) {}
+}  
   
 window.addEventListener('load', () => {
   checkSetupOnLoad();
