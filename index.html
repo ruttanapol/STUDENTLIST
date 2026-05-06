@@ -3758,21 +3758,6 @@ function renderXLPreview(filename){
   preview.style.display='block';
 }
 
-async function confirmXLImport(){
-  const newStudents=xlImportData.filter(s=>!DB.students.find(x=>x.id===s.id)).map(s=>({...s,room:s.room||DB.rooms[0]||''}));
-  const skipped=xlImportData.length-newStudents.length;
-  try {
-    await sbImportStudents(newStudents);
-    // sync rooms
-    const newRooms=[...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
-    if(newRooms.length){
-      DB.rooms=[...new Set([...DB.rooms,...newRooms])].sort();
-      await sbSaveSettings('rooms', DB.rooms);
-    }
-    cancelXLImport();renderManage();
-    toast(`✅ นำเข้าแล้ว ${newStudents.length} คน${skipped?` (ข้าม ${skipped} ซ้ำ)`:''}`);
-  } catch(e){toast('นำเข้าไม่สำเร็จ: '+e.message,'err');}
-}
 
 function cancelXLImport(){xlImportData=[];document.getElementById('xl-preview').style.display='none';document.getElementById('xl-file').value='';document.getElementById('xl-preview-body').innerHTML='';}
 
