@@ -4814,6 +4814,54 @@ window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
   initMobileModals();
+  // ===== BARCODE SCANNER (USB/Bluetooth) =====
+(function(){
+  let barcodeBuffer = '';
+  let barcodeTimer = null;
+  const BARCODE_TIMEOUT = 50; // ms ระหว่างตัวอักษร
+  const MIN_LENGTH = 3;
+
+  document.addEventListener('keydown', function(e) {
+    // ไม่รับถ้ากำลังพิมพ์ใน input หรือ textarea
+    const tag = document.activeElement.tagName;
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    // ไม่รับถ้าหน้า admin ไม่ได้เปิดอยู่
+    const adminScreen = document.getElementById('s-admin');
+    if(!adminScreen || !adminScreen.classList.contains('on')) return;
+
+    // ไม่รับถ้าไม่ได้อยู่หน้าสแกน
+    const scanPage = document.getElementById('ap-scan');
+    if(!scanPage || !scanPage.classList.contains('on')) return;
+
+    if(e.key === 'Enter') {
+      // Enter = จบการสแกน
+      if(barcodeBuffer.length >= MIN_LENGTH) {
+        const code = barcodeBuffer.trim();
+        barcodeBuffer = '';
+        clearTimeout(barcodeTimer);
+        recordScan(code);
+      }
+      barcodeBuffer = '';
+      return;
+    }
+
+    // รับเฉพาะตัวเลขและตัวอักษร
+    if(e.key.length === 1) {
+      barcodeBuffer += e.key;
+      clearTimeout(barcodeTimer);
+      // ถ้าไม่มี input ใหม่ใน 50ms ถือว่าสแกนเสร็จ
+      barcodeTimer = setTimeout(() => {
+        if(barcodeBuffer.length >= MIN_LENGTH) {
+          const code = barcodeBuffer.trim();
+          barcodeBuffer = '';
+          recordScan(code);
+        }
+        barcodeBuffer = '';
+      }, BARCODE_TIMEOUT);
+    }
+  });
+})();
   document.addEventListener('click', e => {
     const search = document.getElementById('stu-teacher-search');
     const dd = document.getElementById('teacher-dropdown');
