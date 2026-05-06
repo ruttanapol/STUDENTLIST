@@ -2553,11 +2553,17 @@ async function loginAdmin(){
         : JSON.stringify(data.value).replace(/"/g,'');
 
       if(pw === correctPw) {
-        CURRENT_TEACHER = null;
-        if(input) input.value = '';
-        toggleAdminBar(true);
-        showScreen('s-superadmin');
-        loadSuperAdminPanel();
+      // ปิด maintenance ตรงๆ โดยไม่ผ่าน toggleMaintenanceMode
+      try {
+        await SB.from('settings').upsert(
+          {key:'maintenance_mode', value:{enabled:false}},
+          {onConflict:'key'}
+        );
+      } catch(e) {}
+      document.getElementById('maintenance-overlay').style.display = 'none';
+      CURRENT_TEACHER = null;
+      showScreen('s-superadmin');
+      loadSuperAdminPanel();
       } else {
         if(errEl) errEl.textContent = 'รหัสผ่านไม่ถูกต้อง';
         if(input) input.select();
