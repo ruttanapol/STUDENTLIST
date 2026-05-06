@@ -4690,31 +4690,72 @@ function showMaintenancePage(config) {
       new Date(config.started_at).toLocaleString('th-TH');
   }
 
+  // เพิ่มปุ่มลับสำหรับแอดมิน (กดไอคอน 5 ครั้ง)
+  const icon = overlay.querySelector('.maintenance-icon');
+  if(icon) {
+    let tapCount = 0, tapTimer = null;
+    icon.style.cursor = 'pointer';
+    icon.addEventListener('click', () => {
+      tapCount++;
+      clearTimeout(tapTimer);
+      if(tapCount >= 5) {
+        tapCount = 0;
+        showAdminBypass();
+      }
+      tapTimer = setTimeout(() => tapCount = 0, 2000);
+    });
+  }
+
   overlay.style.display = 'flex';
 }
 
-async function toggleMaintenanceMode(enable) {
-  if(!USE_SUPABASE||!SB) return;
-  const value = enable ? {
-    enabled: true,
-    started_at: new Date().toISOString()
-  } : { enabled: false };
-
-  const {error} = await SB.from('settings').upsert(
-    {key:'maintenance_mode', value},
-    {onConflict:'key'}
-  );
-  if(error) { toast2('ไม่สำเร็จ: '+error.message,'err'); return; }
-
-  if(enable) {
-    toast2('เปิดโหมดปรับปรุงระบบแล้ว ⚙️','warn');
-  } else {
-    toast2('ปิดโหมดปรับปรุงระบบแล้ว ✅');
-    document.getElementById('maintenance-overlay').style.display='none';
-  }
-  updateMaintenanceBtn(enable);
+function showAdminBypass() {
+  const overlay = document.getElementById('maintenance-overlay');
+  const box = overlay.querySelector('.maintenance-box');
+  
+  // เพิ่ม input รหัสแอดมิน
+  if(document.getElementById('admin-bypass-area')) return;
+  
+  const bypassDiv = document.createElement('div');
+  bypassDiv.id = 'admin-bypass-area';
+  bypassDiv.style.cssText = 'margin-top:16px;background:rgba(255,255,255,0.1);border-radius:14px;padding:16px;';
+  bypassDiv.innerHTML = `
+    <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:10px;font-weight:600;">🔐 Super Admin เท่านั้น</div>
+    <input type="password" id="bypass-pw" placeholder="รหัส Super Admin..." 
+      style="width:100%;padding:12px 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:#fff;font-size:15px;font-family:Sarabun,sans-serif;outline:none;margin-bottom:8px;"
+      onkeydown="if(event.key==='Enter')bypassMaintenance()">
+    <div id="bypass-err" style="font-size:12px;color:#FCA5A5;min-height:16px;margin-bottom:8px;"></div>
+    <button onclick="bypassMaintenance()" style="width:100%;padding:12px;font-size:15px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,#EF4444,#DC2626);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
+      🔐 เข้าสู่ระบบแอดมิน
+    </button>
+  `;
+  box.appendChild(bypassDiv);
+  setTimeout(() => document.getElementById('bypass-pw')?.focus(), 100);
 }
 
+async function bypassMaintenance() {
+  const pw = document.getElementById('bypass-pw')?.value.trim();
+  const errEl = document.getElementById('bypass-err');
+  if(!pw) return;
+  
+  try {
+    const {data} = await SB.from('settings').select('value').eq('key','superadmin_pw').maybeSingle();
+    const correctPw = data ? (typeof data.value === 'string' ? data.value : JSON.stringify(data.value).replace(/"/g,'')) : 'superadmin999';
+    
+    if(pw === correctPw) {
+      // ปิด maintenance แล้วเข้าหน้าแอดมิน
+      await toggleMaintenanceMode(false);
+      document.getElementById('maintenance-overlay').style.display = 'none';
+      CURRENT_TEACHER = null;
+      showScreen('s-superadmin');
+      loadSuperAdminPanel();
+    } else {
+      if(errEl) errEl.textContent = 'รหัสผ่านไม่ถูกต้อง';
+    }
+  } catch(e) {
+    if(errEl) errEl.textContent = 'เกิดข้อผิดพลาด: ' + e.message;
+  }
+}
 function updateMaintenanceBtn(isOn) {
   const btn = document.getElementById('maintenance-toggle-btn');
   if(!btn) return;
