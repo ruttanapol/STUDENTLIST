@@ -1276,6 +1276,26 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       <div>
         <div class="tb-name" id="sa-name">Super Admin</div>
         <div class="tb-role">จัดการบัญชีครูทั้งระบบ</div>
+        <!-- Change Super Admin Password -->
+    <div class="card" style="border-color:#FECACA;background:linear-gradient(135deg,#FFF5F5,#FEE2E2);">
+      <div class="card-title" style="color:#B91C1C;">🔐 เปลี่ยนรหัส Super Admin</div>
+      <label class="lbl">รหัสใหม่</label>
+      <div class="pw-wrap">
+        <input type="password" id="new-sa-pw" placeholder="รหัสผ่านใหม่...">
+        <button class="pw-toggle" onclick="togglePw('new-sa-pw',this)" tabindex="-1">แสดง</button>
+      </div>
+      <label class="lbl">ยืนยันรหัสใหม่</label>
+      <input type="password" id="new-sa-pw2" placeholder="พิมพ์อีกครั้ง...">
+      <div class="err-msg" id="sa-pw-err"></div>
+      <button onclick="changeSuperAdminPw()" style="width:100%;padding:12px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,#EF4444,#DC2626);color:#fff;cursor:pointer;margin-top:10px;font-family:Sarabun,sans-serif;">
+        💾 บันทึกรหัสใหม่
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== ADMIN ===== -->
       </div>
     </div>
     <div style="display:flex;gap:6px;">
@@ -1944,7 +1964,8 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 <script>
-const SUPER_ADMIN_PW = 'superadmin999';  // รหัสแอดมินกลาง (เปลี่ยนได้)
+  
+const SUPER_ADMIN_PW = null; // ย้ายไป Supabase แล้ว  //
 const ADMIN_PW = 'teacher123';  // เหลือไว้ compatibility (ไม่ใช้แล้ว)
 
 // ============================================================
@@ -2503,21 +2524,52 @@ function showScreen(id){
   document.getElementById(id).classList.add('on');
 }
 
-function loginAdmin(){
+async function loginAdmin(){
   const input = document.getElementById('admin-pw');
-  const pw = input ? input.value : '';
+  const pw = input ? input.value.trim() : '';
   const errEl = document.getElementById('admin-err');
   if(errEl) errEl.textContent = '';
   if(!pw){ if(errEl) errEl.textContent='กรุณากรอกรหัสผ่าน'; return; }
-  if(pw === SUPER_ADMIN_PW){
-    CURRENT_TEACHER = null;
-    if(input) input.value = '';
-    toggleAdminBar(true);
-    showScreen('s-superadmin');
-    loadSuperAdminPanel();
-  } else {
-    if(errEl) errEl.textContent = 'รหัสผ่านไม่ถูกต้อง';
-    if(input) input.select();
+
+  // ปิดปุ่มระหว่างตรวจสอบ
+  const btn = document.querySelector('#admin-login-panel button[onclick="loginAdmin()"]');
+  if(btn){ btn.textContent='⏳ กำลังตรวจสอบ...'; btn.disabled=true; }
+
+  try {
+    if(USE_SUPABASE && SB) {
+      // ดึงรหัสจาก Supabase
+      const {data, error} = await SB.from('settings')
+        .select('value')
+        .eq('key','superadmin_pw')
+        .maybeSingle();
+
+      if(error || !data) {
+        if(errEl) errEl.textContent='ไม่สามารถตรวจสอบรหัสได้';
+        return;
+      }
+
+      const correctPw = typeof data.value === 'string'
+        ? data.value
+        : JSON.stringify(data.value).replace(/"/g,'');
+
+      if(pw === correctPw) {
+        CURRENT_TEACHER = null;
+        if(input) input.value = '';
+        toggleAdminBar(true);
+        showScreen('s-superadmin');
+        loadSuperAdminPanel();
+      } else {
+        if(errEl) errEl.textContent = 'รหัสผ่านไม่ถูกต้อง';
+        if(input) input.select();
+      }
+    } else {
+      // Fallback ถ้าไม่ได้เชื่อมต่อ Supabase
+      if(errEl) errEl.textContent='ต้องเชื่อมต่อ Supabase ก่อน';
+    }
+  } catch(e) {
+    if(errEl) errEl.textContent='เกิดข้อผิดพลาด: '+e.message;
+  } finally {
+    if(btn){ btn.textContent='🔐 เข้าสู่ระบบแอดมิน'; btn.disabled=false; }
   }
 }
 
