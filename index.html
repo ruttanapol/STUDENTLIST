@@ -77,6 +77,7 @@ body { background:var(--bg); overscroll-behavior:none; }
     border-right: 1.5px solid var(--border);
     padding: 20px 12px;
     overflow-y: auto;
+    display: block;
   }
   
   #s-admin-main {
@@ -122,6 +123,11 @@ body { background:var(--bg); overscroll-behavior:none; }
 }
 .logout-btn:hover{background:rgba(255,255,255,0.25);}
 .logout-btn:active{background:rgba(255,255,255,0.3);}
+.tb-icon-btn {
+  width:36px;height:36px;padding:0 !important;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:10px !important;flex-shrink:0;
+}
 
 /* ===== DESKTOP SIDEBAR NAV ===== */
 .sidebar-nav-item {
@@ -144,10 +150,10 @@ body { background:var(--bg); overscroll-behavior:none; }
 }
 .bnav-btn {
   flex:1;display:flex;flex-direction:column;
-  align-items:center;gap:3px;padding:10px 4px 6px;
+  align-items:center;gap:2px;padding:8px 4px 4px;
   background:none;border:none;cursor:pointer;
   color:var(--text3);font-size:11px;font-weight:600;
-  transition:color .15s;min-height:56px;
+  transition:color .15s;min-height:52px;
 }
 .bnav-btn.on{color:var(--blue);}
 .bnav-btn .bnav-dot{width:4px;height:4px;border-radius:50%;background:var(--blue);margin-top:2px;display:none;}
@@ -499,6 +505,11 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,1
 .score-input-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
 
 /* ===== DESKTOP ADMIN SPECIFIC ===== */
+@media(max-width:1023px){
+  #s-admin-sidebar { display: none !important; }
+  #s-admin-body { display: block !important; }
+  #s-admin-main { overflow-y: visible; }
+}
 @media(min-width:1024px){
   #s-admin-body { min-height: 0; }
   
@@ -1080,9 +1091,13 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       </div>
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
-      <button class="logout-btn" onclick="showProfileModal()" style="padding:7px 10px;font-size:15px;" title="แก้ไขโปรไฟล์">👤</button>
-      <button class="logout-btn" onclick="showChangePwModal()" style="padding:7px 10px;font-size:15px;" title="เปลี่ยนรหัสผ่าน">🔑</button>
-      <button class="logout-btn" onclick="logout()">ออก</button>
+      <button class="logout-btn tb-icon-btn" onclick="showProfileModal()" title="แก้ไขโปรไฟล์">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </button>
+      <button class="logout-btn tb-icon-btn" onclick="showChangePwModal()" title="เปลี่ยนรหัสผ่าน">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="3"/><path d="M11 15h6l2-4-1.5-1L16 12l-1.5-1-1 2H11"/><path d="M16.5 5.5L18 7"/><path d="M14 8l1.5-2.5"/></svg>
+      </button>
+      <button class="logout-btn" onclick="logout()" style="padding:7px 16px;">ออก</button>
     </div>
   </div>
   <div class="toast-slot"><div id="toast-a" class="tbar"></div></div>
