@@ -4750,8 +4750,11 @@ async function bypassMaintenance() {
     
     if(pw === correctPw) {
       // ปิด maintenance แล้วเข้าหน้าแอดมิน
-      await toggleMaintenanceMode(false);
+      try {
+        await SB.from('settings').upsert({key:'maintenance_mode',value:{enabled:false}},{onConflict:'key'});
+      } catch(e2) {}
       document.getElementById('maintenance-overlay').style.display = 'none';
+      updateMaintenanceBtn(false);
       CURRENT_TEACHER = null;
       showScreen('s-superadmin');
       loadSuperAdminPanel();
@@ -4781,8 +4784,29 @@ async function loadMaintenanceStatus() {
     const isOn = data && data.value && data.value.enabled === true;
     updateMaintenanceBtn(isOn);
   } catch(e) {}
-}  
-  
+}
+
+async function toggleMaintenanceMode(enable) {
+  if(!USE_SUPABASE||!SB) return;
+  const value = enable ? {
+    enabled: true,
+    started_at: new Date().toISOString()
+  } : { enabled: false };
+  const {error} = await SB.from('settings').upsert(
+    {key:'maintenance_mode', value},
+    {onConflict:'key'}
+  );
+  if(error) { toast2('ไม่สำเร็จ: '+error.message,'err'); return; }
+  if(enable) {
+    toast2('เปิดโหมดปรับปรุงระบบแล้ว ⚙️','warn');
+  } else {
+    toast2('ปิดโหมดปรับปรุงระบบแล้ว ✅');
+    const ov = document.getElementById('maintenance-overlay');
+    if(ov) ov.style.display='none';
+  }
+  updateMaintenanceBtn(enable);
+}
+
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
