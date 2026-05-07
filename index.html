@@ -1150,29 +1150,64 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
         <div class="card-title" style="margin:0;color:var(--purple);">📝 งานที่กำลังตรวจ</div>
         <div id="hw-save-badge" style="font-size:11px;font-weight:700;color:var(--green-dark);background:var(--green-light);padding:3px 10px;border-radius:20px;display:none;">✓ บันทึกแล้ว</div>
       </div>
-      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-        <div style="flex:0 0 72px;">
-          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">ครั้งที่</div>
-          <input type="number" id="hw-num-input" placeholder="1" inputmode="numeric" min="1"
-            style="text-align:center;font-size:18px;font-weight:700;color:var(--purple);padding:10px 8px;"
-            oninput="onHWFieldChange()">
+      <!-- Dropdown เลือกงาน -->
+      <div style="margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">เลือกงานที่จะตรวจ</div>
+        <select id="hw-select-dropdown" onchange="selectHWFromDropdown(this.value)"
+          style="font-size:15px;padding:12px 14px;font-weight:600;color:var(--purple);border-color:#C4B5FD;background:var(--purple-light);width:100%;">
+          <option value="">— เลือกชิ้นงาน —</option>
+        </select>
+      </div>
+
+      <!-- แสดงรายละเอียดงานที่เลือก -->
+      <div id="hw-selected-detail" style="display:none;background:rgba(139,92,246,0.06);border:1.5px solid #C4B5FD;border-radius:12px;padding:12px 14px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div style="background:var(--purple-light);border-radius:8px;padding:4px 12px;font-size:20px;font-weight:800;color:var(--purple);min-width:44px;text-align:center;" id="hw-detail-num">—</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="hw-detail-title">—</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px;" id="hw-detail-sub">—</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:11px;color:var(--text3);">คะแนนเต็ม</div>
+            <div style="font-size:18px;font-weight:800;color:var(--blue);" id="hw-detail-max">—</div>
+          </div>
         </div>
-        <div style="flex:1;min-width:120px;">
-          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">หัวข้องาน</div>
-          <input type="text" id="hw-title-input" placeholder="เช่น แบบฝึกหัดบทที่ 1..."
-            style="font-size:15px;font-weight:600;"
-            oninput="onHWFieldChange()">
+      </div>
+
+      <!-- ฟิลด์ manual (ซ่อนไว้ เปิดเมื่อกด "กรอกเอง") -->
+      <div id="hw-manual-fields" style="display:none;">
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+          <div style="flex:0 0 72px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">ครั้งที่</div>
+            <input type="number" id="hw-num-input" placeholder="1" inputmode="numeric" min="1"
+              style="text-align:center;font-size:18px;font-weight:700;color:var(--purple);padding:10px 8px;"
+              oninput="onHWFieldChange()">
+          </div>
+          <div style="flex:1;min-width:120px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">หัวข้องาน</div>
+            <input type="text" id="hw-title-input" placeholder="เช่น แบบฝึกหัดบทที่ 1..."
+              style="font-size:15px;font-weight:600;"
+              oninput="onHWFieldChange()">
+          </div>
+          <div style="flex:0 0 120px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">วิชา</div>
+            <select id="hw-subj-input" onchange="onHWFieldChange()" style="font-size:14px;padding:10px 10px;"></select>
+          </div>
+          <div style="flex:0 0 80px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">คะแนนเต็ม</div>
+            <input type="number" id="hw-maxscore-input" placeholder="100" inputmode="numeric" min="1"
+              style="text-align:center;font-size:16px;font-weight:700;color:var(--blue);padding:10px 6px;"
+              oninput="onHWFieldChange()">
+          </div>
         </div>
-        <div style="flex:0 0 120px;">
-          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">วิชา</div>
-          <select id="hw-subj-input" onchange="onHWFieldChange()" style="font-size:14px;padding:10px 10px;"></select>
-        </div>
-        <div style="flex:0 0 80px;">
-          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">คะแนนเต็ม</div>
-          <input type="number" id="hw-maxscore-input" placeholder="100" inputmode="numeric" min="1"
-            style="text-align:center;font-size:16px;font-weight:700;color:var(--blue);padding:10px 6px;"
-            oninput="onHWFieldChange()">
-        </div>
+      </div>
+
+      <!-- ปุ่ม toggle manual -->
+      <div style="text-align:center;margin-top:6px;">
+        <button onclick="toggleHWManual()" id="hw-manual-toggle-btn"
+          style="background:none;border:none;font-size:12px;color:var(--text3);cursor:pointer;font-family:Sarabun,sans-serif;text-decoration:underline;padding:4px;">
+          ✏️ กรอกงานใหม่ด้วยตัวเอง
+        </button>
       </div>
       <div id="hw-conflict-warn" style="display:none;margin-top:8px;font-size:12px;color:#B45309;background:#FEF3C7;border-radius:8px;padding:7px 10px;"></div>
     </div>
@@ -1998,6 +2033,7 @@ async function reloadHomeworks() {
   if(tid) q = q.eq('teacher_id', tid);
   const {data} = await q;
   DB.homeworks = (data||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||''}));
+  populateHWDropdown();
 }
 
 let _currentStuId = null; // track which student is viewing
@@ -3135,15 +3171,20 @@ function ts(){return new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minut
 let hwAutoSaveTimer=null;
 
 function populateScanSelects(){
+  // populate dropdown ก่อน
+  populateHWDropdown();
   const ss=document.getElementById('hw-subj-input');
   if(ss)ss.innerHTML=DB.subjects.map(s=>`<option>${s}</option>`).join('');
   const saved=lsGet('hw_current');
-  if(saved){
+  if(saved && saved.num){
     if(document.getElementById('hw-num-input'))document.getElementById('hw-num-input').value=saved.num||'';
     if(document.getElementById('hw-title-input'))document.getElementById('hw-title-input').value=saved.title||'';
     if(ss&&saved.subject)ss.value=saved.subject;
     const msEl=document.getElementById('hw-maxscore-input');
     if(msEl&&saved.maxScore)msEl.value=saved.maxScore;
+    // sync dropdown
+    const dd=document.getElementById('hw-select-dropdown');
+    if(dd) { dd.value=saved.num; selectHWFromDropdown(String(saved.num)); }
   } else if(DB.homeworks.length){
     const h=DB.homeworks[0];
     if(document.getElementById('hw-num-input'))document.getElementById('hw-num-input').value=h.num;
@@ -3151,6 +3192,9 @@ function populateScanSelects(){
     if(ss)ss.value=h.subject;
     const msEl2=document.getElementById('hw-maxscore-input');
     if(msEl2)msEl2.value=h.maxScore||100;
+    // auto select first hw in dropdown
+    const dd2=document.getElementById('hw-select-dropdown');
+    if(dd2) { dd2.value=h.num; selectHWFromDropdown(String(h.num)); }
   }
   updateConflictWarn();
 }
@@ -4510,6 +4554,74 @@ async function toggleMaintenanceMode(enable) {
 }
 
 if('scrollRestoration' in history) history.scrollRestoration='manual';
+
+// ===== HW DROPDOWN FUNCTIONS =====
+
+function populateHWDropdown() {
+  const dd = document.getElementById('hw-select-dropdown');
+  if(!dd) return;
+  const cur = dd.value;
+  dd.innerHTML = '<option value="">— เลือกชิ้นงาน —</option>';
+  DB.homeworks.forEach(h => {
+    const opt = document.createElement('option');
+    opt.value = h.num;
+    const deadline = h.deadline ? ' · กำหนดส่ง: ' + new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '';
+    opt.textContent = 'ครั้งที่ ' + h.num + ' — ' + h.title + ' (' + (h.subject||'ไม่ระบุวิชา') + ')' + deadline;
+    dd.appendChild(opt);
+  });
+  // restore previous selection
+  if(cur) dd.value = cur;
+}
+
+function selectHWFromDropdown(numStr) {
+  if(!numStr) {
+    // ล้าง detail
+    document.getElementById('hw-selected-detail').style.display = 'none';
+    document.getElementById('hw-num-input').value = '';
+    document.getElementById('hw-title-input').value = '';
+    document.getElementById('hw-maxscore-input').value = '';
+    return;
+  }
+  const num = parseInt(numStr);
+  const hw = DB.homeworks.find(h => h.num === num);
+  if(!hw) return;
+
+  // อัพเดต hidden inputs (ใช้โดย recordScan)
+  document.getElementById('hw-num-input').value = hw.num;
+  document.getElementById('hw-title-input').value = hw.title;
+  document.getElementById('hw-maxscore-input').value = hw.maxScore || 100;
+  const subj = document.getElementById('hw-subj-input');
+  if(subj && hw.subject) subj.value = hw.subject;
+
+  // แสดง detail card
+  document.getElementById('hw-detail-num').textContent = hw.num;
+  document.getElementById('hw-detail-title').textContent = hw.title;
+  const subLabel = (hw.subject || 'ไม่ระบุวิชา');
+  const dlLabel = hw.deadline ? ' · กำหนดส่ง: ' + new Date(hw.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '';
+  document.getElementById('hw-detail-sub').textContent = subLabel + dlLabel;
+  document.getElementById('hw-detail-max').textContent = hw.maxScore || 100;
+  document.getElementById('hw-selected-detail').style.display = 'block';
+
+  // บันทึก cache
+  lsSet('hw_current', {num:hw.num, title:hw.title, subject:hw.subject, maxScore:hw.maxScore||100});
+  const badge = document.getElementById('hw-save-badge');
+  if(badge) { badge.style.display = ''; setTimeout(()=>badge.style.display='none', 1500); }
+}
+
+function toggleHWManual() {
+  const manual = document.getElementById('hw-manual-fields');
+  const btn = document.getElementById('hw-manual-toggle-btn');
+  const isOpen = manual.style.display !== 'none';
+  manual.style.display = isOpen ? 'none' : 'block';
+  btn.textContent = isOpen ? '✏️ กรอกงานใหม่ด้วยตัวเอง' : '✕ ปิด';
+  if(!isOpen) {
+    // clear dropdown เมื่อกรอกเอง
+    const dd = document.getElementById('hw-select-dropdown');
+    if(dd) dd.value = '';
+    document.getElementById('hw-selected-detail').style.display = 'none';
+  }
+}
+
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
