@@ -1801,7 +1801,62 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
           💳
         </div>
         <div class="logo-title">ชำระค่าบริการ</div>
-        <div class="logo-sub">สแกปเสร็จ · รอตรวจสลิป · เริ่มใช้งาน</div>
+        <div class="logo-sub">เลือกแพลน · ชำระเงิน · เริ่มใช้งาน</div>
+      </div>
+
+      <!-- Plan Selector (แสดงก่อนเลือกสลิป) -->
+      <div id="slip-plan-selector" class="login-panel" style="margin-bottom:14px;">
+        <div class="panel-header" style="margin-bottom:14px;">
+          <div class="panel-icon" style="background:linear-gradient(135deg,var(--purple-light),#EDE9FE);">💎</div>
+          <div>
+            <div class="panel-title">เลือกแพลนที่ต้องการ</div>
+            <div class="panel-desc">เลือกก่อนชำระเงิน</div>
+          </div>
+        </div>
+
+        <!-- Free Plan -->
+        <label id="plan-sel-free" onclick="selectSlipPlan('free')"
+          style="display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:14px;border:2px solid var(--border);background:#fff;cursor:pointer;margin-bottom:10px;transition:all .2s;">
+          <input type="radio" name="slip-plan-radio" value="free" checked style="accent-color:var(--blue);width:18px;height:18px;flex-shrink:0;margin-top:2px;">
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <span style="font-size:16px;font-weight:800;color:var(--text);">🎁 Free</span>
+              <span style="font-size:20px;font-weight:800;color:var(--text);">฿0</span>
+              <span style="font-size:11px;color:var(--text2);">/ ตลอดไป</span>
+            </div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.8;">
+              ✅ สแกน QR / Barcode ไม่จำกัด<br>
+              ✅ นักเรียนไม่จำกัด<br>
+              ⚠️ <span style="background:#FEF3C7;padding:1px 6px;border-radius:10px;color:#B45309;font-weight:700;">สูงสุด 5 ห้อง</span><br>
+              ⚠️ <span style="background:#FEF3C7;padding:1px 6px;border-radius:10px;color:#B45309;font-weight:700;">สูงสุด 9 ชิ้น / ระบบ</span><br>
+              ✅ Export PDF พื้นฐาน<br>
+              ❌ <span style="color:var(--red);">ไม่รองรับ Excel</span>
+            </div>
+          </div>
+        </label>
+
+        <!-- Premium Plan -->
+        <label id="plan-sel-premium" onclick="selectSlipPlan('premium')"
+          style="display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:14px;border:2px solid var(--purple);background:linear-gradient(135deg,#FAFAFF,#F5F0FF);cursor:pointer;margin-bottom:6px;transition:all .2s;box-shadow:0 2px 12px rgba(124,58,237,0.1);">
+          <input type="radio" name="slip-plan-radio" value="premium" style="accent-color:var(--purple);width:18px;height:18px;flex-shrink:0;margin-top:2px;">
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+              <span style="font-size:16px;font-weight:800;color:var(--purple);">💎 Premium ครู</span>
+              <span style="font-size:20px;font-weight:800;color:var(--purple);">฿99-149</span>
+              <span style="font-size:11px;color:var(--text2);">/ เดือน</span>
+              <span style="font-size:11px;font-weight:700;background:var(--purple);color:#fff;padding:2px 8px;border-radius:20px;">แนะนำ</span>
+            </div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.8;">
+              ✅ ห้องและนักเรียนไม่จำกัด<br>
+              ✅ ชิ้นงานไม่จำกัด<br>
+              ✅ Export PDF + Excel<br>
+              🤖 <span style="background:var(--purple-light);padding:1px 6px;border-radius:10px;color:var(--purple);font-weight:700;">AI สรุปรายงานห้องเรียน</span><br>
+              📊 รายงานผู้ปกครองอัตโนมัติ<br>
+              📋 Template คะแนนรายเทอม
+            </div>
+          </div>
+        </label>
+        <div id="slip-plan-note" style="font-size:12px;color:var(--text3);text-align:center;padding:4px 0;">เลือกแพลนแล้วดูข้อมูลการชำระด้านล่าง</div>
       </div>
 
       <div class="login-panel">
@@ -1831,7 +1886,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
             <div>🏦 ธนาคาร: <b id="payment-bank">กสิกรไทย</b></div>
             <div>📱 เลขบัญชี: <b id="payment-account">xxx-x-xxxxx-x</b></div>
             <div>👤 ชื่อบัญชี: <b id="payment-name">ชื่อเจ้าของระบบ</b></div>
-            <div>💰 ยอดชำระ: <b id="payment-amount" style="color:var(--green-dark);font-size:16px;">฿XXX/ปี</b></div>
+            <div>💰 ยอดชำระ: <b id="payment-amount" style="color:var(--green-dark);font-size:16px;">ฟรี (ไม่ต้องชำระ)</b></div>
           </div>
         </div>
 
@@ -3301,7 +3356,12 @@ function renderTeacherList(teachers){
         ${t.slip_url||t.expires_at?`
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           ${renderExpireBadge(t.expires_at)}
+          ${t.plan_requested?renderPlanRequestedBadge(t.plan_requested):''}
           ${t.slip_url?`<a href="${t.slip_url}" target="_blank" style="font-size:12px;color:var(--blue-dark);font-weight:600;text-decoration:none;">💳 ดูสลิป</a>`:''}
+        </div>`:''}
+        ${!t.slip_url&&!t.expires_at&&t.plan_requested?`
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          ${renderPlanRequestedBadge(t.plan_requested)}
         </div>`:''}
       </div>`;
     }).join('');
@@ -4911,6 +4971,12 @@ function previewSlip(e) {
 async function uploadSlip() {
   const file = document.getElementById('slip-file-input').files[0];
   if(!file||!CURRENT_TEACHER) return;
+  const selectedPlan = document.querySelector('input[name="slip-plan-radio"]:checked')?.value || 'free';
+  // ถ้า free plan ไม่ต้องอัพโหลดสลิป
+  if(selectedPlan === 'free') {
+    await activateFreeTeacher();
+    return;
+  }
   const btn = document.getElementById('slip-submit-btn');
   btn.textContent='⏳ กำลังอัพโหลด...';
   btn.disabled=true;
@@ -4921,10 +4987,12 @@ async function uploadSlip() {
     if(upErr) throw upErr;
     const {data} = SB.storage.from('slips').getPublicUrl(path);
     const slipUrl = data.publicUrl+'?t='+Date.now();
+    const selectedPlan = document.querySelector('input[name="slip-plan-radio"]:checked')?.value || 'free';
     const {error:dbErr} = await SB.from('teachers').update({
       slip_url: slipUrl,
       slip_uploaded_at: new Date().toISOString(),
-      status: 'slip_uploaded'
+      status: 'slip_uploaded',
+      plan_requested: selectedPlan
     }).eq('id', CURRENT_TEACHER.id);
     if(dbErr) throw dbErr;
     // แสดงหน้ารอการอนุมัติ
@@ -5968,6 +6036,114 @@ async function confirmSetPlan() {
   }
 }
 
+
+// ===== SLIP PLAN SELECTOR =====
+
+let _selectedSlipPlan = 'free';
+
+function selectSlipPlan(plan) {
+  _selectedSlipPlan = plan;
+  const freeLabel = document.getElementById('plan-sel-free');
+  const premLabel = document.getElementById('plan-sel-premium');
+  const note = document.getElementById('slip-plan-note');
+  const payAmt = document.getElementById('payment-amount');
+  const submitBtn = document.getElementById('slip-submit-btn');
+  const uploadArea = document.getElementById('slip-upload-area');
+
+  if(freeLabel) {
+    freeLabel.style.borderColor = plan==='free' ? 'var(--blue)' : 'var(--border)';
+    freeLabel.style.background = plan==='free' ? 'var(--blue-light)' : '#fff';
+  }
+  if(premLabel) {
+    premLabel.style.borderColor = plan==='premium' ? 'var(--purple)' : 'var(--border)';
+    premLabel.style.background = plan==='premium' ? 'linear-gradient(135deg,#FAFAFF,#F5F0FF)' : '#fff';
+    premLabel.style.boxShadow = plan==='premium' ? '0 2px 12px rgba(124,58,237,0.15)' : 'none';
+  }
+
+  if(plan === 'free') {
+    if(payAmt) payAmt.textContent = 'ฟรี (ไม่ต้องชำระ)';
+    if(payAmt) payAmt.style.color = 'var(--green-dark)';
+    if(note) note.textContent = '✅ แพลนฟรี — กดปุ่มด้านล่างเพื่อเริ่มใช้งานได้เลย';
+    if(note) note.style.color = 'var(--green-dark)';
+    // ซ่อน upload area แสดงปุ่มเริ่มใช้งานฟรีแทน
+    if(uploadArea) uploadArea.style.display = 'none';
+    // แสดงปุ่มฟรี
+    let freeBtn = document.getElementById('free-plan-btn');
+    if(!freeBtn) {
+      freeBtn = document.createElement('button');
+      freeBtn.id = 'free-plan-btn';
+      freeBtn.onclick = uploadSlip;
+      freeBtn.style.cssText = 'width:100%;padding:16px;font-size:17px;font-weight:700;border-radius:14px;border:none;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;margin-top:8px;';
+      freeBtn.textContent = '🚀 เริ่มใช้งาน Free Plan';
+      uploadArea.parentNode.insertBefore(freeBtn, uploadArea.nextSibling);
+    }
+    freeBtn.style.display = 'block';
+    // ซ่อน payment info
+    const payInfo = document.querySelector('[style*="payment-bank"]');
+    const payBlock = document.getElementById('payment-bank')?.closest('[style*="blue-light"]');
+    if(payBlock) payBlock.style.display = 'none';
+  } else {
+    // premium
+    if(payAmt) payAmt.textContent = '฿99-149 / เดือน';
+    if(payAmt) payAmt.style.color = 'var(--purple)';
+    if(note) note.textContent = '💎 Premium — โอนเงินแล้วส่งสลิปด้านล่าง';
+    if(note) note.style.color = 'var(--purple)';
+    if(uploadArea) uploadArea.style.display = '';
+    const freeBtn = document.getElementById('free-plan-btn');
+    if(freeBtn) freeBtn.style.display = 'none';
+    const payBlock = document.getElementById('payment-bank')?.closest('[style*="blue-light"]') ||
+                     document.querySelector('#s-slip [style*="blue-light"]');
+    if(payBlock) payBlock.style.display = '';
+  }
+}
+
+async function activateFreeTeacher() {
+  if(!SB || !CURRENT_TEACHER) return;
+  try {
+    const {error} = await SB.from('teachers').update({
+      status: 'approved',
+      plan: 'free',
+      plan_requested: 'free',
+      expires_at: null
+    }).eq('id', CURRENT_TEACHER.id);
+    if(error) throw error;
+    CURRENT_TEACHER.status = 'approved';
+    CURRENT_TEACHER.plan = 'free';
+    toast('เริ่มใช้งาน Free Plan แล้ว ✅');
+    // โหลดข้อมูลและเข้าระบบ
+    await loadFromSupabase();
+    showScreen('s-admin');
+  } catch(e) {
+    toast('เกิดข้อผิดพลาด: '+e.message, 'err');
+  }
+}
+
+
+function renderPlanRequestedBadge(plan) {
+  if(!plan) return '';
+  if(plan === 'free') {
+    return '<span style="font-size:11px;font-weight:700;background:#F1F5F9;color:#64748B;padding:3px 10px;border-radius:20px;border:1.5px solid #E2E8F0;">🎁 ขอ Free Plan</span>';
+  }
+  if(plan === 'premium') {
+    return '<span style="font-size:11px;font-weight:700;background:var(--purple-light);color:var(--purple);padding:3px 10px;border-radius:20px;border:1.5px solid #C4B5FD;">💎 ขอ Premium Plan</span>';
+  }
+  return '';
+}
+
+// เพิ่ม plan badge ใน topbar ของครู
+function renderTeacherPlanBadge() {
+  const plan = CURRENT_TEACHER?.plan || 'free';
+  const badge = plan === 'premium'
+    ? '<span style="font-size:10px;font-weight:700;background:linear-gradient(135deg,var(--purple),#7C3AED);color:#fff;padding:2px 8px;border-radius:20px;margin-left:4px;">💎 Premium</span>'
+    : '<span style="font-size:10px;font-weight:700;background:rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);padding:2px 8px;border-radius:20px;margin-left:4px;">🎁 Free</span>';
+  const roleEl = document.getElementById('teacher-topbar-role');
+  if(roleEl && !roleEl.querySelector('.plan-badge')) {
+    const span = document.createElement('span');
+    span.className = 'plan-badge';
+    span.innerHTML = badge;
+    roleEl.appendChild(span);
+  }
+}
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
