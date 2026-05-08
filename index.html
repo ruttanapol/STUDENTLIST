@@ -6907,17 +6907,21 @@ let _anthropicKey = '';
 async function loadAnthropicKey() {
   if(!SB) return;
   try {
-    // โหลด global key (ไม่ใช่ per-teacher) ใช้ key 'anthropic_key' ตรงๆ
-    const {data} = await SB.from('settings').select('value').eq('key','anthropic_key').single();
-    if(data?.value) {
-      _anthropicKey = data.value;
-      // อัพเดต UI ของ SA ถ้ามี
+    // ค้นหา key ที่มี 'anthropic_key' ใน key name (ทั้ง global และ scoped)
+    const {data, error} = await SB.from('settings').select('key,value').like('key','%anthropic_key%');
+    if(error) { console.log('loadAnthropicKey error:', error); return; }
+    if(data && data.length > 0) {
+      // ใช้อันแรกที่เจอ
+      _anthropicKey = data[0].value;
+      console.log('Loaded anthropic key from:', data[0].key);
       const el = document.getElementById('sa-anthropic-key');
       if(el) el.value = _anthropicKey;
       const st = document.getElementById('sa-api-key-status');
       if(st) st.innerHTML = '<span style="color:var(--green-dark);font-weight:700;">✅ ตั้งค่าแล้ว: '+_anthropicKey.substring(0,12)+'...</span>';
+    } else {
+      console.log('No anthropic key found in settings');
     }
-  } catch(e) { console.log('loadAnthropicKey error:', e); }
+  } catch(e) { console.log('loadAnthropicKey exception:', e); }
 }
 
 function toggleApiKeyVisibility() {
@@ -6935,7 +6939,7 @@ async function saveAnthropicKey() {
   if(!SB){ toast('ไม่ได้เชื่อมต่อ Supabase','err'); return; }
   showActionPopup('กำลังบันทึก API Key','','add');
   try {
-    // บันทึกเป็น global key (ไม่มี teacher scope) ให้ทุกคนใช้ได้
+    // บันทึกเป็น global key เสมอ
     const {error} = await SB.from('settings').upsert({key:'anthropic_key', value:key},{onConflict:'key'});
     if(error) throw error;
     _anthropicKey = key;
