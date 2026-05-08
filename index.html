@@ -1105,6 +1105,24 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       </div>
     </div>
   
+    <!-- Bypass IDs (Test Accounts) -->
+    <div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#FAF5FF,#EDE9FE);">
+      <div class="card-title" style="color:var(--purple);">🔓 บัญชีทดสอบ (Bypass Maintenance)</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.6;">
+        บัญชีเหล่านี้สามารถ <b>เข้าระบบได้ปกติ</b> แม้ระหว่างโหมดปรับปรุง<br>
+        <span style="font-size:12px;color:var(--text3);">ใส่ Teacher ID (UUID) หรือ Email ของครูที่ต้องการ bypass</span>
+      </div>
+      <div id="bypass-ids-list" style="margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="bypass-id-input" placeholder="Email หรือ Teacher ID ที่ต้องการ bypass"
+          style="flex:1;font-size:13px;padding:9px 12px;">
+        <button onclick="addBypassId()"
+          style="padding:9px 16px;font-size:13px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,var(--purple),#5B21B6);color:#fff;cursor:pointer;white-space:nowrap;font-family:Sarabun,sans-serif;">
+          + เพิ่ม
+        </button>
+      </div>
+    </div>
+
     <!-- Change Super Admin Password -->
     <div class="card" style="border-color:#FECACA;background:linear-gradient(135deg,#FFF5F5,#FEE2E2);">
       <div class="card-title" style="color:#B91C1C;">🔐 เปลี่ยนรหัส Super Admin</div>
@@ -2660,6 +2678,21 @@ if(teacher.expires_at && new Date(teacher.expires_at) < new Date()){
   await SB.auth.signOut();return;
 }
     // เข้าสู่ระบบสำเร็จ
+    // เช็ค maintenance mode — bypass accounts ผ่านได้
+    const {data:maintData} = await SB.from('settings').select('value').eq('key','maintenance_mode').maybeSingle();
+    const maintOn = maintData && maintData.value && maintData.value.enabled === true;
+    if(maintOn) {
+      const bypass = await isBypassAccount(email) || await isBypassAccount(uid);
+      if(!bypass) {
+        await SB.auth.signOut();
+        errEl.textContent='ระบบอยู่ในโหมดปรับปรุง กรุณาลองใหม่ภายหลัง';
+        // แสดง maintenance overlay
+        showMaintenancePage(maintData.value);
+        return;
+      }
+      // bypass account — แสดง badge แจ้งเตือน
+      toast('🔓 เข้าระบบสำเร็จ (โหมดทดสอบ)','warn');
+    }
     CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||''};
     await loadFromSupabase();
     setTimeout(()=>setupRealtime(),500);
@@ -2936,6 +2969,7 @@ async function loadContactLinksForLogin(){
 async function loadContactSettings(){
   loadPaymentSettings();
   loadPlansSettings(); // โหลด plans ด้วย
+  loadBypassIds();     // โหลด bypass ids ด้วย
   if(!USE_SUPABASE) return;
   const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').single();
   const contacts = (data&&data.value) ? data.value : [];
@@ -4862,12 +4896,80 @@ async function cleanOrphanData() {
 }
 
 // ===== MAINTENANCE MODE =====
+// ===== BYPASS IDs (TEST ACCOUNTS FOR MAINTENANCE) =====
+async function loadBypassIds() {
+  if(!USE_SUPABASE||!SB) return;
+  try {
+    const {data} = await SB.from('settings').select('value').eq('key','bypass_ids').maybeSingle();
+    const ids = (data&&data.value) ? data.value : [];
+    renderBypassList(ids);
+  } catch(e) {}
+}
+
+function renderBypassList(ids) {
+  const el = document.getElementById('bypass-ids-list');
+  if(!el) return;
+  if(!ids.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text3);text-align:center;padding:8px;">ยังไม่มีบัญชีทดสอบ</div>';
+    return;
+  }
+  el.innerHTML = ids.map((id,i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border-radius:10px;border:1.5px solid #C4B5FD;margin-bottom:6px;">
+      <span style="font-size:16px;">🔓</span>
+      <span style="flex:1;font-size:13px;font-weight:600;color:var(--purple);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${id}</span>
+      <button onclick="removeBypassId(${i})"
+        style="padding:4px 10px;font-size:12px;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;flex-shrink:0;font-family:Sarabun,sans-serif;">ลบ</button>
+    </div>`).join('');
+}
+
+async function addBypassId() {
+  const val = document.getElementById('bypass-id-input')?.value.trim();
+  if(!val) { toast2('กรอก Email หรือ Teacher ID ด้วย','warn'); return; }
+  const {data} = await SB.from('settings').select('value').eq('key','bypass_ids').maybeSingle();
+  const ids = (data&&data.value) ? data.value : [];
+  if(ids.includes(val)) { toast2('มีอยู่แล้ว','warn'); return; }
+  ids.push(val);
+  const {error} = await SB.from('settings').upsert({key:'bypass_ids',value:ids},{onConflict:'key'});
+  if(error) { toast2('ไม่สำเร็จ: '+error.message,'err'); return; }
+  renderBypassList(ids);
+  document.getElementById('bypass-id-input').value = '';
+  toast2('เพิ่มบัญชีทดสอบแล้ว ✅');
+}
+
+async function removeBypassId(idx) {
+  const {data} = await SB.from('settings').select('value').eq('key','bypass_ids').maybeSingle();
+  const ids = (data&&data.value) ? data.value : [];
+  ids.splice(idx,1);
+  await SB.from('settings').upsert({key:'bypass_ids',value:ids},{onConflict:'key'});
+  renderBypassList(ids);
+  toast2('ลบบัญชีทดสอบแล้ว','warn');
+}
+
+async function isBypassAccount(emailOrId) {
+  if(!USE_SUPABASE||!SB) return false;
+  try {
+    const {data} = await SB.from('settings').select('value').eq('key','bypass_ids').maybeSingle();
+    const ids = (data&&data.value) ? data.value : [];
+    return ids.some(v => v === emailOrId);
+  } catch(e) { return false; }
+}
+
 async function checkMaintenanceMode() {
   if(!USE_SUPABASE||!SB) return;
   try {
     const {data} = await SB.from('settings').select('value').eq('key','maintenance_mode').maybeSingle();
     const isOn = data && data.value && data.value.enabled === true;
     if(isOn) {
+      // ถ้ามี session อยู่แล้ว ให้เช็คว่าเป็น bypass account ไหม
+      try {
+        const {data:sess} = await SB.auth.getSession();
+        if(sess&&sess.session) {
+          const email = sess.session.user.email;
+          const uid = sess.session.user.id;
+          const bypass = await isBypassAccount(email) || await isBypassAccount(uid);
+          if(bypass) return; // ข้ามผ่าน maintenance
+        }
+      } catch(e2) {}
       showMaintenancePage(data.value);
     }
   } catch(e) {}
