@@ -1200,9 +1200,12 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     <div class="tb-left">
       <div id="teacher-topbar-avatar" class="tb-avatar av-admin">ครู</div>
       <div>
-        <div class="tb-name" id="teacher-topbar-name">ครู</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div class="tb-name" id="teacher-topbar-name">ครู</div>
+          <div id="topbar-plan-badge" style="display:none;"></div>
+        </div>
         <div class="tb-role" id="teacher-topbar-email" style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:1px;">ระบบตรวจส่งงาน</div>
-<div id="teacher-expiry-display" style="margin-top:2px;"></div>
+        <div id="teacher-expiry-display" style="margin-top:2px;"></div>
       </div>
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
@@ -2397,8 +2400,22 @@ function setupRealtime() {
       await reloadHomeworks();
       if(document.getElementById('s-admin')?.classList.contains('on')) renderDashboard();
     })
-    .on('postgres_changes', {event:'*', schema:'public', table:'teachers'}, async () => {
-      if(document.getElementById('s-superadmin')?.classList.contains('on')) loadSuperAdminPanel();
+    .on('postgres_changes', {event:'UPDATE', schema:'public', table:'teachers', filter:`id=eq.${CURRENT_TEACHER?.id}`}, async (payload) => {
+      // super admin เปลี่ยน plan — อัปเดต CURRENT_TEACHER และ UI ทันที
+      if(!CURRENT_TEACHER) return;
+      const newRecord = payload.new;
+      const oldPlan = CURRENT_TEACHER.plan;
+      CURRENT_TEACHER.plan = newRecord.plan || 'free';
+      CURRENT_TEACHER.plan_expires_at = newRecord.plan_expires_at || null;
+      renderPlanBanner();
+      // แจ้งเตือนถ้า plan เปลี่ยน
+      if(oldPlan !== CURRENT_TEACHER.plan) {
+        if(CURRENT_TEACHER.plan === 'premium') {
+          toast('🎉 อัปเกรดเป็น Premium แล้ว! ปลดล็อคทุกฟีเจอร์', 'ok');
+        } else {
+          toast('ℹ️ Plan เปลี่ยนเป็น Free', 'warn');
+        }
+      }
     })
     .subscribe();
   showRealtimeDot();
@@ -5793,34 +5810,69 @@ function showUpgradeModal(reason) {
 function showUpgradeInfo() { showUpgradeModal(); }
 
 function renderPlanBanner() {
-  // อัปเดต Excel lock icon
+  // ===== Topbar badge =====
+  const topbarBadge = document.getElementById('topbar-plan-badge');
+  if(topbarBadge) {
+    if(isPremium()) {
+      const exp = CURRENT_TEACHER && CURRENT_TEACHER.plan_expires_at;
+      const expStr = exp ? new Date(exp).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '';
+      topbarBadge.style.display = '';
+      topbarBadge.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#FDE68A,#FCD34D);color:#78350F;white-space:nowrap;">💎 Premium${expStr?' · '+expStr:''}</span>`;
+    } else {
+      topbarBadge.style.display = '';
+      topbarBadge.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,0.2);color:rgba(255,255,255,0.9);white-space:nowrap;cursor:pointer;" onclick="showUpgradeModal()">🎁 Free ⬆️</span>`;
+    }
+  }
+
+  // ===== Excel lock icon =====
   const lockIcon = document.getElementById('excel-lock-icon');
   if(lockIcon) lockIcon.textContent = isPremium() ? '' : '🔒';
 
+  // ===== Dashboard plan banner =====
   const el = document.getElementById('plan-banner');
   if (!el) return;
   if (isPremium()) {
-    const exp = CURRENT_TEACHER.plan_expires_at;
+    const exp = CURRENT_TEACHER && CURRENT_TEACHER.plan_expires_at;
     const expStr = exp ? new Date(exp).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'2-digit'}) : 'ไม่มีกำหนด';
-    el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);border:1.5px solid #FCD34D;border-radius:12px;margin-bottom:10px;">
-      <span style="font-size:20px;">💎</span>
-      <div><div style="font-size:13px;font-weight:700;color:#92400E;">Premium Plan</div>
-      <div style="font-size:11px;color:#B45309;">หมดอายุ: ${expStr}</div></div>
+    const daysLeft = exp ? Math.ceil((new Date(exp) - new Date()) / 86400000) : null;
+    const urgentStyle = daysLeft !== null && daysLeft <= 7 ? 'border-color:#FCD34D;background:linear-gradient(135deg,#FFFBEB,#FEF3C7);' : 'border-color:#C4B5FD;background:linear-gradient(135deg,#FAF5FF,#EDE9FE);';
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;${urgentStyle}border:1.5px solid;border-radius:12px;margin-bottom:10px;">
+      <span style="font-size:24px;">💎</span>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;color:#6D28D9;">Premium Plan</div>
+        <div style="font-size:11px;color:#7C3AED;">หมดอายุ: ${expStr}${daysLeft!==null?' · เหลือ '+daysLeft+' วัน':''}</div>
+      </div>
+      ${daysLeft !== null && daysLeft <= 7 ? '<span style="font-size:11px;font-weight:700;background:#FCD34D;color:#78350F;padding:3px 8px;border-radius:20px;">ใกล้หมดอายุ!</span>' : ''}
     </div>`;
   } else {
-    const roomsLeft = FREE_LIMITS.rooms - DB.rooms.length;
-    const hwLeft = FREE_LIMITS.homeworks - DB.homeworks.length;
-    const roomPct = Math.min(100, DB.rooms.length / FREE_LIMITS.rooms * 100);
-    const hwPct = Math.min(100, DB.homeworks.length / FREE_LIMITS.homeworks * 100);
-    el.innerHTML = `<div style="background:#fff;border:1.5px solid #CBD5E1;border-radius:12px;padding:12px 14px;margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    const roomsUsed = DB.rooms.length;
+    const hwUsed = DB.homeworks.length;
+    const roomPct = Math.min(100, roomsUsed / FREE_LIMITS.rooms * 100);
+    const hwPct = Math.min(100, hwUsed / FREE_LIMITS.homeworks * 100);
+    const roomWarn = roomPct >= 80;
+    const hwWarn = hwPct >= 80;
+    el.innerHTML = `<div style="background:#fff;border:1.5px solid ${roomWarn||hwWarn?'#FCD34D':'#CBD5E1'};border-radius:12px;padding:12px 14px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <span class="plan-badge-free">🎁 Free Plan</span>
-        <button onclick="showUpgradeInfo()" style="padding:5px 12px;font-size:12px;font-weight:700;border-radius:20px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">⬆️ อัปเกรด</button>
+        <button onclick="showUpgradeModal()" style="padding:5px 14px;font-size:12px;font-weight:700;border-radius:20px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">⬆️ อัปเกรด</button>
       </div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">ห้องเรียน ${DB.rooms.length}/${FREE_LIMITS.rooms}</div>
-      <div class="plan-limit-bar"><div class="plan-limit-fill ${roomPct>=80?'warn':'ok'}" style="width:${roomPct}%;"></div></div>
-      <div style="font-size:12px;color:var(--text2);margin-top:6px;margin-bottom:4px;">ชิ้นงาน ${DB.homeworks.length}/${FREE_LIMITS.homeworks}</div>
-      <div class="plan-limit-bar"><div class="plan-limit-fill ${hwPct>=80?'warn':'ok'}" style="width:${hwPct}%;"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+            <span style="color:var(--text2);">🏫 ห้องเรียน</span>
+            <span style="font-weight:700;color:${roomWarn?'#B45309':'var(--text)'};">${roomsUsed}/${FREE_LIMITS.rooms}</span>
+          </div>
+          <div class="plan-limit-bar"><div class="plan-limit-fill ${roomWarn?'warn':'ok'}" style="width:${roomPct}%;"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+            <span style="color:var(--text2);">📝 ชิ้นงาน</span>
+            <span style="font-weight:700;color:${hwWarn?'#B45309':'var(--text)'};">${hwUsed}/${FREE_LIMITS.homeworks}</span>
+          </div>
+          <div class="plan-limit-bar"><div class="plan-limit-fill ${hwWarn?'warn':'ok'}" style="width:${hwPct}%;"></div></div>
+        </div>
+      </div>
+      ${roomWarn||hwWarn?`<div style="margin-top:8px;font-size:11px;font-weight:600;color:#B45309;background:#FEF3C7;border-radius:8px;padding:5px 10px;">⚠️ ${roomPct>=100||hwPct>=100?'ถึงขีดจำกัดแล้ว — อัปเกรดเพื่อเพิ่มต่อ':'ใกล้ถึงขีดจำกัด — พิจารณาอัปเกรด'}</div>`:''}
     </div>`;
   }
 }
