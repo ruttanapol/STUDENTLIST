@@ -527,6 +527,11 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,1
   
   .sidebar-section { font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:1px;padding:0 8px;margin:16px 0 8px; }
 }
+
+/* HW file download button */
+.hw-dl-btn { transition: opacity .15s, transform .15s; }
+.hw-dl-btn:hover { opacity:.85; transform:scale(0.98); }
+a[download]:active { transform:scale(0.96); }
 </style>
 
 <div class="app">
@@ -659,6 +664,11 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       <span id="setup-status-icon">⏳</span><span id="setup-status-text">กำลังเชื่อมต่อ...</span>
     </div>
 
+    
+    <div class="setup-step" style="border-left-color:var(--green);">
+      <div class="setup-step-num">⚠️ สำหรับไฟล์แนบชิ้นงาน</div>
+      <div class="setup-step-text">ต้องสร้าง Storage Bucket ชื่อ <code>homeworks</code> ใน Supabase Dashboard → Storage → New Bucket → ตั้งชื่อ <code>homeworks</code> และเปิด Public</div>
+    </div>
     <button class="setup-connect-btn" id="setup-connect-btn" onclick="connectSupabase()">
       🚀 เชื่อมต่อและเริ่มใช้งาน
     </button>
@@ -1427,7 +1437,15 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
         <div style="flex:0 0 80px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">คะแนนต่อชิ้น</div><input type="number" id="n-hwmaxscore" placeholder="100" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--blue);" value="100"></div>
       </div>
       <div style="margin-top:8px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">กำหนดส่ง (ไม่บังคับ)</div><input type="date" id="n-hwdeadline" style="font-size:14px;"></div>
-      <button class="add-btn" onclick="saveHW()" style="margin-top:10px;">💾 บันทึกชิ้นงาน</button>
+      <div style="margin-top:10px;">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">📎 แนบไฟล์ชิ้นงาน (ไม่บังคับ)</div>
+        <label style="display:block;border:2px dashed var(--border);border-radius:10px;padding:12px;text-align:center;cursor:pointer;background:#fff;transition:all .2s;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border)'">
+          <input type="file" id="hw-file-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.zip" style="display:none;" onchange="previewSelectedFile(this)">
+          <div id="hw-file-label" style="font-size:13px;color:var(--text2);">📂 คลิกเพื่อเลือกไฟล์ (PDF, Word, Excel, รูปภาพ)</div>
+        </label>
+        <div id="hw-file-preview-new" style="margin-top:6px;"></div>
+      </div>
+      <button class="add-btn" onclick="saveHWWithFile()" style="margin-top:10px;">💾 บันทึกชิ้นงาน</button>
       <div id="hw-card-list" style="margin-top:10px;"></div>
     </div>
   </div>
@@ -2037,8 +2055,8 @@ async function loadFromSupabase() {
   const [stuRes, hwRes, subRes, setRes] = await Promise.all([stuQ, hwQ, subQ, SB.from('settings').select('*')]);
 
   DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room}));
-  DB.rooms = [...new Set(DB.students.map(s => s.room))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
-  DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||''}));
+  DB.rooms = [...new Set(DB.students.map(s => s.room))].sort();
+  DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||'', fileUrl: r.file_url||'', fileName: r.file_name||''}));
 
   const subs = {};
   (subRes.data || []).forEach(r => {
@@ -2133,7 +2151,7 @@ async function reloadStudents() {
   if(tid) q = q.eq('teacher_id', tid);
   const {data} = await q;
   DB.students = (data||[]).map(r=>({id:r.id,name:r.name,room:r.room}));
-  DB.rooms = [...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
+  DB.rooms = [...new Set(DB.students.map(s=>s.room))].sort();
 }
 
 async function reloadHomeworks() {
@@ -2142,7 +2160,7 @@ async function reloadHomeworks() {
   let q = SB.from('homeworks').select('*').order('num');
   if(tid) q = q.eq('teacher_id', tid);
   const {data} = await q;
-  DB.homeworks = (data||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||''}));
+  DB.homeworks = (data||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||'',fileUrl:r.file_url||'',fileName:r.file_name||''}));
   // อัพเดต UI และ dropdown
   renderManage();
   populateHWDropdown();
@@ -2232,13 +2250,15 @@ async function sbAddHomework(hw) {
       subject: hw.subject||'',
       max_score: hw.maxScore||100,
       teacher_id: tid,
-      deadline: hw.deadline||null   // ✅ เพิ่ม deadline ที่นี่เลย
+      deadline: hw.deadline||null,
+      file_url: hw.fileUrl||null,
+      file_name: hw.fileName||null
     });
     if(error) throw error;
     await reloadHomeworks();
   } else {
     const existing = DB.homeworks.find(h => h.num === hw.num);
-    if(existing) { existing.title=hw.title; existing.subject=hw.subject; existing.maxScore=hw.maxScore; existing.deadline=hw.deadline||''; }
+    if(existing) { existing.title=hw.title; existing.subject=hw.subject; existing.maxScore=hw.maxScore; existing.deadline=hw.deadline||''; existing.fileUrl=hw.fileUrl||''; existing.fileName=hw.fileName||''; }
     else { DB.homeworks.push(hw); DB.homeworks.sort((a,b)=>a.num-b.num); }
     saveDB();
     renderManage();
@@ -3027,7 +3047,7 @@ function closeSATeacherView(){
 }
 
 function renderSATeacherData(){
-  const rooms=[...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
+  const rooms=[...new Set(DB.students.map(s=>s.room))].sort();
   document.getElementById('sa-tv-stats').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
       <div style="background:var(--blue-light);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:700;">${DB.students.length}</div><div style="font-size:12px;color:var(--text2);">นักเรียน</div></div>
@@ -3214,10 +3234,11 @@ function renderStudentView(s, stuDB){
 
     hws.forEach(h => {
       const sub = db.submissions[s.id+'_'+h.num];
-      html += `<div class="my-hw-row">
-        <div>
+      html += `<div class="my-hw-row" style="flex-wrap:wrap;gap:8px;">
+        <div style="flex:1;min-width:0;">
           <div style="font-size:15px;font-weight:700;color:var(--text);">ชิ้นที่ ${h.num}: ${h.title}</div>
           ${h.deadline?`<div style="font-size:11px;color:var(--text3);margin-top:2px;">กำหนดส่ง: ${new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'})}</div>`:''}
+          ${h.fileUrl?`<a href="${h.fileUrl}" target="_blank" download="${h.fileName||'homework'}" style="display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:5px 12px;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;border-radius:20px;font-size:12px;font-weight:700;text-decoration:none;box-shadow:0 2px 8px rgba(79,142,247,0.3);">⬇️ ดาวน์โหลดไฟล์งาน</a>`:''}
         </div>
         ${sub
           ? `<div class="hw-status-ok">
@@ -3344,7 +3365,7 @@ async function recordScan(sid, scoreOverride){
   if(scoreOverride!==undefined&&scoreOverride!==null&&scoreOverride!==''){
     score=parseFloat(scoreOverride);
   } else {
-    // อ่านจาก scan-score-input ก่อน
+    // อ่านจาก scan-score-input ก่อน (UI ใหม่)
     const scanScoreEl=document.getElementById('scan-score-input');
     if(scanScoreEl&&scanScoreEl.value!==''){
       score=parseFloat(scanScoreEl.value);
@@ -3354,8 +3375,6 @@ async function recordScan(sid, scoreOverride){
       if(scoreEl&&scoreEl.value!==''){score=parseFloat(scoreEl.value);scoreEl.value='';}
     }
   }
-  // ถ้าไม่ระบุคะแนน → ใช้คะแนนเต็มของชิ้นงาน
-  if(score===null||isNaN(score)){score=maxScore;}
   const stu=DB.students.find(s=>s.id===sid);
   const key=sid+'_'+hwNum;
   const log=document.getElementById('scan-log');
@@ -3584,7 +3603,7 @@ function showDetail(sid){
 function openEditStu(id){
   const s=DB.students.find(x=>x.id===id);if(!s)return;
   // รวมห้องจาก DB.rooms + ห้องจากนักเรียนทั้งหมด เผื่อ settings ยังไม่โหลด
-  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
+  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort();
   // ถ้าห้องของนักเรียนคนนี้ไม่อยู่ใน list ให้เพิ่มเข้าไปด้วย
   if(s.room&&!allRooms.includes(s.room))allRooms.push(s.room);
   document.getElementById('edit-stu-old-id').value=s.id;
@@ -3606,8 +3625,8 @@ async function saveEditStu(){
   if(newId!==oldId&&DB.students.find(x=>x.id===newId)){toast('รหัสนี้มีอยู่แล้ว','warn');return;}
   try {
     await sbUpdateStudent(oldId,{id:newId,name:newName,room:newRoom});
-    renderManage();closeEditStu();setTimeout(()=>actionPopupDone('บันทึกข้อมูลแล้ว ✅',newName,'edit'),100);
-  } catch(e){actionPopupError('แก้ไขไม่สำเร็จ: '+e.message);}
+    renderManage();closeEditStu();toast('แก้ไข '+newName+' เรียบร้อย ✅');
+  } catch(e){toast('แก้ไขไม่สำเร็จ: '+e.message,'err');}
 }
 
 async function openEditScore(sid,hwNum){
@@ -3751,11 +3770,10 @@ async function addRoom(){
   const n=document.getElementById('n-room').value.trim();
   if(!n){toast('กรอกชื่อห้อง','warn');return;}
   if(DB.rooms.includes(n)){toast('ห้องนี้มีอยู่แล้ว','warn');return;}
-  DB.rooms=[...new Set([...DB.rooms,n])].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
   showActionPopup('กำลังเพิ่มห้อง '+n,'','add');
+  DB.rooms=[...DB.rooms,n].sort();
   await sbSaveSettings('rooms',DB.rooms);
-  renderManage();
-  setTimeout(()=>actionPopupDone('เพิ่มห้อง '+n+' แล้ว','','add'),100);
+  renderManage();actionPopupDone('เพิ่มห้อง '+n+' แล้ว','','add');
   document.getElementById('n-room').value='';
   //toast('เพิ่มห้อง '+n+' แล้ว');
   document.getElementById('n-room').value='';
@@ -3794,9 +3812,9 @@ async function delRoom(n){
   // ลบออกจาก DB.rooms settings
   DB.rooms = DB.rooms.filter(r=>r!==n);
   await sbSaveSettings('rooms', DB.rooms);
+  actionPopupDone('ลบห้อง '+n+' แล้ว','','delete');
   renderManage();
   renderDashboard();
-  setTimeout(()=>actionPopupDone('ลบห้อง '+n+' แล้ว','','delete'),100);
 }
 
 async function addStudent(){
@@ -3806,7 +3824,7 @@ async function addStudent(){
   if(!id||!name){toast('กรอกให้ครบ','warn');return;}
   if(DB.students.find(s=>s.id===id)){toast('รหัสนี้มีแล้ว','warn');return;}
   showActionPopup('กำลังเพิ่มนักเรียน','รหัส '+id+' · '+name,'add');
-  try{await sbAddStudent({id,name,room});renderManage();document.getElementById('ns-id').value='';document.getElementById('ns-name').value='';setTimeout(()=>actionPopupDone('เพิ่มนักเรียนแล้ว ✅',name+' · '+room,'add'),100);}
+  try{await sbAddStudent({id,name,room});renderManage();document.getElementById('ns-id').value='';document.getElementById('ns-name').value='';actionPopupDone('เพิ่มนักเรียนแล้ว ✅',name+' · '+room,'add');}
   catch(e){actionPopupError('เพิ่มไม่สำเร็จ: '+e.message);}
 }
 
@@ -3814,7 +3832,7 @@ async function delStu(id){
   const s=DB.students.find(x=>x.id===id);
   if(!confirm('ลบนักเรียน '+(s?s.name:id)+'?'))return;
   showActionPopup('กำลังลบนักเรียน',s?s.name:id,'delete');
-  try{await sbDeleteStudent(id);renderManage();setTimeout(()=>actionPopupDone('ลบนักเรียนแล้ว',s?s.name:id,'delete'),100);}
+  try{await sbDeleteStudent(id);actionPopupDone('ลบนักเรียนแล้ว',s?s.name:id,'delete');renderManage();}
   catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}
 }
 
@@ -3848,7 +3866,7 @@ async function delHW(num){
   const h=DB.homeworks.find(x=>x.num===num);
   if(!confirm('ลบงานชิ้นที่ '+num+(h?' ('+h.title+')':'')+'?'))return;
   showActionPopup('กำลังลบชิ้นงาน','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');
-  try{await sbDeleteHomework(num);renderManage();setTimeout(()=>actionPopupDone('ลบชิ้นงานแล้ว','ครั้งที่ '+num+(h?' · '+h.title:''),'delete'),100);}
+  try{await sbDeleteHomework(num);actionPopupDone('ลบชิ้นงานแล้ว','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');renderManage();}
   catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}
 }
 
@@ -3865,7 +3883,7 @@ async function clearScans(){
   } else {
     DB.submissions={};saveDB();
   }
-  setTimeout(()=>actionPopupDone('ล้างข้อมูลสำเร็จ','ข้อมูลการส่งงานถูกล้างแล้ว','warn'),100);
+  actionPopupDone('ล้างข้อมูลสำเร็จ','ข้อมูลการส่งงานถูกล้างแล้ว','warn');
 }
 
 async function clearAllStudents(){
@@ -3884,7 +3902,7 @@ async function clearAllStudents(){
   } else {
     DB.students=[];DB.submissions=[];saveDB();
   }
-  renderManage();setTimeout(()=>actionPopupDone('ลบรายชื่อนักเรียนแล้ว','ลบ '+count+' คนสำเร็จ','delete'),100);
+  renderManage();actionPopupDone('ลบรายชื่อนักเรียนแล้ว','ลบ '+count+' คนสำเร็จ','delete');
 }
 
 // ===== EXPORT =====
@@ -3970,7 +3988,7 @@ async function saveHW(){
   try{
     await sbAddHomework({num,title,subject,maxScore,deadline});
     renderManage();
-    setTimeout(()=>actionPopupDone('บันทึกงานแล้ว ✅','ครั้งที่ '+num+': '+title,'add'),100);
+    actionPopupDone('บันทึกงานแล้ว ✅','ครั้งที่ '+num+': '+title,'add');
     document.getElementById('n-hwnum').value='';
     document.getElementById('n-hwtitle').value='';
     if(document.getElementById('n-hwdeadline'))document.getElementById('n-hwdeadline').value='';
@@ -4018,7 +4036,7 @@ function renderManage(){
       ql.innerHTML = '<div style="font-size:13px;color:var(--text3);">ยังไม่มีวิชา — ไปที่แท็บ 📚 วิชา</div>';
     }
   }
-  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
+  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort();
   const filterSel=document.getElementById('filter-room-manage');
   if(filterSel){
     const cur=filterSel.value;
@@ -4055,7 +4073,7 @@ function renderManage(){
           else dlBadge=`<span class="deadline-badge dl-ok">${dl.toLocaleDateString('th-TH',{day:'numeric',month:'short'})}</span>`;
         }
         const submitted=Object.keys(DB.submissions).filter(k=>k.endsWith('_'+h.num)).length;
-        return `<div class="hw-card-item"><div class="hw-card-num">${h.num}</div><div class="hw-card-info"><div class="hw-card-title">${h.title}</div><div class="hw-card-sub">${h.subject||''} · เต็ม ${h.maxScore||100} · ส่ง ${submitted}/${DB.students.length} · ${dlBadge}</div></div><button onclick="openEditHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;margin-right:4px;white-space:nowrap;">แก้ไข</button><button onclick="delHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;">ลบ</button></div>`;
+        return `<div class="hw-card-item"><div class="hw-card-num">${h.num}</div><div class="hw-card-info"><div class="hw-card-title">${h.title}</div><div class="hw-card-sub">${h.subject||''} · เต็ม ${h.maxScore||100} · ส่ง ${submitted}/${DB.students.length} · ${dlBadge}</div>${h.fileUrl?'<div style="margin-top:4px;display:flex;align-items:center;gap:6px;"><span style="font-size:12px;">'+ getFileIcon(h.fileName)+'</span><span style="font-size:11px;color:var(--green-dark);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">'+(h.fileName||'ไฟล์แนบ')+'</span><button onclick="removeHWFile('+ h.num+')" style="padding:2px 6px;font-size:10px;border-radius:6px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบไฟล์</button></div>':''}</div><button onclick="openEditHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;margin-right:4px;white-space:nowrap;">แก้ไข</button><button onclick="delHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;">ลบ</button></div>`;
       }).join('')
     :'<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">ยังไม่มีชิ้นงาน</div>';
 }
@@ -4225,16 +4243,13 @@ async function confirmXLImport(){
     await sbImportStudents(newStudents);
     const newRooms=[...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
     if(newRooms.length){
-      DB.rooms=[...new Set([...DB.rooms,...newRooms])].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
+      DB.rooms=[...new Set([...DB.rooms,...newRooms])].sort();
       await sbSaveSettings('rooms', DB.rooms);
     }
-    // sort ห้องเรียนอัตโนมัติ
-    DB.rooms = [...new Set([...DB.rooms, ...newStudents.map(s=>s.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
-    await sbSaveSettings('rooms', DB.rooms);
     cancelXLImport();renderManage();
     if(_lastImportedStudents.length>0)document.getElementById('qr-gen-card').style.display='';
-    actionPopupDone('อัพโหลดเสร็จสิ้น! 🎉','นำเข้าสำเร็จ '+newStudents.length+' คน'+(skipped?'\nข้ามซ้ำ '+skipped+' คน':''),'upload');
-  } catch(e){actionPopupError('นำเข้าไม่สำเร็จ: '+e.message);}
+    toast('✅ นำเข้าแล้ว '+newStudents.length+' คน'+(skipped?' (ข้าม '+skipped+' ซ้ำ)':''));
+  } catch(e){toast('นำเข้าไม่สำเร็จ: '+e.message,'err');}
 }
 // ===== EXPIRY SYSTEM =====
 function getExpiryInfo(expiresAt) {
@@ -4831,7 +4846,7 @@ async function addSubjectFull() {
   renderSubjectsFull();
   renderManage();
   populateHWDropdown();
-  setTimeout(()=>actionPopupDone('เพิ่มวิชาแล้ว ✅',name,'add'),100);
+  actionPopupDone('เพิ่มวิชาแล้ว ✅',name,'add');
 }
 
 async function deleteSubjectFull(name) {
@@ -4839,9 +4854,9 @@ async function deleteSubjectFull(name) {
   showActionPopup('กำลังลบวิชา',name,'delete');
   DB.subjects = DB.subjects.filter(s => (typeof s === 'string' ? s : s.name) !== name);
   await sbSaveSettings('subjects', DB.subjects);
+  actionPopupDone('ลบวิชาแล้ว',name,'delete');
   renderSubjectsFull();
   renderManage();
-  setTimeout(()=>actionPopupDone('ลบวิชาแล้ว',name,'delete'),100);
 }
 
 async function updateSubjectScore(name, total, hwCount) {
@@ -5089,27 +5104,20 @@ function showActionPopup(title, sub, type) {
   _apTimer = setTimeout(()=>{ document.getElementById('ap-bar').style.width='70%'; }, 100);
 }
 function actionPopupDone(title, sub, type) {
-  const icons = {add:'✅', delete:'🗑️', edit:'✅', upload:'🎉', success:'✅', warn:'⚠️'};
-  const barColors = {delete:'linear-gradient(90deg,#EF4444,#DC2626)', warn:'linear-gradient(90deg,#F59E0B,#D97706)', add:'linear-gradient(90deg,var(--green),var(--green-dark))', edit:'linear-gradient(90deg,var(--blue),var(--purple))', upload:'linear-gradient(90deg,var(--green),var(--green-dark))'};
-  const btnColors = {delete:'linear-gradient(135deg,#EF4444,#DC2626)', warn:'linear-gradient(135deg,#F59E0B,#D97706)'};
-  const p = document.getElementById('action-popup');
-  if(!p) return;
-  // แสดง popup ก่อนถ้ายังไม่แสดง
-  p.style.display = 'flex';
-  // ใช้ requestAnimationFrame เพื่อให้ browser render popup ก่อน
-  requestAnimationFrame(() => {
-    document.getElementById('ap-icon').textContent = icons[type]||'✅';
-    document.getElementById('ap-title').textContent = title||'เสร็จสิ้น!';
-    document.getElementById('ap-sub').textContent = sub||'';
-    document.getElementById('ap-bar').style.width = '100%';
-    document.getElementById('ap-bar').style.background = barColors[type]||'linear-gradient(90deg,var(--green),var(--green-dark))';
-    const btn = document.getElementById('ap-btn');
-    btn.style.background = btnColors[type]||'linear-gradient(135deg,var(--green),var(--green-dark))';
-    btn.textContent = type==='delete'?'🗑️ ลบแล้ว':type==='warn'?'⚠️ รับทราบ':'✅ เรียบร้อย';
-    btn.style.display = 'block';
-    clearTimeout(_apTimer);
-    _apTimer = setTimeout(closeActionPopup, 3000);
-  });
+  const icons = {add:'✅', delete:'✅', edit:'✅', upload:'🎉', success:'✅', warn:'⚠️'};
+  const btnColors = {delete:'linear-gradient(135deg,var(--red),#DC2626)', warn:'linear-gradient(135deg,var(--yellow),#D97706)'};
+  document.getElementById('ap-icon').textContent = icons[type]||'✅';
+  document.getElementById('ap-title').textContent = title||'เสร็จสิ้น!';
+  document.getElementById('ap-sub').textContent = sub||'';
+  document.getElementById('ap-bar').style.width = '100%';
+  if(type==='delete'||type==='warn') document.getElementById('ap-bar').style.background = type==='delete'?'linear-gradient(90deg,var(--red),#DC2626)':'linear-gradient(90deg,var(--yellow),#D97706)';
+  const btn = document.getElementById('ap-btn');
+  btn.style.background = btnColors[type]||'linear-gradient(135deg,var(--green),var(--green-dark))';
+  btn.textContent = type==='delete'?'✅ ลบเสร็จสิ้น':type==='warn'?'⚠️ รับทราบ':'✅ เรียบร้อย';
+  btn.style.display = 'block';
+  // auto close after 2s
+  clearTimeout(_apTimer);
+  _apTimer = setTimeout(closeActionPopup, 2500);
 }
 function actionPopupError(msg) {
   document.getElementById('ap-icon').textContent = '❌';
@@ -5126,6 +5134,111 @@ function actionPopupError(msg) {
 function closeActionPopup() {
   clearTimeout(_apTimer);
   document.getElementById('action-popup').style.display = 'none';
+}
+
+// ===== HOMEWORK FILE UPLOAD =====
+
+async function uploadHWFile(file, hwNum) {
+  if(!SB || !file) return null;
+  const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : 'local';
+  const ext = file.name.split('.').pop();
+  const path = `hw_files/${tid}/hw_${hwNum}_${Date.now()}.${ext}`;
+  const { data, error } = await SB.storage.from('homeworks').upload(path, file, { upsert: true });
+  if(error) throw error;
+  const { data: urlData } = SB.storage.from('homeworks').getPublicUrl(path);
+  return { url: urlData.publicUrl, name: file.name };
+}
+
+async function saveHWWithFile() {
+  const num = parseInt(document.getElementById('n-hwnum').value);
+  const title = document.getElementById('n-hwtitle').value.trim();
+  const subject = document.getElementById('n-hwsubj').value;
+  const maxScore = parseInt(document.getElementById('n-hwmaxscore')?.value) || 100;
+  const deadline = document.getElementById('n-hwdeadline')?.value || '';
+  const fileInput = document.getElementById('hw-file-input');
+  const file = fileInput?.files[0];
+
+  if(!num || !title) { toast('กรอกให้ครบ','warn'); return; }
+
+  showActionPopup('กำลังบันทึกชิ้นงาน','ครั้งที่ '+num+': '+title, 'add');
+
+  let fileUrl = '';
+  let fileName = '';
+
+  // ถ้ามีไฟล์ใหม่ → อัพโหลดก่อน
+  if(file) {
+    try {
+      document.getElementById('ap-sub').textContent = 'กำลังอัพโหลดไฟล์: '+file.name;
+      const result = await uploadHWFile(file, num);
+      if(result) { fileUrl = result.url; fileName = result.name; }
+    } catch(e) {
+      actionPopupError('อัพโหลดไฟล์ไม่สำเร็จ: '+e.message);
+      return;
+    }
+  } else {
+    // ใช้ไฟล์เดิมถ้ามี
+    const existing = DB.homeworks.find(h => h.num === num);
+    if(existing) { fileUrl = existing.fileUrl||''; fileName = existing.fileName||''; }
+  }
+
+  try {
+    await sbAddHomework({num, title, subject, maxScore, deadline, fileUrl, fileName});
+    if(fileInput) fileInput.value = '';
+    updateHWFilePreview(num);
+    setTimeout(() => actionPopupDone('บันทึกงานแล้ว ✅','ครั้งที่ '+num+': '+title,'add'), 100);
+  } catch(e) {
+    actionPopupError('ไม่สำเร็จ: '+e.message);
+  }
+}
+
+async function removeHWFile(hwNum) {
+  if(!confirm('ลบไฟล์แนบของงานชิ้นที่ '+hwNum+'?')) return;
+  const h = DB.homeworks.find(x => x.num === hwNum);
+  if(!h) return;
+  h.fileUrl = ''; h.fileName = '';
+  await sbAddHomework({num:h.num,title:h.title,subject:h.subject,maxScore:h.maxScore,deadline:h.deadline,fileUrl:'',fileName:''});
+  updateHWFilePreview(hwNum);
+  toast('ลบไฟล์แนบแล้ว','warn');
+}
+
+function updateHWFilePreview(hwNum) {
+  const el = document.getElementById('hw-file-preview-'+hwNum);
+  if(!el) return;
+  const h = DB.homeworks.find(x => x.num === hwNum);
+  if(h && h.fileUrl) {
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:8px;background:var(--green-light);border:1.5px solid #86EFAC;border-radius:10px;padding:8px 12px;margin-top:8px;">
+      <span style="font-size:18px;">${getFileIcon(h.fileName)}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:var(--green-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h.fileName||'ไฟล์แนบ'}</div>
+        <div style="font-size:11px;color:var(--text2);">ไฟล์แนบสำหรับชิ้นงานนี้</div>
+      </div>
+      <button onclick="removeHWFile(${hwNum})" style="padding:4px 8px;font-size:11px;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;flex-shrink:0;">ลบ</button>
+    </div>`;
+  } else {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text3);margin-top:4px;">ยังไม่มีไฟล์แนบ</div>';
+  }
+}
+
+function getFileIcon(name) {
+  if(!name) return '📎';
+  const ext = name.split('.').pop().toLowerCase();
+  const icons = {pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',ppt:'📑',pptx:'📑',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',zip:'🗜️',rar:'🗜️'};
+  return icons[ext]||'📎';
+}
+
+
+function previewSelectedFile(input) {
+  const file = input?.files[0];
+  const label = document.getElementById('hw-file-label');
+  const preview = document.getElementById('hw-file-preview-new');
+  if(!label) return;
+  if(file) {
+    label.innerHTML = getFileIcon(file.name)+' <b>'+file.name+'</b> <span style="color:var(--text3);">('+Math.round(file.size/1024)+' KB)</span>';
+    if(preview) preview.innerHTML = '<div style="font-size:11px;color:var(--green-dark);font-weight:600;">✅ เลือกไฟล์แล้ว — จะอัพโหลดเมื่อกดบันทึก</div>';
+  } else {
+    label.innerHTML = '📂 คลิกเพื่อเลือกไฟล์ (PDF, Word, Excel, รูปภาพ)';
+    if(preview) preview.innerHTML = '';
+  }
 }
 window.addEventListener('load', () => {
   checkSetupOnLoad();
