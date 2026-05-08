@@ -1380,6 +1380,15 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
         Export Excel <span id="excel-lock-icon"></span>
       </button>
     </div>
+    <!-- AI Report Button (Premium) -->
+    <div id="ai-report-section" style="margin-bottom:12px;">
+      <button onclick="openAIReport()" id="ai-report-btn"
+        style="width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:14px;border:none;cursor:pointer;font-family:Sarabun,sans-serif;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;box-shadow:0 4px 16px rgba(124,58,237,0.3);display:flex;align-items:center;justify-content:center;gap:8px;">
+        🤖 <span>AI สรุปรายงานห้องเรียน</span>
+        <span id="ai-premium-lock" style="font-size:11px;background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:20px;">💎 Premium</span>
+      </button>
+    </div>
+
     <div class="rscroll" id="room-tabs"></div>
     <div class="srch-wrap">
       <span class="srch-icon">
@@ -2133,6 +2142,61 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   </div>
 </div>
 
+
+
+<!-- ===== AI REPORT MODAL ===== -->
+<div id="ai-report-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);align-items:flex-end;justify-content:center;padding:0;">
+  <div style="background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:700px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,0.25);">
+    <!-- Header -->
+    <div style="padding:20px 20px 14px;border-bottom:1.5px solid var(--border);flex-shrink:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#7C3AED,#4F8EF7);display:flex;align-items:center;justify-content:center;font-size:20px;">🤖</div>
+          <div>
+            <div style="font-size:17px;font-weight:800;color:var(--text);">AI สรุปรายงานห้องเรียน</div>
+            <div style="font-size:12px;color:var(--text2);">วิเคราะห์แนวโน้ม · ระบุกลุ่มเสี่ยง · ข้อเสนอแนะ</div>
+          </div>
+        </div>
+        <button onclick="closeAIReport()" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:18px;color:var(--text2);">✕</button>
+      </div>
+
+      <!-- Options -->
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:120px;">
+          <label class="lbl" style="margin-top:0;font-size:11px;">ห้องเรียน</label>
+          <select id="ai-room-sel" style="font-size:13px;padding:8px;">
+            <option value="">ทุกห้อง</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:120px;">
+          <label class="lbl" style="margin-top:0;font-size:11px;">วิชา</label>
+          <select id="ai-subj-sel" style="font-size:13px;padding:8px;">
+            <option value="">ทุกวิชา</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:120px;">
+          <label class="lbl" style="margin-top:0;font-size:11px;">ภาษาของรายงาน</label>
+          <select id="ai-lang-sel" style="font-size:13px;padding:8px;">
+            <option value="th">ภาษาไทย</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="generateAIReport()" id="ai-generate-btn"
+        style="width:100%;margin-top:12px;padding:12px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
+        ✨ สร้างรายงาน AI
+      </button>
+    </div>
+
+    <!-- Report Content -->
+    <div id="ai-report-content" style="flex:1;overflow-y:auto;padding:16px 20px 24px;">
+      <div style="text-align:center;padding:32px 16px;color:var(--text3);">
+        <div style="font-size:40px;margin-bottom:12px;">🤖</div>
+        <div style="font-size:14px;">กดปุ่ม "สร้างรายงาน AI" เพื่อวิเคราะห์ข้อมูลห้องเรียน</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ===== ACTION POPUP ===== -->
 <div id="action-popup" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.5);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
@@ -6575,6 +6639,242 @@ async function exportGradeExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'เกรด');
   XLSX.writeFile(wb, 'เกรด_'+filterSubj+'_'+filterRoom+'_'+new Date().toLocaleDateString('th-TH')+'.xlsx');
   toast('Export เกรดสำเร็จ ✅');
+}
+
+
+// ===== AI REPORT SYSTEM =====
+
+function openAIReport() {
+  if(!isPremium()) {
+    showUpgradeModal('AI สรุปรายงานห้องเรียน เฉพาะ Premium 🔒');
+    return;
+  }
+  // populate selects
+  const roomSel = document.getElementById('ai-room-sel');
+  const subjSel = document.getElementById('ai-subj-sel');
+  if(roomSel) {
+    roomSel.innerHTML = '<option value="">ทุกห้อง</option>' +
+      DB.rooms.map(r=>`<option>${r}</option>`).join('');
+  }
+  if(subjSel) {
+    subjSel.innerHTML = '<option value="">ทุกวิชา</option>' +
+      getSubjectNames().map(n=>`<option>${n}</option>`).join('');
+  }
+  // reset content
+  document.getElementById('ai-report-content').innerHTML = `
+    <div style="text-align:center;padding:32px 16px;color:var(--text3);">
+      <div style="font-size:40px;margin-bottom:12px;">🤖</div>
+      <div style="font-size:14px;">กดปุ่ม "สร้างรายงาน AI" เพื่อวิเคราะห์ข้อมูลห้องเรียน</div>
+    </div>`;
+  document.getElementById('ai-report-modal').style.display = 'flex';
+}
+
+function closeAIReport() {
+  document.getElementById('ai-report-modal').style.display = 'none';
+}
+
+function buildAIPrompt(filterRoom, filterSubj, lang) {
+  const students = DB.students.filter(s => !filterRoom || s.room === filterRoom);
+  const hws = DB.homeworks.filter(h => !filterSubj || h.subject === filterSubj);
+  const teacher = CURRENT_TEACHER;
+
+  // คำนวณสถิติแต่ละคน
+  const studentStats = students.map(s => {
+    const done = hws.filter(h => {
+      const sub = DB.submissions[s.id+'_'+h.num];
+      return sub !== undefined && sub !== null;
+    });
+    const scores = done.map(h => {
+      const sub = DB.submissions[s.id+'_'+h.num];
+      return sub?.score != null ? parseFloat(sub.score) : null;
+    }).filter(x => x !== null);
+    const avgScore = scores.length > 0 ? scores.reduce((a,b)=>a+b,0)/scores.length : null;
+    const maxScore = hws.length > 0 && done.length > 0
+      ? done.map(h => parseFloat(h.maxScore||100)).reduce((a,b)=>a+b,0)/done.length : null;
+    const submitRate = hws.length > 0 ? (done.length/hws.length*100).toFixed(0) : 0;
+    return {
+      name: s.name, id: s.id, room: s.room,
+      submitted: done.length, total: hws.length, submitRate,
+      avgScore: avgScore ? avgScore.toFixed(1) : null,
+    };
+  });
+
+  // กลุ่มเสี่ยง (ส่งงานน้อยกว่า 50%)
+  const atRisk = studentStats.filter(s => parseFloat(s.submitRate) < 50);
+  // กลุ่มดีเลิศ (ส่งงาน 100%)
+  const excellent = studentStats.filter(s => parseFloat(s.submitRate) === 100);
+  // ค่าเฉลี่ยห้อง
+  const avgSubmit = students.length > 0
+    ? (studentStats.reduce((a,s)=>a+parseFloat(s.submitRate),0)/students.length).toFixed(1) : 0;
+
+  // subject stats
+  const subjStats = getSubjectNames().filter(n => !filterSubj || n===filterSubj).map(subj => {
+    const subjHWs = hws.filter(h=>h.subject===subj);
+    if(!subjHWs.length) return null;
+    const allSubs = students.flatMap(s => subjHWs.map(h => DB.submissions[s.id+'_'+h.num])).filter(Boolean);
+    const submitCount = allSubs.length;
+    const totalPossible = students.length * subjHWs.length;
+    const rate = totalPossible > 0 ? (submitCount/totalPossible*100).toFixed(0) : 0;
+    return {subj, hwCount: subjHWs.length, submitRate: rate};
+  }).filter(Boolean);
+
+  const thPrompt = `คุณเป็นผู้เชี่ยวชาญด้านการวิเคราะห์ข้อมูลการศึกษา กรุณาวิเคราะห์ข้อมูลต่อไปนี้และสรุปเป็นรายงานภาษาไทยที่ชัดเจน เข้าใจง่าย
+
+**ข้อมูลห้องเรียน:**
+- ครูผู้สอน: ${teacher?.display_name || 'ไม่ระบุ'}
+- ห้องที่วิเคราะห์: ${filterRoom || 'ทุกห้อง'}
+- วิชา: ${filterSubj || 'ทุกวิชา'}
+- จำนวนนักเรียน: ${students.length} คน
+- จำนวนชิ้นงานทั้งหมด: ${hws.length} ชิ้น
+- อัตราการส่งงานเฉลี่ย: ${avgSubmit}%
+
+**สถิติรายวิชา:**
+${subjStats.map(s=>`- ${s.subj}: ${s.hwCount} ชิ้นงาน, ส่งงาน ${s.submitRate}%`).join('\n') || '- ไม่มีข้อมูลวิชา'}
+
+**กลุ่มเสี่ยง (ส่งงานน้อยกว่า 50%):** ${atRisk.length} คน
+${atRisk.slice(0,5).map(s=>`- ${s.name} (ห้อง ${s.room}): ส่ง ${s.submitRate}%`).join('\n') || '- ไม่มี'}
+
+**กลุ่มดีเลิศ (ส่งงาน 100%):** ${excellent.length} คน
+
+กรุณาสรุปในหัวข้อ:
+1. ภาพรวมห้องเรียน
+2. จุดแข็ง
+3. จุดที่ควรพัฒนา
+4. กลุ่มนักเรียนที่ต้องให้ความสนใจเป็นพิเศษ
+5. ข้อเสนอแนะสำหรับครู
+
+ตอบเป็นภาษาไทย กระชับ ได้ใจความ ใช้ Markdown formatting`;
+
+  const enPrompt = `You are an educational data analysis expert. Analyze the following classroom data and provide a clear, actionable report.
+
+**Classroom Data:**
+- Teacher: ${teacher?.display_name || 'Unknown'}
+- Room: ${filterRoom || 'All rooms'}
+- Subject: ${filterSubj || 'All subjects'}
+- Students: ${students.length}
+- Total assignments: ${hws.length}
+- Average submission rate: ${avgSubmit}%
+
+**At-risk students (< 50% submission):** ${atRisk.length}
+${atRisk.slice(0,5).map(s=>`- ${s.name} (Room ${s.room}): ${s.submitRate}% submitted`).join('\n') || '- None'}
+
+**Excellent students (100% submission):** ${excellent.length}
+
+Please provide analysis covering:
+1. Classroom overview
+2. Strengths
+3. Areas for improvement
+4. Students needing special attention
+5. Recommendations for the teacher
+
+Use Markdown formatting`;
+
+  return lang === 'en' ? enPrompt : thPrompt;
+}
+
+function renderMarkdown(text) {
+  return text
+    .replace(/^### (.+)$/gm, '<h3 style="font-size:15px;font-weight:800;color:var(--purple);margin:16px 0 6px;">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 style="font-size:16px;font-weight:800;color:var(--blue-dark);margin:16px 0 6px;">$2</h2>')
+    .replace(/^# (.+)$/gm, '<h1 style="font-size:18px;font-weight:800;color:var(--text);margin:16px 0 8px;">$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^- (.+)$/gm, '<li style="margin:4px 0;padding-left:4px;">$1</li>')
+    .replace(/^(\d+)\. (.+)$/gm, '<li style="margin:4px 0;">$2</li>')
+    .replace(/\n\n/g, '</p><p style="margin:8px 0;">')
+    .replace(/\n/g, '<br>');
+}
+
+async function generateAIReport() {
+  const filterRoom = document.getElementById('ai-room-sel')?.value || '';
+  const filterSubj = document.getElementById('ai-subj-sel')?.value || '';
+  const lang = document.getElementById('ai-lang-sel')?.value || 'th';
+  const btn = document.getElementById('ai-generate-btn');
+  const content = document.getElementById('ai-report-content');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ กำลังวิเคราะห์...';
+  content.innerHTML = `
+    <div style="text-align:center;padding:40px 16px;">
+      <div style="font-size:40px;margin-bottom:16px;animation:spin 1s linear infinite;">⚙️</div>
+      <div style="font-size:15px;font-weight:700;color:var(--purple);margin-bottom:8px;">AI กำลังวิเคราะห์ข้อมูล...</div>
+      <div style="font-size:13px;color:var(--text2);">อาจใช้เวลา 10-30 วินาที</div>
+    </div>
+    <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>`;
+
+  try {
+    const prompt = buildAIPrompt(filterRoom, filterSubj, lang);
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: lang==='th'
+          ? 'คุณเป็นผู้เชี่ยวชาญด้านการศึกษา ตอบเป็นภาษาไทย กระชับ ชัดเจน ใช้ Markdown'
+          : 'You are an education expert. Be concise, clear, and use Markdown formatting.',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if(!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error?.message || 'API Error '+resp.status);
+    }
+
+    const data = await resp.json();
+    const reportText = data.content?.[0]?.text || 'ไม่ได้รับข้อมูลจาก AI';
+
+    // แสดง metadata
+    const filterRoom_ = filterRoom || (lang==='th'?'ทุกห้อง':'All rooms');
+    const filterSubj_ = filterSubj || (lang==='th'?'ทุกวิชา':'All subjects');
+    const now = new Date().toLocaleString('th-TH');
+
+    content.innerHTML = `
+      <div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:1.5px solid #C4B5FD;border-radius:12px;padding:12px 14px;margin-bottom:14px;">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--purple);">
+          <span>🏫 ${filterRoom_}</span>
+          <span>📚 ${filterSubj_}</span>
+          <span>👥 ${DB.students.filter(s=>!filterRoom||s.room===filterRoom).length} คน</span>
+          <span>📝 ${DB.homeworks.filter(h=>!filterSubj||h.subject===filterSubj).length} ชิ้นงาน</span>
+          <span style="margin-left:auto;color:var(--text3);">🕐 ${now}</span>
+        </div>
+      </div>
+      <div style="font-size:14px;line-height:1.8;color:var(--text);">
+        <p style="margin:8px 0;">${renderMarkdown(reportText)}</p>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;">
+        <button onclick="copyAIReport()" style="flex:1;padding:10px;font-size:13px;font-weight:700;border-radius:10px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
+          📋 คัดลอก
+        </button>
+        <button onclick="generateAIReport()" style="flex:1;padding:10px;font-size:13px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
+          🔄 สร้างใหม่
+        </button>
+      </div>`;
+
+  } catch(e) {
+    content.innerHTML = `
+      <div style="text-align:center;padding:24px 16px;">
+        <div style="font-size:36px;margin-bottom:12px;">❌</div>
+        <div style="font-size:15px;font-weight:700;color:var(--red);margin-bottom:8px;">เกิดข้อผิดพลาด</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:16px;">${e.message}</div>
+        <div style="font-size:12px;color:var(--text3);background:var(--bg);border-radius:10px;padding:10px;text-align:left;">
+          💡 ตรวจสอบ: API Key ถูกต้องไหม? มี internet ไหม?
+        </div>
+        <button onclick="generateAIReport()" style="margin-top:12px;padding:10px 24px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
+          🔄 ลองใหม่
+        </button>
+      </div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ สร้างรายงาน AI';
+  }
+}
+
+function copyAIReport() {
+  const content = document.getElementById('ai-report-content');
+  const text = content?.innerText || '';
+  navigator.clipboard.writeText(text).then(()=>toast('คัดลอกแล้ว ✅')).catch(()=>toast('คัดลอกไม่สำเร็จ','err'));
 }
 
 window.addEventListener('load', () => {
