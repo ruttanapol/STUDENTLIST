@@ -3201,7 +3201,7 @@ async function loadSuperAdminPanel(){
   try{
     // แสดง loading
     document.getElementById('sa-pending-list').innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);">⏳ กำลังโหลด...</div>';
-    const {data,error}=await SB.from('teachers').select('id,email,username,first_name,last_name,display_name,status,created_at,expires_at,slip_url,slip_uploaded_at').order('created_at');
+    const {data,error}=await SB.from('teachers').select('id,email,username,first_name,last_name,display_name,status,created_at,expires_at,slip_url,slip_uploaded_at,plan,plan_expires_at').order('created_at');
     if(error)throw error;
     renderTeacherList(data||[]);
     loadContactSettings();
@@ -3258,10 +3258,10 @@ function renderTeacherList(teachers){
       const cardBorder = isPrem ? '1.5px solid #C4B5FD' : '1.5px solid var(--border)';
       const avatarBorder = isPrem ? '2px solid #A78BFA' : '2px solid transparent';
       const planBadge = isPrem
-        ? `<span onclick="openSetPlan('${t.id}','premium')" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:linear-gradient(135deg,#EDE9FE,#DDD6FE);color:#6D28D9;border:1px solid #C4B5FD;cursor:pointer;white-space:nowrap;">💎 Premium</span>`
-        : `<span onclick="openSetPlan('${t.id}','free')" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:#F1EFE8;color:#6B7280;border:1px solid #D1D5DB;cursor:pointer;white-space:nowrap;">🎁 Free</span>`;
+        ? `<span onclick="openSetPlan('${t.id}','premium')" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#EDE9FE,#DDD6FE);color:#6D28D9;border:1px solid #C4B5FD;cursor:pointer;white-space:nowrap;">💎 Premium</span>`
+        : `<span onclick="openSetPlan('${t.id}','free')" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#F1EFE8;color:#6B7280;border:1px solid #D1D5DB;cursor:pointer;white-space:nowrap;">🎁 Free</span>`;
       return `
-      <div style="background:#fff;border:${cardBorder};border-radius:12px;padding:12px 14px;margin-bottom:8px;${isPrem?'background:linear-gradient(135deg,#FDFCFF,#FAF5FF);':''}">
+      <div style="background:${isPrem?'linear-gradient(135deg,#FDFCFF,#FAF5FF)':'#fff'};border:${cardBorder};border-radius:12px;padding:12px 14px;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <div style="position:relative;flex-shrink:0;">
             ${t.avatar_url
@@ -3293,6 +3293,7 @@ function renderTeacherList(teachers){
             ${t.status!=='approved'?`<button onclick="approveTeacher('${t.id}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;white-space:nowrap;">✅ อนุมัติ</button>`:''}
             ${t.status!=='rejected'?`<button onclick="rejectTeacher('${t.id}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;">✕ ปฏิเสธ</button>`:''}
             <button onclick="viewTeacherData('${t.id}','${t.display_name}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;white-space:nowrap;">👁 ข้อมูล</button>
+            <button onclick="openSetExpiry('${t.id}','${t.expires_at||''}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--yellow);background:var(--yellow-light);color:#B45309;cursor:pointer;white-space:nowrap;">⏱ อายุ</button>
             <button onclick="openSetPlan('${t.id}','${t.plan||'free'}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid #C4B5FD;background:var(--purple-light);color:var(--purple);cursor:pointer;white-space:nowrap;">💎 Plan</button>
             <button onclick="deleteTeacher('${t.id}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid #FECACA;background:#FEE2E2;color:#B91C1C;cursor:pointer;white-space:nowrap;">🗑 ลบ</button>
           </div>
