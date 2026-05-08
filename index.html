@@ -2256,6 +2256,8 @@ renderDashboard();
     const key = sub.sid + '_' + sub.hwNum;
     DB.submissions[key] = {...sub, ts: ts()};
     saveDB();
+    // อัพเดต UI ทันที
+    renderDashboard();
   }
 }
 
@@ -3269,7 +3271,7 @@ let hwAutoSaveTimer=null;
 function populateScanSelects(){
   populateHWDropdown();
   const ss=document.getElementById('hw-subj-input');
-  if(ss)ss.innerHTML=DB.subjects.map(s=>`<option>${s}</option>`).join('');
+  if(ss)ss.innerHTML=getSubjectNames().map(n=>`<option>${n}</option>`).join('');
   const saved=lsGet('hw_current');
   if(saved){
     if(document.getElementById('hw-num-input'))document.getElementById('hw-num-input').value=saved.num||'';
@@ -3884,6 +3886,7 @@ function switchManageTab(tab, btn){
   if(el)el.style.display='';
   if(btn)btn.classList.add('on');
   if(tab==='subjects') renderSubjectsFull();
+  if(tab==='homework') renderManage();
 }
 
 // ===== HW SAVE (supports edit+add) =====
@@ -3920,6 +3923,13 @@ function openEditHW(num){
 // ===== RENDER MANAGE EXTENSIONS =====
 function renderManage(){
   renderSubjectsFull();
+  // populate วิชาใน form เพิ่มงาน
+  const nhSubj = document.getElementById('n-hwsubj');
+  if(nhSubj) {
+    const cur = nhSubj.value;
+    nhSubj.innerHTML = '<option value="">— เลือกวิชา —</option>' + getSubjectNames().map(n=>`<option>${n}</option>`).join('');
+    if(cur) nhSubj.value = cur;
+  }
   // quick subject list in homework tab
   const ql = document.getElementById('subj-quick-list');
   if(ql) {
@@ -4745,6 +4755,7 @@ async function addSubjectFull() {
   
   renderSubjectsFull();
   renderManage();
+  populateHWDropdown();
   toast('เพิ่มวิชา ' + name + ' แล้ว ✅');
 }
 
