@@ -2130,6 +2130,9 @@ async function reloadHomeworks() {
   if(tid) q = q.eq('teacher_id', tid);
   const {data} = await q;
   DB.homeworks = (data||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||''}));
+  // อัพเดต UI และ dropdown
+  renderManage();
+  populateHWDropdown();
 }
 
 let _currentStuId = null; // track which student is viewing
@@ -2225,6 +2228,8 @@ async function sbAddHomework(hw) {
     if(existing) { existing.title=hw.title; existing.subject=hw.subject; existing.maxScore=hw.maxScore; existing.deadline=hw.deadline||''; }
     else { DB.homeworks.push(hw); DB.homeworks.sort((a,b)=>a.num-b.num); }
     saveDB();
+    renderManage();
+    populateHWDropdown();
   }
 }
 
@@ -3326,8 +3331,15 @@ async function recordScan(sid, scoreOverride){
   if(scoreOverride!==undefined&&scoreOverride!==null&&scoreOverride!==''){
     score=parseFloat(scoreOverride);
   } else {
-    const scoreEl=document.getElementById('manual-score');
-    if(scoreEl&&scoreEl.value!==''){score=parseFloat(scoreEl.value);scoreEl.value='';}
+    // อ่านจาก scan-score-input ก่อน (UI ใหม่)
+    const scanScoreEl=document.getElementById('scan-score-input');
+    if(scanScoreEl&&scanScoreEl.value!==''){
+      score=parseFloat(scanScoreEl.value);
+    } else {
+      // fallback: manual-score เดิม
+      const scoreEl=document.getElementById('manual-score');
+      if(scoreEl&&scoreEl.value!==''){score=parseFloat(scoreEl.value);scoreEl.value='';}
+    }
   }
   const stu=DB.students.find(s=>s.id===sid);
   const key=sid+'_'+hwNum;
