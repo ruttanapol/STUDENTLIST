@@ -1762,6 +1762,19 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   </div>
 </div>
 
+
+<!-- ===== ACTION POPUP ===== -->
+<div id="action-popup" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.5);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:20px;padding:28px 24px;max-width:300px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+    <div id="ap-icon" style="font-size:48px;margin-bottom:10px;">⏳</div>
+    <div id="ap-title" style="font-size:17px;font-weight:800;color:var(--text);margin-bottom:6px;">กำลังดำเนินการ...</div>
+    <div id="ap-sub" style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6;min-height:16px;white-space:pre-line;"></div>
+    <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:16px;">
+      <div id="ap-bar" style="height:100%;border-radius:3px;width:0%;transition:width .4s ease;background:linear-gradient(90deg,var(--blue),var(--purple));"></div>
+    </div>
+    <button id="ap-btn" onclick="closeActionPopup()" style="display:none;width:100%;padding:13px;font-size:15px;font-weight:700;border-radius:12px;border:none;cursor:pointer;font-family:Sarabun,sans-serif;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;">✅ เรียบร้อย</button>
+  </div>
+</div>
 </div>
 
 <script>
@@ -3582,6 +3595,7 @@ function openEditStu(id){
 }
 function closeEditStu(){document.getElementById('edit-stu-modal').style.display='none';}
 async function saveEditStu(){
+  showActionPopup('กำลังบันทึกข้อมูล','แก้ไขข้อมูลนักเรียน','edit');
   const oldId=document.getElementById('edit-stu-old-id').value;
   const newId=document.getElementById('edit-stu-id').value.trim();
   const newName=document.getElementById('edit-stu-name').value.trim();
@@ -3735,13 +3749,17 @@ async function addRoom(){
   const n=document.getElementById('n-room').value.trim();
   if(!n){toast('กรอกชื่อห้อง','warn');return;}
   if(DB.rooms.includes(n)){toast('ห้องนี้มีอยู่แล้ว','warn');return;}
+  showActionPopup('กำลังเพิ่มห้อง '+n,'','add');
   DB.rooms=[...DB.rooms,n].sort();
   await sbSaveSettings('rooms',DB.rooms);
-  renderManage();toast('เพิ่มห้อง '+n+' แล้ว');
+  renderManage();actionPopupDone('เพิ่มห้อง '+n+' แล้ว','','add');
+  document.getElementById('n-room').value='';
+  //toast('เพิ่มห้อง '+n+' แล้ว');
   document.getElementById('n-room').value='';
 }
 
 async function delRoom(n){
+  showActionPopup('กำลังลบห้อง',n,'delete');
   const stuInRoom=DB.students.filter(s=>s.room===n).length;
   const msg = stuInRoom>0
     ? 'ลบห้อง "'+n+'" และนักเรียน '+stuInRoom+' คนในห้องนี้?\n(ข้อมูลการส่งงานของนักเรียนในห้องนี้จะถูกลบด้วย)'
@@ -3784,14 +3802,17 @@ async function addStudent(){
   const room=document.getElementById('ns-room').value;
   if(!id||!name){toast('กรอกให้ครบ','warn');return;}
   if(DB.students.find(s=>s.id===id)){toast('รหัสนี้มีแล้ว','warn');return;}
-  try{await sbAddStudent({id,name,room});renderManage();toast('เพิ่ม '+name+' แล้ว ✅');document.getElementById('ns-id').value='';document.getElementById('ns-name').value='';}
-  catch(e){toast('เพิ่มไม่สำเร็จ: '+e.message,'err');}
+  showActionPopup('กำลังเพิ่มนักเรียน','รหัส '+id+' · '+name,'add');
+  try{await sbAddStudent({id,name,room});renderManage();document.getElementById('ns-id').value='';document.getElementById('ns-name').value='';actionPopupDone('เพิ่มนักเรียนแล้ว ✅',name+' · '+room,'add');}
+  catch(e){actionPopupError('เพิ่มไม่สำเร็จ: '+e.message);}
 }
 
 async function delStu(id){
-  if(!confirm('ลบนักเรียน '+id+'?'))return;
-  try{await sbDeleteStudent(id);renderManage();}
-  catch(e){toast('ลบไม่สำเร็จ: '+e.message,'err');}
+  const s=DB.students.find(x=>x.id===id);
+  if(!confirm('ลบนักเรียน '+(s?s.name:id)+'?'))return;
+  showActionPopup('กำลังลบนักเรียน',s?s.name:id,'delete');
+  try{await sbDeleteStudent(id);renderManage();actionPopupDone('ลบนักเรียนแล้ว',s?s.name:id,'delete');}
+  catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}
 }
 
 async function addSubject(){
@@ -3821,12 +3842,16 @@ async function addHW(){
 }
 
 async function delHW(num){
-  try{await sbDeleteHomework(num);renderManage();}
-  catch(e){toast('ลบไม่สำเร็จ: '+e.message,'err');}
+  const h=DB.homeworks.find(x=>x.num===num);
+  if(!confirm('ลบงานชิ้นที่ '+num+(h?' ('+h.title+')':'')+'?'))return;
+  showActionPopup('กำลังลบชิ้นงาน','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');
+  try{await sbDeleteHomework(num);renderManage();actionPopupDone('ลบชิ้นงานแล้ว','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');}
+  catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}
 }
 
 async function clearScans(){
   if(!confirm('ล้างข้อมูลการส่งงานทั้งหมด?'))return;
+  showActionPopup('กำลังล้างข้อมูล','ข้อมูลการส่งงานทั้งหมด','delete');
   if(USE_SUPABASE){
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
     let delQ = SB.from('submissions').delete();
@@ -3837,7 +3862,7 @@ async function clearScans(){
   } else {
     DB.submissions={};saveDB();
   }
-  toast('ล้างข้อมูลแล้ว','warn');
+  actionPopupDone('ล้างข้อมูลสำเร็จ','ข้อมูลการส่งงานถูกล้างแล้ว','warn');
 }
 
 async function clearAllStudents(){
@@ -3856,7 +3881,7 @@ async function clearAllStudents(){
   } else {
     DB.students=[];DB.submissions=[];saveDB();
   }
-  renderManage();toast(`ลบรายชื่อนักเรียน ${count} คนแล้ว`,'warn');
+  renderManage();actionPopupDone('ลบรายชื่อนักเรียนแล้ว','ลบ '+count+' คนสำเร็จ','delete');
 }
 
 // ===== EXPORT =====
@@ -3938,10 +3963,11 @@ async function saveHW(){
   const maxScore=parseInt(document.getElementById('n-hwmaxscore').value)||100;
   const deadline=document.getElementById('n-hwdeadline')?document.getElementById('n-hwdeadline').value:'';
   if(!num||!title){toast('กรอกให้ครบ','warn');return;}
+  showActionPopup('กำลังบันทึกชิ้นงาน','ครั้งที่ '+num+': '+title,'add');
   try{
     await sbAddHomework({num,title,subject,maxScore,deadline});
     renderManage();
-    toast('บันทึกงานชิ้นที่ '+num+' แล้ว');
+    actionPopupDone('บันทึกงานแล้ว ✅','ครั้งที่ '+num+': '+title,'add');
     document.getElementById('n-hwnum').value='';
     document.getElementById('n-hwtitle').value='';
     if(document.getElementById('n-hwdeadline'))document.getElementById('n-hwdeadline').value='';
@@ -4191,6 +4217,7 @@ async function confirmXLImport(){
   _lastImportedStudents=[...xlImportData];
   const newStudents=xlImportData.filter(s=>!DB.students.find(x=>x.id===s.id)).map(s=>({...s,room:s.room||DB.rooms[0]||''}));
   const skipped=xlImportData.length-newStudents.length;
+  showActionPopup('กำลังอัพโหลด...','กำลังบันทึกรายชื่อ '+newStudents.length+' คน...','upload');
   try {
     await sbImportStudents(newStudents);
     const newRooms=[...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
@@ -4786,6 +4813,7 @@ async function addSubjectFull() {
     DB.subjects = DB.subjects.map(s => ({name:s, total:100, hwCount:10}));
   }
   
+  showActionPopup('กำลังเพิ่มวิชา',name,'add');
   DB.subjects.push(subjObj);
   await sbSaveSettings('subjects', DB.subjects);
 
@@ -4797,16 +4825,17 @@ async function addSubjectFull() {
   renderSubjectsFull();
   renderManage();
   populateHWDropdown();
-  toast('เพิ่มวิชา ' + name + ' แล้ว ✅');
+  actionPopupDone('เพิ่มวิชาแล้ว ✅',name,'add');
 }
 
 async function deleteSubjectFull(name) {
   if(!confirm('ลบวิชา "' + name + '"?')) return;
+  showActionPopup('กำลังลบวิชา',name,'delete');
   DB.subjects = DB.subjects.filter(s => (typeof s === 'string' ? s : s.name) !== name);
   await sbSaveSettings('subjects', DB.subjects);
   renderSubjectsFull();
   renderManage();
-  toast('ลบวิชา ' + name + ' แล้ว','warn');
+  actionPopupDone('ลบวิชาแล้ว',name,'delete');
 }
 
 async function updateSubjectScore(name, total, hwCount) {
@@ -4818,7 +4847,7 @@ async function updateSubjectScore(name, total, hwCount) {
   }
   await sbSaveSettings('subjects', DB.subjects);
   renderSubjectsFull();
-  toast('อัพเดต ' + name + ' แล้ว ✅');
+  actionPopupDone('อัพเดต ' + name + ' แล้ว ✅','','edit');
 }
 
 function renderSubjectsFull() {
@@ -5034,6 +5063,57 @@ function closeRoomModal() {
   document.getElementById('room-stu-modal').style.display = 'none';
 }
 
+
+// ===== ACTION POPUP =====
+let _apTimer = null;
+function showActionPopup(title, sub, type) {
+  // type: 'loading' | 'add' | 'delete' | 'edit' | 'upload'
+  const icons = {loading:'⏳', add:'💾', delete:'🗑️', edit:'✏️', upload:'📤', success:'✅', error:'❌', warn:'⚠️'};
+  const colors = {add:'linear-gradient(90deg,var(--green),var(--green-dark))', delete:'linear-gradient(90deg,var(--red),#DC2626)', edit:'linear-gradient(90deg,var(--blue),var(--purple))', upload:'linear-gradient(90deg,var(--blue),var(--purple))', loading:'linear-gradient(90deg,var(--blue),var(--purple))'};
+  document.getElementById('ap-icon').textContent = icons[type]||'⏳';
+  document.getElementById('ap-title').textContent = title||'กำลังดำเนินการ...';
+  document.getElementById('ap-sub').textContent = sub||'';
+  document.getElementById('ap-bar').style.width = '0%';
+  document.getElementById('ap-bar').style.background = colors[type]||colors.loading;
+  document.getElementById('ap-btn').style.display = 'none';
+  document.getElementById('ap-btn').style.background = 'linear-gradient(135deg,var(--green),var(--green-dark))';
+  document.getElementById('ap-btn').textContent = '✅ เรียบร้อย';
+  document.getElementById('action-popup').style.display = 'flex';
+  clearTimeout(_apTimer);
+  _apTimer = setTimeout(()=>{ document.getElementById('ap-bar').style.width='70%'; }, 100);
+}
+function actionPopupDone(title, sub, type) {
+  const icons = {add:'✅', delete:'🗑️', edit:'✅', upload:'🎉', success:'✅', warn:'⚠️'};
+  const btnColors = {delete:'linear-gradient(135deg,var(--red),#DC2626)', warn:'linear-gradient(135deg,var(--yellow),#D97706)'};
+  document.getElementById('ap-icon').textContent = icons[type]||'✅';
+  document.getElementById('ap-title').textContent = title||'เสร็จสิ้น!';
+  document.getElementById('ap-sub').textContent = sub||'';
+  document.getElementById('ap-bar').style.width = '100%';
+  if(type==='delete'||type==='warn') document.getElementById('ap-bar').style.background = type==='delete'?'linear-gradient(90deg,var(--red),#DC2626)':'linear-gradient(90deg,var(--yellow),#D97706)';
+  const btn = document.getElementById('ap-btn');
+  btn.style.background = btnColors[type]||'linear-gradient(135deg,var(--green),var(--green-dark))';
+  btn.textContent = type==='delete'?'🗑️ ลบแล้ว':type==='warn'?'⚠️ รับทราบ':'✅ เรียบร้อย';
+  btn.style.display = 'block';
+  // auto close after 2s
+  clearTimeout(_apTimer);
+  _apTimer = setTimeout(closeActionPopup, 2000);
+}
+function actionPopupError(msg) {
+  document.getElementById('ap-icon').textContent = '❌';
+  document.getElementById('ap-title').textContent = 'เกิดข้อผิดพลาด';
+  document.getElementById('ap-sub').textContent = msg||'';
+  document.getElementById('ap-bar').style.width = '100%';
+  document.getElementById('ap-bar').style.background = 'var(--red)';
+  const btn = document.getElementById('ap-btn');
+  btn.style.display = 'block';
+  btn.style.background = 'linear-gradient(135deg,var(--red),#DC2626)';
+  btn.textContent = '✕ ปิด';
+  clearTimeout(_apTimer);
+}
+function closeActionPopup() {
+  clearTimeout(_apTimer);
+  document.getElementById('action-popup').style.display = 'none';
+}
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
