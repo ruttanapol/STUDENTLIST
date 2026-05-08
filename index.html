@@ -3344,7 +3344,7 @@ async function recordScan(sid, scoreOverride){
   if(scoreOverride!==undefined&&scoreOverride!==null&&scoreOverride!==''){
     score=parseFloat(scoreOverride);
   } else {
-    // อ่านจาก scan-score-input ก่อน (UI ใหม่)
+    // อ่านจาก scan-score-input ก่อน
     const scanScoreEl=document.getElementById('scan-score-input');
     if(scanScoreEl&&scanScoreEl.value!==''){
       score=parseFloat(scanScoreEl.value);
@@ -3354,6 +3354,8 @@ async function recordScan(sid, scoreOverride){
       if(scoreEl&&scoreEl.value!==''){score=parseFloat(scoreEl.value);scoreEl.value='';}
     }
   }
+  // ถ้าไม่ระบุคะแนน → ใช้คะแนนเต็มของชิ้นงาน
+  if(score===null||isNaN(score)){score=maxScore;}
   const stu=DB.students.find(s=>s.id===sid);
   const key=sid+'_'+hwNum;
   const log=document.getElementById('scan-log');
