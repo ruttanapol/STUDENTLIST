@@ -1105,35 +1105,6 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       </div>
     </div>
   
-    <!-- Plan Type + Test ID Info Card -->
-<div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#F5F3FF,#EDE9FE);">
-  <div class="card-title" style="color:var(--purple);">💎 ประเภทแผน (Plan Type)</div>
-  <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6;">
-    กำหนดว่าแต่ละครูใช้แผนประเภทใด — ระบบจะล็อกหรือปลดล็อก feature ตามนั้น
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-    <div style="background:#fff;border-radius:10px;padding:10px 12px;border:1.5px solid var(--border);">
-      <div style="font-size:13px;font-weight:700;color:var(--text2);">🆓 ฟรี (free)</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:3px;line-height:1.5;">สูงสุด 5 ห้อง · 9 ชิ้นงาน · PDF เท่านั้น</div>
-    </div>
-    <div style="background:var(--purple-light);border-radius:10px;padding:10px 12px;border:1.5px solid #C4B5FD;">
-      <div style="font-size:13px;font-weight:700;color:var(--purple);">💎 Premium ครู</div>
-      <div style="font-size:11px;color:var(--purple);opacity:.7;margin-top:3px;line-height:1.5;">ไม่จำกัด · AI · Excel · PDF ผู้ปกครอง</div>
-    </div>
-  </div>
-  <div style="font-size:12px;color:var(--text2);">👉 กดปุ่ม <b>💎 Plan</b> ในรายชื่อครูด้านบนเพื่อเปลี่ยนแผน</div>
-</div>
-
-<!-- Test ID Card -->
-<div class="card" style="border-color:#86EFAC;background:linear-gradient(135deg,#F0FDF4,#DCFCE7);">
-  <div class="card-title" style="color:var(--green-dark);">🧪 ไอดีทดสอบระบบ (Test IDs)</div>
-  <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6;">
-    ไอดีที่ตั้งเป็น Test จะ <b>ข้ามระบบ Maintenance</b> และยังใช้งานได้ปกติ — เหมาะสำหรับทดสอบระบบขณะปรับปรุง
-  </div>
-  <div id="test-id-list" style="margin-bottom:8px;"></div>
-  <button onclick="loadTestIds()" style="padding:9px 16px;font-size:13px;font-weight:700;border-radius:10px;border:1.5px solid var(--green);background:#fff;color:var(--green-dark);cursor:pointer;font-family:Sarabun,sans-serif;">🔄 โหลดรายชื่อ Test IDs</button>
-</div>
-
     <!-- Change Super Admin Password -->
     <div class="card" style="border-color:#FECACA;background:linear-gradient(135deg,#FFF5F5,#FEE2E2);">
       <div class="card-title" style="color:#B91C1C;">🔐 เปลี่ยนรหัส Super Admin</div>
@@ -1835,38 +1806,6 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   </div>
 </div>
 
-<!-- ===== PLAN TYPE MODAL ===== -->
-<div id="plan-type-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)closePlanTypeModal()">
-  <div style="background:#fff;border-radius:20px;padding:24px 20px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
-    <input type="hidden" id="plan-type-tid">
-    <div style="text-align:center;margin-bottom:16px;">
-      <div style="font-size:36px;margin-bottom:8px;">💎</div>
-      <div style="font-size:18px;font-weight:800;color:var(--text);">กำหนด Plan Type</div>
-      <div style="font-size:13px;color:var(--text2);margin-top:4px;" id="plan-type-name">—</div>
-    </div>
-    <div style="display:grid;gap:8px;margin-bottom:16px;">
-      <label id="plan-opt-free" onclick="selectPlanTypeOpt('free',this)" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;border:2px solid var(--border);cursor:pointer;background:#fff;transition:all .15s;">
-        <input type="radio" name="plan-type-opt" value="free" style="accent-color:var(--blue);width:16px;height:16px;">
-        <div>
-          <div style="font-size:14px;font-weight:700;color:var(--text);">🆓 ฟรี (Free)</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:2px;">5 ห้อง · 9 ชิ้นงาน · PDF เท่านั้น</div>
-        </div>
-      </label>
-      <label id="plan-opt-premium" onclick="selectPlanTypeOpt('premium',this)" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;border:2px solid var(--border);cursor:pointer;background:#fff;transition:all .15s;">
-        <input type="radio" name="plan-type-opt" value="premium" style="accent-color:var(--purple);width:16px;height:16px;">
-        <div>
-          <div style="font-size:14px;font-weight:700;color:var(--purple);">💎 Premium ครู</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:2px;">ไม่จำกัด · AI · Excel · PDF ผู้ปกครอง</div>
-        </div>
-      </label>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="closePlanTypeModal()" style="flex:1;padding:12px;font-size:14px;font-weight:600;border-radius:12px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:Sarabun,sans-serif;color:var(--text2);">ยกเลิก</button>
-      <button onclick="savePlanType()" style="flex:2;padding:12px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--purple),#5B21B6);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">💾 บันทึก Plan</button>
-    </div>
-  </div>
-</div>
-
 <!-- ===== MAINTENANCE MODE ===== -->
 <div id="maintenance-overlay" class="maintenance-overlay" style="display:none;">
   <div class="maintenance-box">
@@ -2100,7 +2039,6 @@ async function tryRestoreSession(){
     CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,
       username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||''};
     await loadFromSupabase();
-    await loadCurrentTeacherPlan();
     setTimeout(()=>setupRealtime(),500);
     document.getElementById('teacher-topbar-name').textContent=teacher.display_name;if(teacher.avatar_url) updateTopbarAvatar(teacher.avatar_url);
     document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
@@ -2544,10 +2482,19 @@ async function sbSaveSettings(key, value) {
 async function sbImportStudents(students) {
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
-    const rows = students.map(s => ({id:s.id,name:s.name,room:s.room,teacher_id:tid}));
-    // insert only new ones for this teacher
-    for(const row of rows){
-      await SB.from('students').upsert(row, {onConflict:'id', ignoreDuplicates:true});
+    const rows = students.map(s => ({id:s.id, name:s.name, room:s.room, teacher_id:tid}));
+    // batch upsert ทั้งหมดในครั้งเดียว — เร็วกว่า loop มาก
+    const CHUNK = 50; // Supabase รองรับ ~500 rows/call แต่ 50 ปลอดภัยและแสดง progress ได้
+    for(let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      const {error} = await SB.from('students').upsert(chunk, {onConflict:'id,teacher_id', ignoreDuplicates:true});
+      if(error) throw error;
+      // อัพเดต progress bar
+      const pct = Math.round(Math.min((i + CHUNK) / rows.length * 100, 100));
+      const bar = document.getElementById('ap-bar');
+      const sub = document.getElementById('ap-sub');
+      if(bar) bar.style.width = pct + '%';
+      if(sub) sub.textContent = 'บันทึกแล้ว ' + Math.min(i + CHUNK, rows.length) + ' / ' + rows.length + ' คน...';
     }
     await reloadStudents();
   } else {
@@ -2715,7 +2662,6 @@ if(teacher.expires_at && new Date(teacher.expires_at) < new Date()){
     // เข้าสู่ระบบสำเร็จ
     CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||''};
     await loadFromSupabase();
-    await loadCurrentTeacherPlan();
     setTimeout(()=>setupRealtime(),500);
     document.getElementById('teacher-topbar-name').textContent=teacher.display_name;if(teacher.avatar_url) updateTopbarAvatar(teacher.avatar_url);
     document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
@@ -3178,7 +3124,6 @@ function renderTeacherList(teachers){
             ${t.first_name||''} ${t.last_name||''} · สมัคร: ${new Date(t.created_at).toLocaleDateString('th-TH')}
           </div>
           ${renderExpireBadge(t.expires_at)}
-          ${renderPlanBadge(t.plan_type, t.is_test_id)}
           ${t.slip_url?`
             <div style="margin-top:8px;">
               <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">💳 สลิป</div>
@@ -3190,8 +3135,6 @@ function renderTeacherList(teachers){
             ${t.status!=='rejected'?`<button onclick="rejectTeacher('${t.id}')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;">❌ ปฏิเสธ</button>`:''}
             <button onclick="viewTeacherData('${t.id}','${t.display_name}')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;">👁 ข้อมูล</button>
             <button onclick="openSetExpiry('${t.id}','${t.expires_at||''}')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--yellow);background:var(--yellow-light);color:#B45309;cursor:pointer;">⏱ อายุ</button>
-            <button onclick="openSetPlanType('${t.id}','${t.plan_type||'free'}')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid #C4B5FD;background:var(--purple-light);color:var(--purple);cursor:pointer;">💎 Plan</button>
-            <button onclick="toggleTestId('${t.id}',${t.is_test_id?true:false})" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid ${t.is_test_id?'var(--green)':'var(--border)'};background:${t.is_test_id?'var(--green-light)':'#fff'};color:${t.is_test_id?'var(--green-dark)':'var(--text3)'};cursor:pointer;">${t.is_test_id?'🧪 TEST':'🧪 Test ID'}</button>
             <button onclick="deleteTeacher('${t.id}')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid #FECACA;background:#FEE2E2;color:#B91C1C;cursor:pointer;">🗑 ลบ</button>
           </div>
         </div>
@@ -3278,135 +3221,6 @@ async function confirmApproveTeacher() {
   closeApproveModal();
   toast2('✅ อนุมัติแล้ว · ใช้งานได้ '+days+' วัน');
   loadSuperAdminPanel();
-}
-
-// ===== PLAN TYPE =====
-function renderPlanBadge(planType, isTestId) {
-  let badge = '';
-  if(planType === 'premium') {
-    badge += '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--purple-light);color:var(--purple);margin-top:4px;margin-right:4px;">💎 Premium</span>';
-  } else {
-    badge += '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--bg);color:var(--text3);margin-top:4px;margin-right:4px;">🆓 Free</span>';
-  }
-  if(isTestId) {
-    badge += '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--green-light);color:var(--green-dark);margin-top:4px;">🧪 Test ID</span>';
-  }
-  return badge;
-}
-
-function openSetPlanType(tid, currentPlan) {
-  document.getElementById('plan-type-tid').value = tid;
-  const t = (_cachedTeachers||[]).find(x => x.id === tid);
-  document.getElementById('plan-type-name').textContent = t ? t.display_name : tid;
-  const radios = document.querySelectorAll('input[name="plan-type-opt"]');
-  radios.forEach(r => r.checked = r.value === (currentPlan || 'free'));
-  selectPlanTypeOpt(currentPlan || 'free');
-  document.getElementById('plan-type-modal').style.display = 'flex';
-}
-
-function selectPlanTypeOpt(val) {
-  document.querySelectorAll('#plan-type-modal label').forEach(l => {
-    l.style.borderColor = 'var(--border)';
-    l.style.background = '#fff';
-  });
-  const opt = document.getElementById('plan-opt-'+val);
-  if(opt) {
-    opt.style.borderColor = val === 'premium' ? 'var(--purple)' : 'var(--blue)';
-    opt.style.background = val === 'premium' ? 'var(--purple-light)' : 'var(--blue-light)';
-    const radio = opt.querySelector('input[type=radio]');
-    if(radio) radio.checked = true;
-  }
-}
-
-function closePlanTypeModal() {
-  document.getElementById('plan-type-modal').style.display = 'none';
-}
-
-async function savePlanType() {
-  const tid = document.getElementById('plan-type-tid').value;
-  const checked = document.querySelector('input[name="plan-type-opt"]:checked');
-  const planType = checked ? checked.value : 'free';
-  const {error} = await SB.from('teachers').update({plan_type: planType}).eq('id', tid);
-  if(error) { toast2('ไม่สำเร็จ: '+error.message,'err'); return; }
-  closePlanTypeModal();
-  toast2('✅ เปลี่ยน Plan เป็น '+(planType==='premium'?'Premium 💎':'Free 🆓')+' แล้ว');
-  loadSuperAdminPanel();
-}
-
-// ===== TEST ID =====
-async function toggleTestId(tid, currentVal) {
-  const newVal = !currentVal;
-  const label = newVal ? 'ตั้งเป็น Test ID?\n(ไอดีนี้จะข้ามระบบปิดปรับปรุง)' : 'ยกเลิก Test ID สำหรับไอดีนี้?';
-  if(!confirm(label)) return;
-  const {error} = await SB.from('teachers').update({is_test_id: newVal}).eq('id', tid);
-  if(error) { toast2('ไม่สำเร็จ: '+error.message,'err'); return; }
-  toast2(newVal ? '🧪 ตั้งเป็น Test ID แล้ว' : 'ยกเลิก Test ID แล้ว', newVal ? 'ok' : 'warn');
-  loadSuperAdminPanel();
-  loadTestIds();
-}
-
-async function loadTestIds() {
-  if(!USE_SUPABASE||!SB) return;
-  const {data} = await SB.from('teachers').select('id,display_name,email,plan_type').eq('is_test_id', true);
-  const el = document.getElementById('test-id-list');
-  if(!el) return;
-  if(!data||!data.length) {
-    el.innerHTML = '<div style="font-size:13px;color:var(--text3);padding:8px 0;">ยังไม่มี Test ID — กดปุ่ม 🧪 Test ID ในรายชื่อครูด้านบน</div>';
-    return;
-  }
-  el.innerHTML = data.map(t => `
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border-radius:10px;border:1.5px solid #86EFAC;margin-bottom:6px;">
-      <span style="font-size:18px;">🧪</span>
-      <div style="flex:1;">
-        <div style="font-size:13px;font-weight:700;color:var(--text);">${t.display_name}</div>
-        <div style="font-size:11px;color:var(--text2);">${t.email||'-'} · ${t.plan_type==='premium'?'💎 Premium':'🆓 Free'}</div>
-      </div>
-      <button onclick="toggleTestId('${t.id}',true)" style="padding:4px 10px;font-size:11px;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;font-family:Sarabun,sans-serif;">ลบออก</button>
-    </div>`).join('');
-}
-
-// ===== PLAN LIMITS (สำหรับ teacher session) =====
-let CURRENT_PLAN = 'free';
-
-async function loadCurrentTeacherPlan() {
-  if(!USE_SUPABASE||!SB||!CURRENT_TEACHER) return;
-  try {
-    const {data} = await SB.from('teachers').select('plan_type,is_test_id').eq('id',CURRENT_TEACHER.id).single();
-    if(data) {
-      CURRENT_PLAN = data.plan_type || 'free';
-      CURRENT_TEACHER.is_test_id = data.is_test_id || false;
-      CURRENT_TEACHER.plan_type = CURRENT_PLAN;
-    }
-  } catch(e) {}
-}
-
-function isPremium() {
-  return CURRENT_PLAN === 'premium';
-}
-
-function checkRoomLimit(newRoomName) {
-  if(isPremium()) return true;
-  const rooms = [...new Set(DB.students.map(s => s.room))];
-  if(!rooms.includes(newRoomName) && rooms.length >= 5) {
-    toast('⚠️ แผนฟรีสร้างได้สูงสุด 5 ห้อง — ติดต่อแอดมินเพื่ออัพเกรด Premium','warn');
-    return false;
-  }
-  return true;
-}
-
-function checkHomeworkLimit() {
-  if(isPremium()) return true;
-  if(DB.homeworks.length >= 9) {
-    toast('⚠️ แผนฟรีสร้างได้สูงสุด 9 ชิ้นงาน — ติดต่อแอดมินเพื่ออัพเกรด Premium','warn');
-    return false;
-  }
-  return true;
-}
-
-function checkExcelExport() {
-  if(isPremium()) return true;
-  toast('⚠️ Export Excel ใช้ได้เฉพาะ Premium — ติดต่อแอดมินเพื่ออัพเกรด','warn');
-  return false;
 }
 
 function closeApproveModal() {
@@ -4236,7 +4050,6 @@ async function addStudent(){
   const room=document.getElementById('ns-room').value;
   if(!id||!name){toast('กรอกให้ครบ','warn');return;}
   if(DB.students.find(s=>s.id===id)){toast('รหัสนี้มีแล้ว','warn');return;}
-  if(!checkRoomLimit(room)) return;
   showActionPopup('กำลังเพิ่มนักเรียน','รหัส '+id+' · '+name,'add');
   try{await sbAddStudent({id,name,room});renderManage();document.getElementById('ns-id').value='';document.getElementById('ns-name').value='';actionPopupDone('เพิ่มนักเรียนแล้ว ✅',name+' · '+room,'add');}
   catch(e){actionPopupError('เพิ่มไม่สำเร็จ: '+e.message);}
@@ -4322,7 +4135,6 @@ async function clearAllStudents(){
 // ===== EXPORT =====
 let exportType='pdf',exportRoomSel=new Set(),exportHWSel=new Set();
 function openExportModal(type){
-  if(type === 'excel' && !checkExcelExport()) return;
   exportType=type;
   document.getElementById('export-modal-title').textContent=type==='pdf'?'📄 Export PDF':'📊 Export Excel';
   document.getElementById('export-go-label').textContent=type==='pdf'?'ดาวน์โหลด PDF':'ดาวน์โหลด Excel';
@@ -4653,7 +4465,7 @@ async function confirmXLImport(){
   _lastImportedStudents=[...xlImportData];
   const newStudents=xlImportData.filter(s=>!DB.students.find(x=>x.id===s.id)).map(s=>({...s,room:s.room||DB.rooms[0]||''}));
   const skipped=xlImportData.length-newStudents.length;
-  showActionPopup('กำลังอัพโหลด...','กำลังบันทึกรายชื่อ '+newStudents.length+' คน...','upload');
+  showActionPopup('กำลังอัพโหลด...','เตรียมบันทึกรายชื่อ '+newStudents.length+' คน...','upload');
   try {
     await sbImportStudents(newStudents);
     const newRooms=[...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
@@ -5056,11 +4868,7 @@ async function checkMaintenanceMode() {
     const {data} = await SB.from('settings').select('value').eq('key','maintenance_mode').maybeSingle();
     const isOn = data && data.value && data.value.enabled === true;
     if(isOn) {
-      // ถ้าเป็น Test ID ข้ามได้เลย
-      const isTestId = CURRENT_TEACHER && CURRENT_TEACHER.is_test_id;
-      if(!isTestId) {
-        showMaintenancePage(data.value);
-      }
+      showMaintenancePage(data.value);
     }
   } catch(e) {}
 }
@@ -5594,10 +5402,6 @@ async function saveHWWithFile() {
   const file = fileInput?.files[0];
 
   if(!num || !title) { toast('กรอกให้ครบ','warn'); return; }
-
-  // เช็ค limit เฉพาะชิ้นงานใหม่ (ไม่ใช่แก้ไขของเดิม)
-  const isNew = !DB.homeworks.find(h => h.num === num);
-  if(isNew && !checkHomeworkLimit()) return;
 
   showActionPopup('กำลังบันทึกชิ้นงาน','ครั้งที่ '+num+': '+title, 'add');
 
