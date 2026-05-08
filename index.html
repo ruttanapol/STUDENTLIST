@@ -3295,7 +3295,7 @@ function populateScanSelects(){
   updateConflictWarn();
 }
 
-function onHWFieldChange(){
+async function onHWFieldChange(){
   const badge=document.getElementById('hw-save-badge');
   if(badge)badge.style.display='none';
   clearTimeout(hwAutoSaveTimer);
