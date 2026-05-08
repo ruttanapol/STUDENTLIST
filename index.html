@@ -786,8 +786,25 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
           </div>
           <div>
             <div class="panel-title">สมัครบัญชีครู</div>
-            <div class="panel-desc">รอแอดมินอนุมัติก่อนใช้งาน</div>
+            <div class="panel-desc">สมัครฟรี · จ่ายเมื่อพร้อมใช้งาน</div>
           </div>
+        </div>
+        <!-- Pricing Preview -->
+        <div id="reg-pricing-box" style="background:linear-gradient(135deg,#EBF2FF,#EDE9FE);border:1.5px solid #C4B5FD;border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+          <div style="text-align:center;margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:800;color:var(--purple);text-transform:uppercase;letter-spacing:1px;">แผนบริการ</div>
+          </div>
+          <div id="reg-plans-display" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1.5px solid var(--border);">
+              <div style="font-size:18px;font-weight:800;color:var(--text);" id="plan-price-display">฿—</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px;" id="plan-period-display">กำลังโหลด...</div>
+            </div>
+            <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1.5px solid var(--border);">
+              <div style="font-size:18px;">🎓</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px;">ใช้ได้ไม่จำกัดนักเรียน</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--text2);text-align:center;line-height:1.7;" id="reg-features-list">✅ สแกน QR/Barcode &nbsp;·&nbsp; ✅ ส่งออก Excel/PDF<br>✅ จัดการหลายห้อง &nbsp;·&nbsp; ✅ ไฟล์แนบชิ้นงาน</div>
         </div>
         <div style="display:flex;gap:8px;">
           <div style="flex:1;">
@@ -1050,6 +1067,24 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   <input type="text" id="pay-amount" placeholder="เช่น ฿299/ปี">
   <button onclick="savePaymentInfo()" style="width:100%;padding:12px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;margin-top:10px;font-family:Sarabun,sans-serif;">💾 บันทึกข้อมูลการชำระเงิน</button>
 </div>
+    <!-- Plan Settings -->
+    <div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#F5F3FF,#EDE9FE);">
+      <div class="card-title" style="color:var(--purple);">🗓 จัดการแผนบริการ (Plans)</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">กำหนดราคาและระยะเวลาแต่ละแผน — จะแสดงให้ครูเห็นตอนสมัคร</div>
+      <div id="plans-list"></div>
+      <div style="border-top:1.5px solid var(--border);padding-top:12px;margin-top:12px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">➕ เพิ่มแผน</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <input type="text" id="plan-name-input" placeholder="ชื่อแผน เช่น รายปี" style="flex:2;font-size:13px;padding:9px 10px;">
+          <input type="number" id="plan-days-input" placeholder="วัน" style="flex:1;font-size:13px;padding:9px 10px;" min="1">
+        </div>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="plan-price-input" placeholder="ราคา เช่น 1,490" style="flex:2;font-size:13px;padding:9px 10px;">
+          <button onclick="addPlan()" style="flex:1;padding:9px;font-size:13px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,var(--purple),#5B21B6);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">+ เพิ่ม</button>
+        </div>
+      </div>
+    </div>
+
       <div class="card-title" style="color:var(--purple);">📩 จัดการข้อมูลติดต่อ</div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">ข้อมูลนี้จะแสดงในหน้า Login ให้ครูและนักเรียนเห็น</div>
       <div id="contact-settings-list"></div>
@@ -1692,11 +1727,28 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
           💳
         </div>
         <div class="logo-title">ชำระค่าบริการ</div>
-        <div class="logo-sub">อัพโหลดสลิปเพื่อรอการอนุมัติ</div>
+        <div class="logo-sub">สแกปเสร็จ · รอตรวจสลิป · เริ่มใช้งาน</div>
       </div>
 
       <div class="login-panel">
         <div id="slip-status-area"></div>
+        <!-- Steps -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:18px;">
+          <div style="text-align:center;flex:1;">
+            <div style="width:32px;height:32px;border-radius:50%;background:var(--green);color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;margin:0 auto 4px;">✓</div>
+            <div style="font-size:10px;color:var(--green-dark);font-weight:700;">สมัครแล้ว</div>
+          </div>
+          <div style="flex:1;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));margin-bottom:16px;"></div>
+          <div style="text-align:center;flex:1;">
+            <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;margin:0 auto 4px;">2</div>
+            <div style="font-size:10px;color:var(--blue-dark);font-weight:700;">ชำระเงิน</div>
+          </div>
+          <div style="flex:1;height:2px;background:var(--border);margin-bottom:16px;"></div>
+          <div style="text-align:center;flex:1;">
+            <div style="width:32px;height:32px;border-radius:50%;background:var(--bg);color:var(--text3);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;margin:0 auto 4px;border:1.5px solid var(--border);">3</div>
+            <div style="font-size:10px;color:var(--text3);font-weight:600;">ใช้งาน</div>
+          </div>
+        </div>
 
         <!-- ข้อมูลการโอนเงิน -->
         <div style="background:var(--blue-light);border-radius:14px;padding:16px;margin-bottom:16px;border:1.5px solid #BFDBFE;">
@@ -1729,6 +1781,27 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
           ออกจากระบบ
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== APPROVE MODAL ===== -->
+<div id="approve-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)closeApproveModal()">
+  <div style="background:#fff;border-radius:20px;padding:24px 20px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);max-height:90vh;overflow-y:auto;">
+    <input type="hidden" id="approve-tid">
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--green),var(--green-dark));display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:24px;">✅</div>
+      <div style="font-size:18px;font-weight:800;color:var(--text);">อนุมัติและกำหนด Plan</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:4px;">เลือก Plan ที่ครูชำระมา</div>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;">🗓 เลือกระยะเวลา</div>
+    <div id="approve-plans"></div>
+    <div style="font-size:13px;font-weight:700;color:var(--text2);margin:12px 0 6px;">📝 หมายเหตุ (ไม่บังคับ)</div>
+    <input type="text" id="approve-note" placeholder="เช่น โอนวันที่ 8 พ.ค. 68" style="font-size:14px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;width:100%;outline:none;font-family:Sarabun,sans-serif;">
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button onclick="closeApproveModal()" style="flex:1;padding:12px;font-size:14px;font-weight:600;border-radius:12px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:Sarabun,sans-serif;color:var(--text2);">ยกเลิก</button>
+      <button onclick="confirmApproveTeacher()" style="flex:2;padding:12px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">✅ อนุมัติและเปิดใช้งาน</button>
     </div>
   </div>
 </div>
@@ -1851,6 +1924,88 @@ async function loadPaymentSettings(){
     if(p.amount) document.getElementById('pay-amount').value=p.amount;
   }
 }
+
+// ===== PLAN MANAGEMENT =====
+let _cachedPlans = null;
+
+async function loadPlansSettings() {
+  if(!USE_SUPABASE||!SB) return;
+  try {
+    const {data} = await SB.from('settings').select('value').eq('key','plans').maybeSingle();
+    _cachedPlans = (data&&data.value&&data.value.length) ? data.value : [
+      {name:'รายเดือน', days:30, price:'199'},
+      {name:'รายปี', days:365, price:'1,490'},
+      {name:'2 ปี', days:730, price:'2,490'},
+    ];
+    renderPlansList();
+    loadPricingToRegister();
+  } catch(e) {}
+}
+
+function renderPlansList() {
+  const el = document.getElementById('plans-list');
+  if(!el || !_cachedPlans) return;
+  if(!_cachedPlans.length) { el.innerHTML='<div style="font-size:13px;color:var(--text3);text-align:center;padding:8px;">ยังไม่มีแผน</div>'; return; }
+  el.innerHTML = _cachedPlans.map((p,i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border-radius:10px;border:1.5px solid var(--border);margin-bottom:6px;">
+      <div style="flex:1;">
+        <span style="font-size:14px;font-weight:700;color:var(--text);">${p.name}</span>
+        <span style="font-size:12px;color:var(--text2);margin-left:8px;">${p.days} วัน</span>
+      </div>
+      <span style="font-size:15px;font-weight:800;color:var(--green-dark);">฿${p.price}</span>
+      <button onclick="deletePlan(${i})" style="padding:4px 8px;font-size:11px;border-radius:6px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;font-family:Sarabun,sans-serif;">ลบ</button>
+    </div>`).join('');
+}
+
+async function addPlan() {
+  const name = document.getElementById('plan-name-input').value.trim();
+  const days = parseInt(document.getElementById('plan-days-input').value);
+  const price = document.getElementById('plan-price-input').value.trim();
+  if(!name||!days||!price) { toast2('กรอกให้ครบ','warn'); return; }
+  if(!_cachedPlans) _cachedPlans = [];
+  _cachedPlans.push({name, days, price});
+  await savePlans();
+  document.getElementById('plan-name-input').value='';
+  document.getElementById('plan-days-input').value='';
+  document.getElementById('plan-price-input').value='';
+}
+
+async function deletePlan(idx) {
+  if(!confirm('ลบแผนนี้?')) return;
+  _cachedPlans.splice(idx,1);
+  await savePlans();
+}
+
+async function savePlans() {
+  await SB.from('settings').upsert({key:'plans',value:_cachedPlans},{onConflict:'key'});
+  renderPlansList();
+  loadPricingToRegister();
+  toast2('บันทึกแผนแล้ว ✅');
+}
+
+async function loadPricingToRegister() {
+  // โหลด pricing ไปแสดงในหน้าสมัคร
+  const el = document.getElementById('plan-price-display');
+  const el2 = document.getElementById('plan-period-display');
+  if(!el) return;
+  let plans = _cachedPlans;
+  if(!plans) {
+    try {
+      const {data} = await SB.from('settings').select('value').eq('key','plans').maybeSingle();
+      plans = (data&&data.value&&data.value.length) ? data.value : [{name:'รายปี',days:365,price:'1,490'}];
+    } catch(e) { plans = [{name:'รายปี',days:365,price:'1,490'}]; }
+  }
+  if(plans.length) {
+    const cheapest = plans.reduce((a,b) => parseInt(a.price.replace(/,/g,'')) < parseInt(b.price.replace(/,/g,'')) ? a : b);
+    el.textContent = '฿'+cheapest.price;
+    el2.textContent = cheapest.name + ' ('+cheapest.days+' วัน)';
+    const featEl = document.getElementById('reg-features-list');
+    if(featEl && plans.length > 1) {
+      featEl.innerHTML = plans.map(p=>`<span style="display:inline-block;background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700;color:var(--text);margin:2px;">฿${p.price} / ${p.name}</span>`).join('');
+    }
+  }
+}
+
 // ---- ตรวจว่าเคย setup ไว้แล้วหรือยัง ----
 function checkSetupOnLoad() {
   // ลอง restore saved config ก่อน, ใช้ FIXED ถ้าไม่มี
@@ -2739,6 +2894,7 @@ async function doChangePassword(){
 }
 
 function showRegForm(show){
+  if(show) loadPricingToRegister();
   document.getElementById('teacher-login-form').style.display=show?'none':'block';
   document.getElementById('teacher-reg-form').style.display=show?'block':'none';
   document.getElementById('teacher-forgot-form').style.display='none';
@@ -2770,6 +2926,7 @@ async function loadContactLinksForLogin(){
 
 async function loadContactSettings(){
   loadPaymentSettings();
+  loadPlansSettings();
   if(!USE_SUPABASE) return;
   const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').single();
   const contacts = (data&&data.value) ? data.value : [];
@@ -2995,10 +3152,70 @@ function toggleTeacherDetail(id) {
   if(btn) btn.textContent = isHidden ? '▴ ซ่อน' : '▾ ดู';
 }
 
-async function approveTeacher(tid){
-  const {error}=await SB.from('teachers').update({status:'approved'}).eq('id',tid);
+function approveTeacher(tid) {
+  // โหลด payment_info เพื่อดึงราคา
+  const modal = document.getElementById('approve-modal');
+  document.getElementById('approve-tid').value = tid;
+
+  // โหลด plans จาก settings
+  loadPlansIntoModal();
+  modal.style.display = 'flex';
+}
+
+async function loadPlansIntoModal() {
+  try {
+    const {data} = await SB.from('settings').select('value').eq('key','plans').maybeSingle();
+    const plans = (data && data.value && data.value.length) ? data.value : [
+      {name:'รายเดือน', days:30, price:'199'},
+      {name:'รายปี', days:365, price:'1,490'},
+      {name:'2 ปี', days:730, price:'2,490'},
+    ];
+    const container = document.getElementById('approve-plans');
+    container.innerHTML = plans.map((p,i) => `
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);cursor:pointer;background:#fff;margin-bottom:6px;transition:all .15s;" 
+        onclick="selectPlan(this,${p.days})">
+        <input type="radio" name="approve-plan" value="${p.days}" ${i===0?'checked':''} style="accent-color:var(--blue);width:16px;height:16px;flex-shrink:0;">
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);">${p.name}</div>
+          <div style="font-size:12px;color:var(--text2);">${p.days} วัน</div>
+        </div>
+        <div style="font-size:16px;font-weight:800;color:var(--green-dark);">฿${p.price}</div>
+      </label>`).join('');
+    // เลือก default
+    const firstLabel = container.querySelector('label');
+    if(firstLabel) firstLabel.style.borderColor = 'var(--blue)';
+  } catch(e) {}
+}
+
+function selectPlan(el, days) {
+  document.querySelectorAll('#approve-plans label').forEach(l => l.style.borderColor = 'var(--border)');
+  el.style.borderColor = 'var(--blue)';
+  el.style.background = 'var(--blue-light)';
+}
+
+async function confirmApproveTeacher() {
+  const tid = document.getElementById('approve-tid').value;
+  const checked = document.querySelector('input[name="approve-plan"]:checked');
+  const days = checked ? parseInt(checked.value) : 365;
+  const note = document.getElementById('approve-note').value.trim();
+
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + days);
+
+  const {error} = await SB.from('teachers').update({
+    status: 'approved',
+    expires_at: expiresAt.toISOString(),
+    approved_note: note || null
+  }).eq('id', tid);
+
   if(error){toast2('ไม่สำเร็จ: '+error.message,'err');return;}
-  toast2('อนุมัติครูแล้ว ✅');loadSuperAdminPanel();
+  closeApproveModal();
+  toast2('✅ อนุมัติแล้ว · ใช้งานได้ '+days+' วัน');
+  loadSuperAdminPanel();
+}
+
+function closeApproveModal() {
+  document.getElementById('approve-modal').style.display = 'none';
 }
 
 async function rejectTeacher(tid){
