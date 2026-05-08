@@ -1407,7 +1407,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     </div>
   </div>
 
-  <div <div id="mtab-subjects" class="mtab-page" style="display:none;">
+  <div id="mtab-subjects" class="mtab-page" style="display:none;">
     <div class="card" style="border-color:#86EFAC;background:linear-gradient(135deg,#F0FDF4,#DCFCE7);">
       <div class="card-title" style="color:var(--green-dark);">📚 จัดการวิชา + คะแนนเก็บ</div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6;">
@@ -2935,7 +2935,7 @@ async function loadContactLinksForLogin(){
 
 async function loadContactSettings(){
   loadPaymentSettings();
-  loadPlansSettings();
+  loadPlansSettings(); // โหลด plans ด้วย
   if(!USE_SUPABASE) return;
   const {data} = await SB.from('settings').select('value').eq('key','admin_contacts').single();
   const contacts = (data&&data.value) ? data.value : [];
