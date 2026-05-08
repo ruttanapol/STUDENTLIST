@@ -3791,9 +3791,9 @@ async function delRoom(n){
   // ลบออกจาก DB.rooms settings
   DB.rooms = DB.rooms.filter(r=>r!==n);
   await sbSaveSettings('rooms', DB.rooms);
+  actionPopupDone('ลบห้อง '+n+' แล้ว','','delete');
   renderManage();
   renderDashboard();
-  toast('ลบห้อง '+n+' แล้ว','warn');
 }
 
 async function addStudent(){
@@ -3811,7 +3811,7 @@ async function delStu(id){
   const s=DB.students.find(x=>x.id===id);
   if(!confirm('ลบนักเรียน '+(s?s.name:id)+'?'))return;
   showActionPopup('กำลังลบนักเรียน',s?s.name:id,'delete');
-  try{await sbDeleteStudent(id);renderManage();actionPopupDone('ลบนักเรียนแล้ว',s?s.name:id,'delete');}
+  try{await sbDeleteStudent(id);actionPopupDone('ลบนักเรียนแล้ว',s?s.name:id,'delete');renderManage();}
   catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}
 }
 
@@ -3845,7 +3845,7 @@ async function delHW(num){
   const h=DB.homeworks.find(x=>x.num===num);
   if(!confirm('ลบงานชิ้นที่ '+num+(h?' ('+h.title+')':'')+'?'))return;
   showActionPopup('กำลังลบชิ้นงาน','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');
-  try{await sbDeleteHomework(num);renderManage();actionPopupDone('ลบชิ้นงานแล้ว','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');}
+  try{await sbDeleteHomework(num);actionPopupDone('ลบชิ้นงานแล้ว','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');renderManage();}
   catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}
 }
 
@@ -4833,9 +4833,9 @@ async function deleteSubjectFull(name) {
   showActionPopup('กำลังลบวิชา',name,'delete');
   DB.subjects = DB.subjects.filter(s => (typeof s === 'string' ? s : s.name) !== name);
   await sbSaveSettings('subjects', DB.subjects);
+  actionPopupDone('ลบวิชาแล้ว',name,'delete');
   renderSubjectsFull();
   renderManage();
-  actionPopupDone('ลบวิชาแล้ว',name,'delete');
 }
 
 async function updateSubjectScore(name, total, hwCount) {
@@ -5083,7 +5083,7 @@ function showActionPopup(title, sub, type) {
   _apTimer = setTimeout(()=>{ document.getElementById('ap-bar').style.width='70%'; }, 100);
 }
 function actionPopupDone(title, sub, type) {
-  const icons = {add:'✅', delete:'🗑️', edit:'✅', upload:'🎉', success:'✅', warn:'⚠️'};
+  const icons = {add:'✅', delete:'✅', edit:'✅', upload:'🎉', success:'✅', warn:'⚠️'};
   const btnColors = {delete:'linear-gradient(135deg,var(--red),#DC2626)', warn:'linear-gradient(135deg,var(--yellow),#D97706)'};
   document.getElementById('ap-icon').textContent = icons[type]||'✅';
   document.getElementById('ap-title').textContent = title||'เสร็จสิ้น!';
@@ -5092,11 +5092,11 @@ function actionPopupDone(title, sub, type) {
   if(type==='delete'||type==='warn') document.getElementById('ap-bar').style.background = type==='delete'?'linear-gradient(90deg,var(--red),#DC2626)':'linear-gradient(90deg,var(--yellow),#D97706)';
   const btn = document.getElementById('ap-btn');
   btn.style.background = btnColors[type]||'linear-gradient(135deg,var(--green),var(--green-dark))';
-  btn.textContent = type==='delete'?'🗑️ ลบแล้ว':type==='warn'?'⚠️ รับทราบ':'✅ เรียบร้อย';
+  btn.textContent = type==='delete'?'✅ ลบเสร็จสิ้น':type==='warn'?'⚠️ รับทราบ':'✅ เรียบร้อย';
   btn.style.display = 'block';
   // auto close after 2s
   clearTimeout(_apTimer);
-  _apTimer = setTimeout(closeActionPopup, 2000);
+  _apTimer = setTimeout(closeActionPopup, 2500);
 }
 function actionPopupError(msg) {
   document.getElementById('ap-icon').textContent = '❌';
