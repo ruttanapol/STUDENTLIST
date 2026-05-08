@@ -3743,10 +3743,39 @@ async function addRoom(){
 
 async function delRoom(n){
   const stuInRoom=DB.students.filter(s=>s.room===n).length;
-  if(stuInRoom>0&&!confirm('ห้อง "'+n+'" มีนักเรียน '+stuInRoom+' คน\nยืนยันลบห้องนี้?'))return;
-  DB.rooms=DB.rooms.filter(r=>r!==n);
-  await sbSaveSettings('rooms',DB.rooms);
-  renderManage();toast('ลบห้อง '+n+' แล้ว','warn');
+  const msg = stuInRoom>0
+    ? 'ลบห้อง "'+n+'" และนักเรียน '+stuInRoom+' คนในห้องนี้?\n(ข้อมูลการส่งงานของนักเรียนในห้องนี้จะถูกลบด้วย)'
+    : 'ยืนยันลบห้อง "'+n+'"?';
+  if(!confirm(msg)) return;
+
+  // ลบนักเรียนในห้องนี้ออกทั้งหมด (ทำให้ห้องหายจาก derived list)
+  if(stuInRoom>0){
+    const stusInRoom = DB.students.filter(s=>s.room===n).map(s=>s.id);
+    if(USE_SUPABASE){
+      const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
+      // ลบ submissions ของนักเรียนในห้องนี้
+      for(const sid of stusInRoom){
+        await SB.from('submissions').delete().eq('student_id',sid).eq('teacher_id',tid);
+        await SB.from('students').delete().eq('id',sid).eq('teacher_id',tid);
+      }
+      await reloadStudents();
+      await reloadSubmissions();
+    } else {
+      DB.students = DB.students.filter(s=>s.room!==n);
+      // ลบ submissions
+      Object.keys(DB.submissions).forEach(k=>{
+        if(stusInRoom.includes(k.split('_')[0])) delete DB.submissions[k];
+      });
+      saveDB();
+    }
+  }
+
+  // ลบออกจาก DB.rooms settings
+  DB.rooms = DB.rooms.filter(r=>r!==n);
+  await sbSaveSettings('rooms', DB.rooms);
+  renderManage();
+  renderDashboard();
+  toast('ลบห้อง '+n+' แล้ว','warn');
 }
 
 async function addStudent(){
