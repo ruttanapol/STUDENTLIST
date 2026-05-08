@@ -1965,13 +1965,25 @@ function renderPlansList() {
   if(!el || !_cachedPlans) return;
   if(!_cachedPlans.length) { el.innerHTML='<div style="font-size:13px;color:var(--text3);text-align:center;padding:8px;">ยังไม่มีแผน</div>'; return; }
   el.innerHTML = _cachedPlans.map((p,i) => `
-    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border-radius:10px;border:1.5px solid var(--border);margin-bottom:6px;">
-      <div style="flex:1;">
-        <span style="font-size:14px;font-weight:700;color:var(--text);">${p.name}</span>
-        <span style="font-size:12px;color:var(--text2);margin-left:8px;">${p.days} วัน</span>
+    <div style="background:#fff;border-radius:12px;border:1.5px solid var(--border);padding:12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:14px;font-weight:700;color:var(--text);flex:1;">${p.name}</span>
+        <span style="font-size:13px;font-weight:800;color:var(--green-dark);">฿${p.price}</span>
+        <span style="font-size:12px;color:var(--text2);">${p.days} วัน</span>
+        <button onclick="deletePlan(${i})" style="padding:4px 8px;font-size:11px;border-radius:6px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;font-family:Sarabun,sans-serif;">ลบ</button>
       </div>
-      <span style="font-size:15px;font-weight:800;color:var(--green-dark);">฿${p.price}</span>
-      <button onclick="deletePlan(${i})" style="padding:4px 8px;font-size:11px;border-radius:6px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;font-family:Sarabun,sans-serif;">ลบ</button>
+      <div style="display:flex;gap:6px;">
+        <input type="text" value="${p.name}" placeholder="ชื่อแผน"
+          style="flex:2;font-size:12px;padding:6px 8px;border-radius:8px;border:1.5px solid var(--border);font-family:Sarabun,sans-serif;"
+          onchange="_cachedPlans[${i}].name=this.value">
+        <input type="number" value="${p.days}" placeholder="วัน" min="1"
+          style="flex:1;font-size:12px;padding:6px 8px;border-radius:8px;border:1.5px solid var(--border);text-align:center;font-family:Sarabun,sans-serif;"
+          onchange="_cachedPlans[${i}].days=parseInt(this.value)||30">
+        <input type="text" value="${p.price}" placeholder="ราคา"
+          style="flex:1;font-size:12px;padding:6px 8px;border-radius:8px;border:1.5px solid var(--border);text-align:center;font-family:Sarabun,sans-serif;"
+          onchange="_cachedPlans[${i}].price=this.value">
+        <button onclick="savePlans()" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:linear-gradient(135deg,var(--blue),var(--blue-dark));color:#fff;cursor:pointer;white-space:nowrap;font-family:Sarabun,sans-serif;">&#x1F4BE; บันทึก</button>
+      </div>
     </div>`).join('');
 }
 
