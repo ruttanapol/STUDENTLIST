@@ -3154,7 +3154,7 @@ async function loginStudent(){
     // สร้าง DB ชั่วคราวสำหรับแสดงผลนักเรียน
     const stuDB={
       student:{id:stuData.id,name:stuData.name,room:stuData.room},
-      homeworks:(hwData||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100})),
+      homeworks:(hwData||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||'',fileUrl:r.file_url||'',fileName:r.file_name||''})),
       submissions:{}
     };
     (subData||[]).forEach(r=>{
@@ -3273,7 +3273,8 @@ async function refreshStudentView(){
 
   // อัพเดต homeworks
   _currentStuDB.homeworks = (hwRes.data||[]).map(r=>({
-    num:r.num, title:r.title, subject:r.subject||'', maxScore:r.max_score||100
+    num:r.num, title:r.title, subject:r.subject||'', maxScore:r.max_score||100,
+    deadline:r.deadline||'', fileUrl:r.file_url||'', fileName:r.file_name||''
   }));
 
   // อัพเดต submissions
@@ -5143,8 +5144,24 @@ async function uploadHWFile(file, hwNum) {
   const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : 'local';
   const ext = file.name.split('.').pop();
   const path = `hw_files/${tid}/hw_${hwNum}_${Date.now()}.${ext}`;
-  const { data, error } = await SB.storage.from('homeworks').upload(path, file, { upsert: true });
-  if(error) throw error;
+
+  // ลอง upload ก่อน ถ้า Bucket not found → สร้าง bucket แล้ว retry
+  let uploadResult = await SB.storage.from('homeworks').upload(path, file, { upsert: true });
+
+  if(uploadResult.error) {
+    const errMsg = uploadResult.error.message || '';
+    if(errMsg.toLowerCase().includes('bucket') || errMsg.toLowerCase().includes('not found')) {
+      // สร้าง bucket อัตโนมัติ
+      const { error: bucketErr } = await SB.storage.createBucket('homeworks', { public: true });
+      if(bucketErr && !bucketErr.message.toLowerCase().includes('already exists')) {
+        throw new Error('สร้าง Storage Bucket ไม่สำเร็จ: ' + bucketErr.message + '\n\nกรุณาสร้าง Bucket ชื่อ "homeworks" ใน Supabase Dashboard → Storage ด้วยตนเอง');
+      }
+      // retry upload
+      uploadResult = await SB.storage.from('homeworks').upload(path, file, { upsert: true });
+    }
+    if(uploadResult.error) throw uploadResult.error;
+  }
+
   const { data: urlData } = SB.storage.from('homeworks').getPublicUrl(path);
   return { url: urlData.publicUrl, name: file.name };
 }
