@@ -942,17 +942,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   </div>
 </div>
 
-
-      <!-- CREDIT -->
-      <div style="text-align:center;padding:16px 0 8px;">
-        <div style="display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:9px 20px;">
-          <span style="font-size:18px;">👨‍🏫</span>
-          <div style="text-align:left;">
-            <div style="font-size:11px;color:rgba(255,255,255,0.65);font-weight:500;">สร้างและพัฒนาโดย</div>
-            <div style="font-size:13px;color:#fff;font-weight:700;letter-spacing:.3px;">Kru Rattanapol Aiamnor</div>
-          </div>
-        </div>
-      </div>
+      <p style="text-align:center;font-size:12px;color:rgba(2,2,2,0.5);margin-top:20px;padding-bottom:8px;">👨‍🏫 สร้างและพัฒนาโดย Kru Rattanapol Aiamnor</p>
 
 <!-- ===== SUPER ADMIN ===== -->
 <div id="s-superadmin" class="screen">
@@ -1161,28 +1151,74 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
         <div class="card-title" style="margin:0;color:var(--purple);">📝 งานที่กำลังตรวจ</div>
         <div id="hw-save-badge" style="font-size:11px;font-weight:700;color:var(--green-dark);background:var(--green-light);padding:3px 10px;border-radius:20px;display:none;">✓ บันทึกแล้ว</div>
       </div>
-      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-        <div style="flex:0 0 72px;">
-          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">ครั้งที่</div>
-          <input type="number" id="hw-num-input" placeholder="1" inputmode="numeric" min="1"
-            style="text-align:center;font-size:18px;font-weight:700;color:var(--purple);padding:10px 8px;"
-            oninput="onHWFieldChange()">
+      <!-- Step 1: เลือกวิชา -->
+      <div style="margin-bottom:10px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">1️⃣ เลือกวิชา</div>
+        <select id="hw-subj-filter" onchange="filterHWBySubject()"
+          style="font-size:15px;padding:12px 14px;font-weight:600;color:var(--green-dark);border-color:#86EFAC;background:var(--green-light);width:100%;border-radius:10px;border-width:1.5px;">
+          <option value="">— ทุกวิชา —</option>
+        </select>
+      </div>
+
+      <!-- Step 2: เลือกชิ้นงาน -->
+      <div style="margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">2️⃣ เลือกชิ้นงาน</div>
+        <select id="hw-select-dropdown" onchange="selectHWFromDropdown(this.value)"
+          style="font-size:15px;padding:12px 14px;font-weight:600;color:var(--purple);border-color:#C4B5FD;background:var(--purple-light);width:100%;border-radius:10px;border-width:1.5px;">
+          <option value="">— เลือกชิ้นงาน —</option>
+        </select>
+      </div>
+
+      <!-- detail card -->
+      <div id="hw-selected-detail" style="display:none;background:rgba(139,92,246,0.06);border:1.5px solid #C4B5FD;border-radius:12px;padding:12px 14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div style="background:var(--purple-light);border-radius:8px;padding:6px 14px;font-size:22px;font-weight:800;color:var(--purple);min-width:48px;text-align:center;" id="hw-detail-num">—</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:700;color:var(--text);" id="hw-detail-title">—</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px;" id="hw-detail-sub">—</div>
+          </div>
+          <div style="text-align:center;flex-shrink:0;background:#fff;border-radius:10px;padding:6px 12px;border:1.5px solid var(--blue-light);">
+            <div style="font-size:10px;color:var(--text3);">คะแนน/ชิ้น</div>
+            <div style="font-size:22px;font-weight:800;color:var(--blue);" id="hw-detail-max">—</div>
+          </div>
         </div>
-        <div style="flex:1;min-width:120px;">
-          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">หัวข้องาน</div>
-          <input type="text" id="hw-title-input" placeholder="เช่น แบบฝึกหัดบทที่ 1..."
-            style="font-size:15px;font-weight:600;"
-            oninput="onHWFieldChange()">
-        </div>
-        <div style="flex:0 0 120px;">
-          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">วิชา</div>
-          <select id="hw-subj-input" onchange="onHWFieldChange()" style="font-size:14px;padding:10px 10px;"></select>
-        </div>
-        <div style="flex:0 0 80px;">
-          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">คะแนนเต็ม</div>
-          <input type="number" id="hw-maxscore-input" placeholder="100" inputmode="numeric" min="1"
-            style="text-align:center;font-size:16px;font-weight:700;color:var(--blue);padding:10px 6px;"
-            oninput="onHWFieldChange()">
+      </div>
+
+      <!-- hidden inputs สำหรับ recordScan -->
+      <input type="hidden" id="hw-num-input">
+      <input type="hidden" id="hw-title-input">
+      <input type="hidden" id="hw-maxscore-input">
+      <select id="hw-subj-input" style="display:none;"></select>
+
+      <!-- toggle กรอกเอง -->
+      <div style="text-align:center;">
+        <button onclick="toggleHWManual()" id="hw-manual-toggle-btn"
+          style="background:none;border:none;font-size:12px;color:var(--text3);cursor:pointer;font-family:Sarabun,sans-serif;text-decoration:underline;padding:4px 8px;">
+          ✏️ กรอกงานใหม่ด้วยตัวเอง
+        </button>
+      </div>
+
+      <!-- manual fields -->
+      <div id="hw-manual-fields" style="display:none;margin-top:8px;padding:12px;background:var(--bg);border-radius:10px;">
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+          <div style="flex:0 0 68px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">ครั้งที่</div>
+            <input type="number" id="hw-num-manual" placeholder="1" inputmode="numeric" min="1"
+              style="text-align:center;font-size:16px;font-weight:700;color:var(--purple);padding:9px 6px;"
+              oninput="syncManualFields()">
+          </div>
+          <div style="flex:1;min-width:100px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">หัวข้องาน</div>
+            <input type="text" id="hw-title-manual" placeholder="ชื่องาน..."
+              style="font-size:14px;font-weight:600;"
+              oninput="syncManualFields()">
+          </div>
+          <div style="flex:0 0 76px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">คะแนนเต็ม</div>
+            <input type="number" id="hw-maxscore-manual" placeholder="100" inputmode="numeric" min="1"
+              style="text-align:center;font-size:14px;font-weight:700;color:var(--blue);padding:9px 6px;"
+              oninput="syncManualFields()">
+          </div>
         </div>
       </div>
       <div id="hw-conflict-warn" style="display:none;margin-top:8px;font-size:12px;color:#B45309;background:#FEF3C7;border-radius:8px;padding:7px 10px;"></div>
@@ -1244,6 +1280,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     <button class="mtab on" onclick="switchManageTab('import',this)">📥 นำเข้า</button>
     <button class="mtab" onclick="switchManageTab('rooms',this)">🏫 ห้อง</button>
     <button class="mtab" onclick="switchManageTab('students',this)">👤 นักเรียน</button>
+    <button class="mtab" onclick="switchManageTab('subjects',this)">📚 วิชา</button>
     <button class="mtab" onclick="switchManageTab('homework',this)">📝 งาน</button>
     <button class="mtab" onclick="switchManageTab('reset',this)">🗑️</button>
   </div>
@@ -1326,22 +1363,69 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     </div>
   </div>
 
-  <div id="mtab-homework" class="mtab-page" style="display:none;">
-    <div class="card">
-      <div class="card-title">📖 วิชา</div>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="n-subj" placeholder="ชื่อวิชา" style="flex:1;margin:0;">
-        <button class="mini-btn" onclick="addSubject()" style="border-color:var(--green);color:var(--green-dark);background:var(--green-light);min-height:48px;">+ เพิ่ม</button>
+  <div <div id="mtab-subjects" class="mtab-page" style="display:none;">
+    <div class="card" style="border-color:#86EFAC;background:linear-gradient(135deg,#F0FDF4,#DCFCE7);">
+      <div class="card-title" style="color:var(--green-dark);">📚 จัดการวิชา + คะแนนเก็บ</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6;">
+        ตั้งค่าคะแนนเก็บรายวิชา — ระบบจะคำนวณคะแนนต่อชิ้นงานให้อัตโนมัติ
       </div>
-      <div class="tbl-wrap" style="margin-top:8px;"><table class="mini-tbl"><thead><tr><th>วิชา</th><th style="width:40px;"></th></tr></thead><tbody id="subj-list"></tbody></table></div>
+
+      <!-- เพิ่มวิชาใหม่ -->
+      <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;border:1.5px solid var(--border);">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">➕ เพิ่มวิชาใหม่</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <div style="flex:1;">
+            <label class="lbl" style="margin-top:0;">ชื่อวิชา</label>
+            <input type="text" id="ns-subj-name" placeholder="เช่น คณิตศาสตร์" style="font-size:14px;">
+          </div>
+          <div style="flex:0 0 90px;">
+            <label class="lbl" style="margin-top:0;">คะแนนเก็บ</label>
+            <input type="number" id="ns-subj-total" placeholder="100" inputmode="numeric" min="1"
+              style="text-align:center;font-weight:700;color:var(--green-dark);font-size:14px;">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+          <div style="flex:0 0 90px;">
+            <label class="lbl" style="margin-top:0;">จำนวนชิ้นงาน</label>
+            <input type="number" id="ns-subj-hwcount" placeholder="10" inputmode="numeric" min="1"
+              style="text-align:center;font-weight:700;color:var(--purple);font-size:14px;"
+              oninput="calcSubjScorePerHW()">
+          </div>
+          <div style="flex:1;padding-top:20px;">
+            <div style="background:var(--purple-light);border-radius:10px;padding:10px 14px;text-align:center;">
+              <div style="font-size:11px;color:var(--purple);font-weight:600;">คะแนนต่อชิ้น (อัตโนมัติ)</div>
+              <div style="font-size:22px;font-weight:800;color:var(--purple);" id="ns-subj-per-hw">—</div>
+            </div>
+          </div>
+        </div>
+        <button onclick="addSubjectFull()" style="width:100%;padding:12px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
+          + เพิ่มวิชา
+        </button>
+      </div>
+
+      <!-- รายการวิชา -->
+      <div id="subj-full-list"></div>
+    </div>
+  </div>
+
+  <div id="mtab-homework" class="mtab-page" style="display:none;">
+    <div class="card" style="border-color:#86EFAC;background:linear-gradient(135deg,#F0FDF4,#DCFCE7);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="card-title" style="margin:0;color:var(--green-dark);">📚 วิชาที่มีอยู่</div>
+        <button onclick="switchManageTab('subjects',document.querySelector('.mtab:nth-child(4)'))"
+          style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:20px;border:1.5px solid var(--green);background:#fff;color:var(--green-dark);cursor:pointer;">
+          ⚙️ จัดการวิชา
+        </button>
+      </div>
+      <div id="subj-quick-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
     </div>
     <div class="card">
       <div class="card-title">📝 เพิ่ม / แก้ไขชิ้นงาน</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <div style="flex:0 0 64px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">ครั้งที่</div><input type="number" id="n-hwnum" placeholder="1" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--purple);"></div>
         <div style="flex:1;min-width:120px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">หัวข้องาน</div><input type="text" id="n-hwtitle" placeholder="เช่น แบบฝึกหัดบทที่ 1"></div>
-        <div style="flex:0 0 70px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">คะแนนเต็ม</div><input type="number" id="n-hwmaxscore" placeholder="100" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--blue);" value="100"></div>
-        <div style="flex:0 0 100px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">วิชา</div><select id="n-hwsubj" style="font-size:13px;padding:8px;"></select></div>
+        <div style="flex:0 0 100px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">วิชา</div><select id="n-hwsubj" style="font-size:13px;padding:8px;" onchange="onSubjChangeInHW()"></select></div>
+        <div style="flex:0 0 80px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">คะแนนต่อชิ้น</div><input type="number" id="n-hwmaxscore" placeholder="100" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--blue);" value="100"></div>
       </div>
       <div style="margin-top:8px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">กำหนดส่ง (ไม่บังคับ)</div><input type="date" id="n-hwdeadline" style="font-size:14px;"></div>
       <button class="add-btn" onclick="saveHW()" style="margin-top:10px;">💾 บันทึกชิ้นงาน</button>
@@ -1664,7 +1748,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     <div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin-bottom:20px;">
       <div id="up-bar" style="height:100%;border-radius:4px;width:0%;transition:width .5s ease;background:linear-gradient(90deg,var(--blue),var(--purple));"></div>
     </div>
-    <button id="up-close-btn" onclick="closeUploadPopup()" style="display:none;width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;border:none;cursor:pointer;font-family:Sarabun,sans-serif;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;box-shadow:0 4px 16px rgba(34,197,94,0.3);">✅ เรียบร้อย</button>
+    <button id="up-close-btn" onclick="closeUploadPopup()" style="display:none;width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;border:none;cursor:pointer;font-family:Sarabun,sans-serif;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;">✅ เรียบร้อย</button>
   </div>
 </div>
 </div>
@@ -1902,7 +1986,13 @@ function copySQL() {
 // ============================================================
 let DB = {
   rooms: [],
-  subjects: ['คณิตศาสตร์','วิทยาศาสตร์','ภาษาไทย','ภาษาอังกฤษ','สังคมศึกษา'],
+  subjects: [
+    {name:'คณิตศาสตร์',total:100,hwCount:10},
+    {name:'วิทยาศาสตร์',total:100,hwCount:10},
+    {name:'ภาษาไทย',total:100,hwCount:10},
+    {name:'ภาษาอังกฤษ',total:100,hwCount:10},
+    {name:'สังคมศึกษา',total:100,hwCount:10}
+  ],
   students: [],
   homeworks: [],
   submissions: {}
@@ -1942,8 +2032,15 @@ async function loadFromSupabase() {
   const roomsKey = tid ? 'rooms_'+tid : 'rooms';
   const settingsMap = {};
   (setRes.data || []).forEach(r => { settingsMap[r.key] = r.value; });
-  if(settingsMap[settingsKey]) DB.subjects = settingsMap[settingsKey];
-  else if(settingsMap['subjects']) DB.subjects = settingsMap['subjects'];
+  if(settingsMap[settingsKey]) {
+    DB.subjects = settingsMap[settingsKey];
+  } else if(settingsMap['subjects']) {
+    DB.subjects = settingsMap['subjects'];
+  }
+  // migrate string array to object array
+  if(DB.subjects.length > 0 && typeof DB.subjects[0] === 'string') {
+    DB.subjects = DB.subjects.map(s => ({name:s,total:100,hwCount:10}));
+  }
   if(settingsMap[roomsKey]) DB.rooms = settingsMap[roomsKey];
 }
 
@@ -3159,6 +3256,7 @@ function ts(){return new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minut
 let hwAutoSaveTimer=null;
 
 function populateScanSelects(){
+  populateHWDropdown();
   const ss=document.getElementById('hw-subj-input');
   if(ss)ss.innerHTML=DB.subjects.map(s=>`<option>${s}</option>`).join('');
   const saved=lsGet('hw_current');
@@ -3769,6 +3867,7 @@ function switchManageTab(tab, btn){
   const el=document.getElementById('mtab-'+tab);
   if(el)el.style.display='';
   if(btn)btn.classList.add('on');
+  if(tab==='subjects') renderSubjectsFull();
 }
 
 // ===== HW SAVE (supports edit+add) =====
@@ -3804,6 +3903,25 @@ function openEditHW(num){
 
 // ===== RENDER MANAGE EXTENSIONS =====
 function renderManage(){
+  renderSubjectsFull();
+  // quick subject list in homework tab
+  const ql = document.getElementById('subj-quick-list');
+  if(ql) {
+    const names = getSubjectNames();
+    if(names.length) {
+      ql.innerHTML = names.map(n => {
+        const s = getSubjectObj(n);
+        const per = s && s.hwCount > 0 ? Math.round((s.total/s.hwCount)*100)/100 : 100;
+        const count = DB.homeworks.filter(h=>h.subject===n).length;
+        return '<div style="background:#fff;border:1.5px solid #86EFAC;border-radius:10px;padding:6px 12px;">' +
+          '<div style="font-size:13px;font-weight:700;color:var(--green-dark);">' + n + '</div>' +
+          '<div style="font-size:11px;color:var(--text2);">' + count + ' ชิ้น · ' + per + ' คะแนน/ชิ้น</div>' +
+          '</div>';
+      }).join('');
+    } else {
+      ql.innerHTML = '<div style="font-size:13px;color:var(--text3);">ยังไม่มีวิชา — ไปที่แท็บ 📚 วิชา</div>';
+    }
+  }
   const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort();
   const filterSel=document.getElementById('filter-room-manage');
   if(filterSel){
@@ -3997,7 +4115,7 @@ async function confirmXLImport(){
   _lastImportedStudents=[...xlImportData];
   const newStudents=xlImportData.filter(s=>!DB.students.find(x=>x.id===s.id)).map(s=>({...s,room:s.room||DB.rooms[0]||''}));
   const skipped=xlImportData.length-newStudents.length;
-  showUploadPopup('กำลังอัพโหลด...', 'กำลังบันทึกรายชื่อ ' + newStudents.length + ' คน...');
+  showUploadPopup('กำลังอัพโหลด...','กำลังบันทึกรายชื่อ '+newStudents.length+' คน...');
   try {
     await sbImportStudents(newStudents);
     const newRooms=[...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
@@ -4007,11 +4125,8 @@ async function confirmXLImport(){
     }
     cancelXLImport();renderManage();
     if(_lastImportedStudents.length>0)document.getElementById('qr-gen-card').style.display='';
-    uploadPopupDone(
-      'อัพโหลดเสร็จสิ้น! 🎉',
-      'นำเข้าสำเร็จ ' + newStudents.length + ' คน' + (skipped ? '\nข้ามซ้ำ ' + skipped + ' คน' : '')
-    );
-  } catch(e){ uploadPopupError('นำเข้าไม่สำเร็จ: ' + e.message); }
+    uploadPopupDone('อัพโหลดเสร็จสิ้น! 🎉','นำเข้าสำเร็จ '+newStudents.length+' คน'+(skipped?'\nข้ามซ้ำ '+skipped+' คน':''));
+  } catch(e){uploadPopupError('นำเข้าไม่สำเร็จ: '+e.message);}
 }
 // ===== EXPIRY SYSTEM =====
 function getExpiryInfo(expiresAt) {
@@ -4539,48 +4654,298 @@ async function toggleMaintenanceMode(enable) {
 
 if('scrollRestoration' in history) history.scrollRestoration='manual';
 
+// ===== SUBJECT MANAGEMENT (FULL) =====
+
+function getSubjectObj(name) {
+  if(!Array.isArray(DB.subjects)) return null;
+  if(typeof DB.subjects[0] === 'string') return null;
+  return DB.subjects.find(s => s.name === name) || null;
+}
+
+function getSubjectNames() {
+  if(!Array.isArray(DB.subjects)) return [];
+  if(typeof DB.subjects[0] === 'string') return DB.subjects;
+  return DB.subjects.map(s => s.name);
+}
+
+function calcSubjScorePerHW() {
+  const total = parseFloat(document.getElementById('ns-subj-total')?.value) || 0;
+  const count = parseInt(document.getElementById('ns-subj-hwcount')?.value) || 0;
+  const perEl = document.getElementById('ns-subj-per-hw');
+  if(!perEl) return;
+  if(total > 0 && count > 0) {
+    const per = Math.round((total / count) * 100) / 100;
+    perEl.textContent = per;
+  } else {
+    perEl.textContent = '—';
+  }
+}
+
+// อัพเดต total เมื่อเปลี่ยนวิชาใน form เพิ่มงาน
+function onSubjChangeInHW() {
+  const subjName = document.getElementById('n-hwsubj')?.value;
+  if(!subjName) return;
+  const subj = getSubjectObj(subjName);
+  if(!subj) return;
+  const maxEl = document.getElementById('n-hwmaxscore');
+  if(!maxEl || maxEl.value == subj.scorePerHW) return;
+  // คำนวณ scorePerHW
+  const per = subj.hwCount > 0 ? Math.round((subj.total / subj.hwCount) * 100) / 100 : subj.total;
+  if(maxEl) maxEl.value = per;
+}
+
+async function addSubjectFull() {
+  const name = document.getElementById('ns-subj-name')?.value.trim();
+  const total = parseFloat(document.getElementById('ns-subj-total')?.value) || 100;
+  const hwCount = parseInt(document.getElementById('ns-subj-hwcount')?.value) || 10;
+  if(!name) { toast('กรอกชื่อวิชาด้วย','warn'); return; }
+
+  // ตรวจซ้ำ
+  const names = getSubjectNames();
+  if(names.includes(name)) { toast('วิชานี้มีอยู่แล้ว','warn'); return; }
+
+  const subjObj = { name, total, hwCount };
+  
+  // migrate: ถ้า subjects ยังเป็น string array ให้แปลงเป็น objects
+  if(DB.subjects.length > 0 && typeof DB.subjects[0] === 'string') {
+    DB.subjects = DB.subjects.map(s => ({name:s, total:100, hwCount:10}));
+  }
+  
+  DB.subjects.push(subjObj);
+  await sbSaveSettings('subjects', DB.subjects);
+
+  document.getElementById('ns-subj-name').value = '';
+  document.getElementById('ns-subj-total').value = '';
+  document.getElementById('ns-subj-hwcount').value = '';
+  document.getElementById('ns-subj-per-hw').textContent = '—';
+  
+  renderSubjectsFull();
+  renderManage();
+  toast('เพิ่มวิชา ' + name + ' แล้ว ✅');
+}
+
+async function deleteSubjectFull(name) {
+  if(!confirm('ลบวิชา "' + name + '"?')) return;
+  DB.subjects = DB.subjects.filter(s => (typeof s === 'string' ? s : s.name) !== name);
+  await sbSaveSettings('subjects', DB.subjects);
+  renderSubjectsFull();
+  renderManage();
+  toast('ลบวิชา ' + name + ' แล้ว','warn');
+}
+
+async function updateSubjectScore(name, total, hwCount) {
+  const subj = DB.subjects.find(s => (typeof s === 'string' ? s : s.name) === name);
+  if(!subj) return;
+  if(typeof subj === 'object') {
+    subj.total = parseFloat(total) || 100;
+    subj.hwCount = parseInt(hwCount) || 10;
+  }
+  await sbSaveSettings('subjects', DB.subjects);
+  renderSubjectsFull();
+  toast('อัพเดต ' + name + ' แล้ว ✅');
+}
+
+function renderSubjectsFull() {
+  const el = document.getElementById('subj-full-list');
+  if(!el) return;
+  
+  // migrate string to object
+  if(DB.subjects.length > 0 && typeof DB.subjects[0] === 'string') {
+    DB.subjects = DB.subjects.map(s => ({name:s, total:100, hwCount:10}));
+  }
+
+  if(!DB.subjects.length) {
+    el.innerHTML = '<div class="empty">ยังไม่มีวิชา</div>';
+    return;
+  }
+
+  el.innerHTML = DB.subjects.map(s => {
+    const name = typeof s === 'string' ? s : s.name;
+    const total = typeof s === 'object' ? (s.total||100) : 100;
+    const hwCount = typeof s === 'object' ? (s.hwCount||10) : 10;
+    const perHW = hwCount > 0 ? Math.round((total/hwCount)*100)/100 : total;
+    const hwInSubj = DB.homeworks.filter(h=>h.subject===name).length;
+    return `<div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
+        <div style="font-size:15px;font-weight:700;color:var(--text);">${name}</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;background:var(--green-light);color:var(--green-dark);padding:2px 8px;border-radius:20px;font-weight:700;">${hwInSubj} ชิ้นงาน</span>
+          <button onclick="deleteSubjectFull('${name}')" style="padding:4px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;">ลบ</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">คะแนนเก็บทั้งหมด</div>
+          <input type="number" value="${total}" min="1" 
+            style="text-align:center;font-weight:700;color:var(--green-dark);font-size:15px;padding:8px;"
+            onchange="updateSubjectScore('${name}',this.value,${hwCount})">
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">จำนวนชิ้นงาน</div>
+          <input type="number" value="${hwCount}" min="1"
+            style="text-align:center;font-weight:700;color:var(--purple);font-size:15px;padding:8px;"
+            onchange="updateSubjectScore('${name}',${total},this.value)">
+        </div>
+        <div style="flex:0 0 80px;">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">คะแนน/ชิ้น</div>
+          <div style="background:var(--purple-light);border-radius:8px;padding:8px;text-align:center;font-size:18px;font-weight:800;color:var(--purple);">${perHW}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ===== DROPDOWN SCAN WITH SUBJECT FILTER =====
+
+function populateHWDropdown() {
+  const subjFilter = document.getElementById('hw-subj-filter');
+  const hwDd = document.getElementById('hw-select-dropdown');
+  if(!hwDd) return;
+
+  // populate subject filter
+  if(subjFilter) {
+    const curSubj = subjFilter.value;
+    subjFilter.innerHTML = '<option value="">— ทุกวิชา —</option>';
+    getSubjectNames().forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      subjFilter.appendChild(opt);
+    });
+    if(curSubj) subjFilter.value = curSubj;
+  }
+
+  // populate hw dropdown (filter by subject)
+  const filterVal = subjFilter ? subjFilter.value : '';
+  const cur = hwDd.value;
+  hwDd.innerHTML = '<option value="">— เลือกชิ้นงาน —</option>';
+  
+  DB.homeworks
+    .filter(h => !filterVal || h.subject === filterVal)
+    .forEach(h => {
+      const opt = document.createElement('option');
+      opt.value = h.num;
+      const subjObj = getSubjectObj(h.subject);
+      const perHW = subjObj && subjObj.hwCount > 0 
+        ? Math.round((subjObj.total/subjObj.hwCount)*100)/100 
+        : (h.maxScore||100);
+      const dl = h.deadline ? ' · ส่ง ' + new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '';
+      opt.textContent = 'ครั้งที่ ' + h.num + ' — ' + h.title + ' (' + perHW + ' คะแนน)' + dl;
+      hwDd.appendChild(opt);
+    });
+  
+  if(cur) hwDd.value = cur;
+}
+
+function filterHWBySubject() {
+  populateHWDropdown();
+  // clear selection
+  document.getElementById('hw-selected-detail').style.display = 'none';
+  const dd = document.getElementById('hw-select-dropdown');
+  if(dd) dd.value = '';
+  document.getElementById('hw-num-input').value = '';
+  document.getElementById('hw-title-input').value = '';
+  document.getElementById('hw-maxscore-input').value = '';
+}
+
+function selectHWFromDropdown(numStr) {
+  if(!numStr) {
+    document.getElementById('hw-selected-detail').style.display = 'none';
+    document.getElementById('hw-num-input').value = '';
+    document.getElementById('hw-title-input').value = '';
+    document.getElementById('hw-maxscore-input').value = '';
+    return;
+  }
+  const num = parseInt(numStr);
+  const hw = DB.homeworks.find(h => h.num === num);
+  if(!hw) return;
+
+  // คำนวณคะแนนจากวิชา
+  const subjObj = getSubjectObj(hw.subject);
+  const scorePerHW = subjObj && subjObj.hwCount > 0
+    ? Math.round((subjObj.total / subjObj.hwCount) * 100) / 100
+    : (hw.maxScore || 100);
+
+  // set inputs
+  document.getElementById('hw-num-input').value = hw.num;
+  document.getElementById('hw-title-input').value = hw.title;
+  document.getElementById('hw-maxscore-input').value = scorePerHW;
+  const subj = document.getElementById('hw-subj-input');
+  if(subj && hw.subject) subj.value = hw.subject;
+
+  // show detail
+  document.getElementById('hw-detail-num').textContent = hw.num;
+  document.getElementById('hw-detail-title').textContent = hw.title;
+  const subLabel = hw.subject || 'ไม่ระบุวิชา';
+  const dlLabel = hw.deadline ? ' · ส่ง ' + new Date(hw.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '';
+  document.getElementById('hw-detail-sub').textContent = subLabel + dlLabel;
+  document.getElementById('hw-detail-max').textContent = scorePerHW;
+  document.getElementById('hw-selected-detail').style.display = 'block';
+
+  lsSet('hw_current',{num:hw.num,title:hw.title,subject:hw.subject,maxScore:scorePerHW});
+  const badge = document.getElementById('hw-save-badge');
+  if(badge){badge.style.display='';setTimeout(()=>badge.style.display='none',1500);}
+}
+
+
+function syncManualFields() {
+  const num = document.getElementById('hw-num-manual')?.value;
+  const title = document.getElementById('hw-title-manual')?.value;
+  const max = document.getElementById('hw-maxscore-manual')?.value;
+  if(num) { const el = document.getElementById('hw-num-input'); if(el) el.value = num; }
+  if(title) { const el = document.getElementById('hw-title-input'); if(el) el.value = title; }
+  if(max) { const el = document.getElementById('hw-maxscore-input'); if(el) el.value = max; }
+  onHWFieldChange();
+}
+
+function toggleHWManual() {
+  const manual = document.getElementById('hw-manual-fields');
+  const btn = document.getElementById('hw-manual-toggle-btn');
+  if(!manual||!btn) return;
+  const isOpen = manual.style.display !== 'none';
+  manual.style.display = isOpen ? 'none' : 'block';
+  btn.textContent = isOpen ? '✏️ กรอกงานใหม่ด้วยตัวเอง' : '✕ ปิด';
+  if(!isOpen) {
+    const dd = document.getElementById('hw-select-dropdown');
+    if(dd) dd.value = '';
+    document.getElementById('hw-selected-detail').style.display = 'none';
+  }
+}
+
+
 // ===== UPLOAD POPUP =====
-function showUploadPopup(title, sub) {
-  const p = document.getElementById('upload-popup');
-  if(!p) return;
-  document.getElementById('up-icon').textContent = '⏳';
-  document.getElementById('up-title').textContent = title || 'กำลังอัพโหลด...';
-  document.getElementById('up-sub').textContent = sub || '';
-  document.getElementById('up-bar').style.width = '0%';
-  document.getElementById('up-bar').style.background = 'linear-gradient(90deg,var(--blue),var(--purple))';
-  document.getElementById('up-close-btn').style.display = 'none';
-  document.getElementById('up-close-btn').style.background = 'linear-gradient(135deg,var(--green),var(--green-dark))';
-  document.getElementById('up-close-btn').textContent = '✅ เรียบร้อย';
-  p.style.display = 'flex';
-  setTimeout(() => { const b = document.getElementById('up-bar'); if(b) b.style.width = '65%'; }, 150);
+function showUploadPopup(title,sub){
+  const p=document.getElementById('upload-popup');if(!p)return;
+  document.getElementById('up-icon').textContent='⏳';
+  document.getElementById('up-title').textContent=title||'กำลังอัพโหลด...';
+  document.getElementById('up-sub').textContent=sub||'';
+  document.getElementById('up-bar').style.width='0%';
+  document.getElementById('up-bar').style.background='linear-gradient(90deg,var(--blue),var(--purple))';
+  document.getElementById('up-close-btn').style.display='none';
+  document.getElementById('up-close-btn').style.background='linear-gradient(135deg,var(--green),var(--green-dark))';
+  document.getElementById('up-close-btn').textContent='✅ เรียบร้อย';
+  p.style.display='flex';
+  setTimeout(()=>{const b=document.getElementById('up-bar');if(b)b.style.width='65%';},150);
 }
-
-function uploadPopupDone(title, sub) {
-  document.getElementById('up-icon').textContent = '🎉';
-  document.getElementById('up-title').textContent = title || 'อัพโหลดเสร็จสิ้น!';
-  document.getElementById('up-sub').textContent = sub || '';
-  document.getElementById('up-bar').style.width = '100%';
-  document.getElementById('up-bar').style.background = 'linear-gradient(90deg,var(--green),var(--green-dark))';
-  document.getElementById('up-close-btn').style.display = 'block';
+function uploadPopupDone(title,sub){
+  document.getElementById('up-icon').textContent='🎉';
+  document.getElementById('up-title').textContent=title||'อัพโหลดเสร็จสิ้น!';
+  document.getElementById('up-sub').textContent=sub||'';
+  document.getElementById('up-bar').style.width='100%';
+  document.getElementById('up-bar').style.background='linear-gradient(90deg,var(--green),var(--green-dark))';
+  document.getElementById('up-close-btn').style.display='block';
 }
-
-function uploadPopupError(msg) {
-  document.getElementById('up-icon').textContent = '❌';
-  document.getElementById('up-title').textContent = 'เกิดข้อผิดพลาด';
-  document.getElementById('up-sub').textContent = msg || '';
-  document.getElementById('up-bar').style.width = '100%';
-  document.getElementById('up-bar').style.background = 'var(--red)';
-  const btn = document.getElementById('up-close-btn');
-  btn.style.display = 'block';
-  btn.style.background = 'linear-gradient(135deg,var(--red),#DC2626)';
-  btn.textContent = '✕ ปิด';
+function uploadPopupError(msg){
+  document.getElementById('up-icon').textContent='❌';
+  document.getElementById('up-title').textContent='เกิดข้อผิดพลาด';
+  document.getElementById('up-sub').textContent=msg||'';
+  document.getElementById('up-bar').style.width='100%';
+  document.getElementById('up-bar').style.background='var(--red)';
+  const btn=document.getElementById('up-close-btn');
+  btn.style.display='block';btn.style.background='linear-gradient(135deg,var(--red),#DC2626)';btn.textContent='✕ ปิด';
 }
-
-function closeUploadPopup() {
-  const p = document.getElementById('upload-popup');
-  if(p) p.style.display = 'none';
+function closeUploadPopup(){
+  const p=document.getElementById('upload-popup');if(p)p.style.display='none';
 }
-
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
