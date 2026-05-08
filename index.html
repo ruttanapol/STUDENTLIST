@@ -841,7 +841,23 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
             <div class="panel-desc">สมัครฟรี · จ่ายเมื่อพร้อมใช้งาน</div>
           </div>
         </div>
-        
+        <!-- Pricing Preview -->
+        <div id="reg-pricing-box" style="background:linear-gradient(135deg,#EBF2FF,#EDE9FE);border:1.5px solid #C4B5FD;border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+          <div style="text-align:center;margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:800;color:var(--purple);text-transform:uppercase;letter-spacing:1px;">แผนบริการ</div>
+          </div>
+          <div id="reg-plans-display" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1.5px solid var(--border);">
+              <div style="font-size:18px;font-weight:800;color:var(--text);" id="plan-price-display">฿—</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px;" id="plan-period-display">กำลังโหลด...</div>
+            </div>
+            <div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1.5px solid var(--border);">
+              <div style="font-size:18px;">🎓</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px;">ใช้ได้ไม่จำกัดนักเรียน</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--text2);text-align:center;line-height:1.7;" id="reg-features-list">✅ สแกน QR/Barcode &nbsp;·&nbsp; ✅ ส่งออก Excel/PDF<br>✅ จัดการหลายห้อง &nbsp;·&nbsp; ✅ ไฟล์แนบชิ้นงาน</div>
+        </div>
         <div style="display:flex;gap:8px;">
           <div style="flex:1;">
             <label>ชื่อจริง</label>
@@ -4404,7 +4420,11 @@ async function doExport(){
   btn.disabled=true;pb.classList.add('on');pf.style.width='10%';
   try{
     const data=buildExportData();pf.style.width='40%';
-    if(exportType==='excel'){await exportExcel(data,pf);}else{await exportPDF(data,pf);}
+    if(exportType==='excel'){
+      const xlCheck = checkPlanLimit('excel');
+      if(!xlCheck.ok){ btn.disabled=false;pb.classList.remove('on');pf.style.width='0%';showUpgradeModal(xlCheck.msg);return;}
+      await exportExcel(data,pf);
+    }else{await exportPDF(data,pf);}
     pf.style.width='100%';setTimeout(()=>{pb.classList.remove('on');pf.style.width='0%';closeExportModal();},800);
     toast('ดาวน์โหลดเสร็จแล้ว ✅');
   }catch(e){console.error(e);toast('เกิดข้อผิดพลาด: '+e.message,'err');}
@@ -4465,6 +4485,7 @@ function openEditHW(num){
 
 // ===== RENDER MANAGE EXTENSIONS =====
 function renderManage(){
+  renderPlanLimitBadges();
   renderSubjectsFull();
   // populate วิชาใน form เพิ่มงาน
   const nhSubj = document.getElementById('n-hwsubj');
@@ -4693,6 +4714,17 @@ async function confirmXLImport(){
   _lastImportedStudents=[...xlImportData];
   const newStudents=xlImportData.filter(s=>!DB.students.find(x=>x.id===s.id)).map(s=>({...s,room:s.room||DB.rooms[0]||''}));
   const skipped=xlImportData.length-newStudents.length;
+
+  // ตรวจ plan limit
+  if(!isPremium()) {
+    const newRoomsInImport = [...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
+    const totalRooms = DB.rooms.length + newRoomsInImport.length;
+    if(totalRooms > FREE_LIMITS.rooms) {
+      showUpgradeModal(`นำเข้าจะทำให้มี ${totalRooms} ห้อง เกินขีดจำกัด Free Plan (${FREE_LIMITS.rooms} ห้อง) 🔒`);
+      return;
+    }
+  }
+
   showActionPopup('กำลังอัพโหลด...','เตรียมบันทึกรายชื่อ '+newStudents.length+' คน...','upload');
   try {
     await sbImportStudents(newStudents);
@@ -5707,6 +5739,13 @@ async function saveHWWithFile() {
 
   if(!num || !title) { toast('กรอกให้ครบ','warn'); return; }
 
+  // ตรวจ plan limit (เฉพาะงานใหม่ ไม่ใช่ update)
+  const isNewHW = !DB.homeworks.find(h => h.num === num);
+  if(isNewHW) {
+    const hwLimit = checkPlanLimit('homework');
+    if(!hwLimit.ok) { showUpgradeModal(hwLimit.msg); return; }
+  }
+
   showActionPopup('กำลังบันทึกชิ้นงาน','ครั้งที่ '+num+': '+title, 'add');
 
   let fileUrl = '';
@@ -6126,6 +6165,40 @@ function renderTeacherPlanBadge() {
     span.className = 'plan-badge';
     span.innerHTML = badge;
     roleEl.appendChild(span);
+  }
+}
+
+function renderPlanLimitBadges() {
+  // แสดง badge ขีดจำกัดใน header ของแต่ละ section
+  const plan = getTeacherPlan();
+  if(plan === 'premium') return; // premium ไม่แสดง limit
+
+  // Room limit badge
+  const roomCard = document.querySelector('#mtab-rooms .card-title');
+  if(roomCard && !roomCard.querySelector('.limit-badge')) {
+    const used = DB.rooms.length;
+    const max = FREE_LIMITS.rooms;
+    const pct = used/max;
+    const color = pct >= 1 ? 'var(--red)' : pct >= 0.8 ? '#B45309' : 'var(--text2)';
+    const badge = document.createElement('span');
+    badge.className = 'limit-badge';
+    badge.style.cssText = 'font-size:11px;font-weight:700;margin-left:8px;padding:2px 8px;border-radius:20px;background:'+(pct>=1?'var(--red-light)':'var(--bg)')+';color:'+color+';';
+    badge.textContent = used+'/'+max+' ห้อง';
+    roomCard.appendChild(badge);
+  }
+
+  // HW limit badge
+  const hwCard = document.querySelector('#mtab-homework .card-title');
+  if(hwCard && !hwCard.querySelector('.limit-badge')) {
+    const used = DB.homeworks.length;
+    const max = FREE_LIMITS.homeworks;
+    const pct = used/max;
+    const color = pct >= 1 ? 'var(--red)' : pct >= 0.8 ? '#B45309' : 'var(--text2)';
+    const badge = document.createElement('span');
+    badge.className = 'limit-badge';
+    badge.style.cssText = 'font-size:11px;font-weight:700;margin-left:8px;padding:2px 8px;border-radius:20px;background:'+(pct>=1?'var(--red-light)':'var(--bg)')+';color:'+color+';';
+    badge.textContent = used+'/'+max+' ชิ้น';
+    hwCard.appendChild(badge);
   }
 }
 window.addEventListener('load', () => {
