@@ -942,7 +942,6 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   </div>
 </div>
 
-      <p style="text-align:center;font-size:12px;color:rgba(1,1,1,0.5);margin-top:20px;padding-bottom:8px;">👨‍🏫 สร้างและพัฒนาโดย Kru Rattanapol Aiamnor</p>
 
 <!-- ===== SUPER ADMIN ===== -->
 <div id="s-superadmin" class="screen">
@@ -1082,7 +1081,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
 </div>
 <!-- ===== ADMIN ===== -->
 <div id="s-admin" class="screen">
-  <div class="topbar" style="position:relative;">
+  <div class="topbar">
     <div class="tb-left">
       <div id="teacher-topbar-avatar" class="tb-avatar av-admin">ครู</div>
       <div>
@@ -1289,10 +1288,6 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     <div class="card" style="border-color:#BBF7D0;background:linear-gradient(135deg,#F0FDF4,#DCFCE7);">
       <div class="card-title" style="color:#16A34A;">📥 นำเข้ารายชื่อจาก Excel</div>
       <div style="font-size:13px;color:#166534;margin-bottom:12px;line-height:1.6;">ไฟล์ <b>.xlsx/.xls</b> ที่มี: <span style="background:#fff;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;color:#16A34A;">เลขประจำตัว | ชื่อ-สกุล | ห้อง</span></div>
-    <!-- CREDIT -->
-    <div style="position:absolute;left:50%;transform:translateX(-50%);font-size:12px;color:rgba(1,1,1,0.55);font-weight:500;white-space:nowrap;pointer-events:none;">
-      👨‍🏫 สร้างและพัฒนาโดย Kru Rattanapol Aiamnor
-    </div>
       <div style="display:flex;gap:8px;margin-bottom:10px;">
         <button class="mini-btn" onclick="downloadTemplate()" style="border-color:var(--blue);color:var(--blue-dark);background:var(--blue-light);flex:1;padding:10px;font-size:13px;">⬇️ Template</button>
         <label style="flex:1;margin:0;">
@@ -1743,18 +1738,30 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
 
 
 
-<!-- ===== UPLOAD POPUP ===== -->
-<div id="upload-popup" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
-  <div style="background:#fff;border-radius:24px;padding:32px 24px 28px;max-width:320px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-    <div id="up-icon" style="font-size:56px;margin-bottom:12px;">⏳</div>
-    <div id="up-title" style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:6px;">กำลังอัพโหลด...</div>
-    <div id="up-sub" style="font-size:14px;color:var(--text2);margin-bottom:18px;line-height:1.6;min-height:20px;"></div>
-    <div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin-bottom:20px;">
-      <div id="up-bar" style="height:100%;border-radius:4px;width:0%;transition:width .5s ease;background:linear-gradient(90deg,var(--blue),var(--purple));"></div>
+<!-- ===== ROOM STUDENTS MODAL ===== -->
+<div id="room-stu-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);align-items:flex-end;justify-content:center;padding:0;">
+  <div style="background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:600px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 -8px 32px rgba(0,0,0,0.2);">
+    <!-- Header -->
+    <div style="padding:20px 20px 12px;border-bottom:1.5px solid var(--border);flex-shrink:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:18px;font-weight:800;color:var(--text);" id="room-stu-modal-title">ห้อง —</div>
+          <div style="font-size:13px;color:var(--text2);margin-top:2px;" id="room-stu-modal-count">0 คน</div>
+        </div>
+        <button onclick="closeRoomModal()" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:18px;color:var(--text2);">✕</button>
+      </div>
+      <!-- ค้นหาในห้อง -->
+      <div style="position:relative;margin-top:12px;">
+        <input type="text" id="room-stu-search" placeholder="ค้นหาในห้องนี้..." 
+          style="padding-left:36px;font-size:15px;" oninput="filterRoomModal()">
+        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);">🔍</span>
+      </div>
     </div>
-    <button id="up-close-btn" onclick="closeUploadPopup()" style="display:none;width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;border:none;cursor:pointer;font-family:Sarabun,sans-serif;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;">✅ เรียบร้อย</button>
+    <!-- รายชื่อ -->
+    <div id="room-stu-list" style="overflow-y:auto;padding:12px 16px 24px;flex:1;-webkit-overflow-scrolling:touch;"></div>
   </div>
 </div>
+
 </div>
 
 <script>
@@ -3484,10 +3491,15 @@ function setRoom(r){curRoom=r;renderDashboard();}
 
 function renderTable(){
   const q=(document.getElementById('srch').value||'').toLowerCase();
+  const sl=document.getElementById('stu-list');
+  // ซ่อนรายชื่อถ้าไม่ได้พิมพ์ค้นหา
+  if(!q){
+    sl.innerHTML='<div class="empty" style="padding:24px 0;">🔍 พิมพ์ชื่อหรือรหัสนักเรียนเพื่อค้นหา</div>';
+    return;
+  }
   let list=DB.students;
   if(curRoom!=='all')list=list.filter(s=>s.room===curRoom);
   if(q)list=list.filter(s=>s.id.includes(q)||s.name.toLowerCase().includes(q));
-  const sl=document.getElementById('stu-list');
   if(!list.length){sl.innerHTML='<div class="empty">ไม่พบนักเรียน</div>';return;}
   sl.innerHTML=list.map(s=>{
     const done=DB.homeworks.filter(h=>DB.submissions[s.id+'_'+h.num]).length;
@@ -3937,7 +3949,16 @@ function renderManage(){
   if(chips)chips.innerHTML=allRooms.length
     ?allRooms.map(r=>{
         const cnt=DB.students.filter(s=>s.room===r).length;
-        return `<div class="room-card"><div><div class="room-card-name">${r}</div><div class="room-card-count">${cnt} คน</div></div><button onclick="delRoom(this.dataset.r)" data-r="${r}" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบ</button></div>`;
+        return `<div class="room-card" style="cursor:pointer;" onclick="viewRoomStudents('${r}')" title="ดูรายชื่อนักเรียน">
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <div class="room-card-name">${r}</div>
+            <div class="room-card-count">${cnt} คน</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:var(--purple);font-weight:600;">ดูรายชื่อ →</span>
+            <button onclick="event.stopPropagation();delRoom(this.dataset.r)" data-r="${r}" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบ</button>
+          </div>
+        </div>`;
       }).join('')
     :'<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;grid-column:1/-1;">ยังไม่มีห้องเรียน</div>';
   // HW cards with deadline + edit button
@@ -4119,7 +4140,6 @@ async function confirmXLImport(){
   _lastImportedStudents=[...xlImportData];
   const newStudents=xlImportData.filter(s=>!DB.students.find(x=>x.id===s.id)).map(s=>({...s,room:s.room||DB.rooms[0]||''}));
   const skipped=xlImportData.length-newStudents.length;
-  showUploadPopup('กำลังอัพโหลด...','กำลังบันทึกรายชื่อ '+newStudents.length+' คน...');
   try {
     await sbImportStudents(newStudents);
     const newRooms=[...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
@@ -4129,8 +4149,8 @@ async function confirmXLImport(){
     }
     cancelXLImport();renderManage();
     if(_lastImportedStudents.length>0)document.getElementById('qr-gen-card').style.display='';
-    uploadPopupDone('อัพโหลดเสร็จสิ้น! 🎉','นำเข้าสำเร็จ '+newStudents.length+' คน'+(skipped?'\nข้ามซ้ำ '+skipped+' คน':''));
-  } catch(e){uploadPopupError('นำเข้าไม่สำเร็จ: '+e.message);}
+    toast('✅ นำเข้าแล้ว '+newStudents.length+' คน'+(skipped?' (ข้าม '+skipped+' ซ้ำ)':''));
+  } catch(e){toast('นำเข้าไม่สำเร็จ: '+e.message,'err');}
 }
 // ===== EXPIRY SYSTEM =====
 function getExpiryInfo(expiresAt) {
@@ -4916,40 +4936,52 @@ function toggleHWManual() {
 }
 
 
-// ===== UPLOAD POPUP =====
-function showUploadPopup(title,sub){
-  const p=document.getElementById('upload-popup');if(!p)return;
-  document.getElementById('up-icon').textContent='⏳';
-  document.getElementById('up-title').textContent=title||'กำลังอัพโหลด...';
-  document.getElementById('up-sub').textContent=sub||'';
-  document.getElementById('up-bar').style.width='0%';
-  document.getElementById('up-bar').style.background='linear-gradient(90deg,var(--blue),var(--purple))';
-  document.getElementById('up-close-btn').style.display='none';
-  document.getElementById('up-close-btn').style.background='linear-gradient(135deg,var(--green),var(--green-dark))';
-  document.getElementById('up-close-btn').textContent='✅ เรียบร้อย';
-  p.style.display='flex';
-  setTimeout(()=>{const b=document.getElementById('up-bar');if(b)b.style.width='65%';},150);
+// ===== ROOM STUDENTS MODAL =====
+function viewRoomStudents(room) {
+  const students = DB.students.filter(s => s.room === room);
+  document.getElementById('room-stu-modal-title').textContent = '🏫 ' + room;
+  document.getElementById('room-stu-modal-count').textContent = students.length + ' คน';
+  document.getElementById('room-stu-search').value = '';
+  renderRoomModal(students);
+  document.getElementById('room-stu-modal').style.display = 'flex';
 }
-function uploadPopupDone(title,sub){
-  document.getElementById('up-icon').textContent='🎉';
-  document.getElementById('up-title').textContent=title||'อัพโหลดเสร็จสิ้น!';
-  document.getElementById('up-sub').textContent=sub||'';
-  document.getElementById('up-bar').style.width='100%';
-  document.getElementById('up-bar').style.background='linear-gradient(90deg,var(--green),var(--green-dark))';
-  document.getElementById('up-close-btn').style.display='block';
+
+function filterRoomModal() {
+  const q = (document.getElementById('room-stu-search').value || '').toLowerCase();
+  const title = document.getElementById('room-stu-modal-title').textContent.replace('🏫 ','');
+  const all = DB.students.filter(s => s.room === title);
+  const filtered = q ? all.filter(s => s.id.includes(q) || s.name.toLowerCase().includes(q)) : all;
+  renderRoomModal(filtered);
 }
-function uploadPopupError(msg){
-  document.getElementById('up-icon').textContent='❌';
-  document.getElementById('up-title').textContent='เกิดข้อผิดพลาด';
-  document.getElementById('up-sub').textContent=msg||'';
-  document.getElementById('up-bar').style.width='100%';
-  document.getElementById('up-bar').style.background='var(--red)';
-  const btn=document.getElementById('up-close-btn');
-  btn.style.display='block';btn.style.background='linear-gradient(135deg,var(--red),#DC2626)';btn.textContent='✕ ปิด';
+
+function renderRoomModal(students) {
+  const el = document.getElementById('room-stu-list');
+  if(!students.length) {
+    el.innerHTML = '<div class="empty">ไม่พบนักเรียน</div>';
+    return;
+  }
+  el.innerHTML = students.map((s, i) => {
+    const hwCount = DB.homeworks.length;
+    const doneCount = DB.homeworks.filter(h => DB.submissions[s.id + '_' + h.num]).length;
+    const pct = hwCount > 0 ? Math.round(doneCount/hwCount*100) : 0;
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--purple);flex-shrink:0;">${i+1}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:15px;font-weight:700;color:var(--text);">${s.name}</div>
+        <div style="font-size:12px;color:var(--text2);">รหัส ${s.id}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:13px;font-weight:700;color:${pct>=80?'var(--green-dark)':pct>=50?'#B45309':'var(--red)'};">${doneCount}/${hwCount}</div>
+        <div style="font-size:11px;color:var(--text3);">${pct}%</div>
+      </div>
+    </div>`;
+  }).join('');
 }
-function closeUploadPopup(){
-  const p=document.getElementById('upload-popup');if(p)p.style.display='none';
+
+function closeRoomModal() {
+  document.getElementById('room-stu-modal').style.display = 'none';
 }
+
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
