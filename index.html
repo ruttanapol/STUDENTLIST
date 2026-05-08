@@ -6692,11 +6692,12 @@ function closeAIReport() {
 }
 
 function buildAIPrompt(filterRoom, filterSubj, lang) {
-  const students = DB.students.filter(s => !filterRoom || s.room === filterRoom);
-  const hws = DB.homeworks.filter(h => !filterSubj || h.subject === filterSubj);
+  const students = (DB.students||[]).filter(s => !filterRoom || s.room === filterRoom);
+  const hws = (DB.homeworks||[]).filter(h => !filterSubj || h.subject === filterSubj);
   const teacher = CURRENT_TEACHER;
 
   // คำนวณสถิติแต่ละคน
+  if(!students.length) return "ไม่มีข้อมูลนักเรียน";
   const studentStats = students.map(s => {
     const done = hws.filter(h => {
       const sub = DB.submissions[s.id+'_'+h.num];
@@ -6726,7 +6727,7 @@ function buildAIPrompt(filterRoom, filterSubj, lang) {
     ? (studentStats.reduce((a,s)=>a+parseFloat(s.submitRate),0)/students.length).toFixed(1) : 0;
 
   // subject stats
-  const subjStats = getSubjectNames().filter(n => !filterSubj || n===filterSubj).map(subj => {
+  const subjStats = (getSubjectNames()||[]).filter(n => !filterSubj || n===filterSubj).map(subj => {
     const subjHWs = hws.filter(h=>h.subject===subj);
     if(!subjHWs.length) return null;
     const allSubs = students.flatMap(s => subjHWs.map(h => DB.submissions[s.id+'_'+h.num])).filter(Boolean);
@@ -6810,6 +6811,12 @@ async function generateAIReport() {
   const btn = document.getElementById('ai-generate-btn');
   const content = document.getElementById('ai-report-content');
 
+  // ตรวจ API Key ก่อน
+  const apiKey = getAnthropicKey();
+  if(!apiKey) {
+    content.innerHTML = `<div style="text-align:center;padding:24px;"><div style="font-size:36px;margin-bottom:12px;">🔑</div><div style="font-size:15px;font-weight:700;color:var(--red);margin-bottom:8px;">ไม่พบ API Key</div><div style="font-size:13px;color:var(--text2);">Super Admin ต้องบันทึก Anthropic API Key ในหน้าตั้งค่าก่อน</div></div>`;
+    return;
+  }
   btn.disabled = true;
   btn.textContent = '⏳ กำลังวิเคราะห์...';
   content.innerHTML = `
@@ -6828,7 +6835,7 @@ async function generateAIReport() {
         'Content-Type': 'application/json',
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
-        'x-api-key': getAnthropicKey()
+        'x-api-key': apiKey
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
@@ -6911,9 +6918,8 @@ async function loadAnthropicKey() {
     const {data, error} = await SB.from('settings').select('key,value').like('key','%anthropic_key%');
     if(error) { console.log('loadAnthropicKey error:', error); return; }
     if(data && data.length > 0) {
-      // ใช้อันแรกที่เจอ
       _anthropicKey = data[0].value;
-      console.log('Loaded anthropic key from:', data[0].key);
+      console.log('✅ Anthropic key loaded from:', data[0].key, 'length:', _anthropicKey.length);
       const el = document.getElementById('sa-anthropic-key');
       if(el) el.value = _anthropicKey;
       const st = document.getElementById('sa-api-key-status');
