@@ -2037,7 +2037,7 @@ async function loadFromSupabase() {
   const [stuRes, hwRes, subRes, setRes] = await Promise.all([stuQ, hwQ, subQ, SB.from('settings').select('*')]);
 
   DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room}));
-  DB.rooms = [...new Set(DB.students.map(s => s.room))].sort();
+  DB.rooms = [...new Set(DB.students.map(s => s.room))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
   DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||''}));
 
   const subs = {};
@@ -2133,7 +2133,7 @@ async function reloadStudents() {
   if(tid) q = q.eq('teacher_id', tid);
   const {data} = await q;
   DB.students = (data||[]).map(r=>({id:r.id,name:r.name,room:r.room}));
-  DB.rooms = [...new Set(DB.students.map(s=>s.room))].sort();
+  DB.rooms = [...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
 }
 
 async function reloadHomeworks() {
@@ -3027,7 +3027,7 @@ function closeSATeacherView(){
 }
 
 function renderSATeacherData(){
-  const rooms=[...new Set(DB.students.map(s=>s.room))].sort();
+  const rooms=[...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
   document.getElementById('sa-tv-stats').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
       <div style="background:var(--blue-light);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:700;">${DB.students.length}</div><div style="font-size:12px;color:var(--text2);">นักเรียน</div></div>
@@ -3582,7 +3582,7 @@ function showDetail(sid){
 function openEditStu(id){
   const s=DB.students.find(x=>x.id===id);if(!s)return;
   // รวมห้องจาก DB.rooms + ห้องจากนักเรียนทั้งหมด เผื่อ settings ยังไม่โหลด
-  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort();
+  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
   // ถ้าห้องของนักเรียนคนนี้ไม่อยู่ใน list ให้เพิ่มเข้าไปด้วย
   if(s.room&&!allRooms.includes(s.room))allRooms.push(s.room);
   document.getElementById('edit-stu-old-id').value=s.id;
@@ -4016,7 +4016,7 @@ function renderManage(){
       ql.innerHTML = '<div style="font-size:13px;color:var(--text3);">ยังไม่มีวิชา — ไปที่แท็บ 📚 วิชา</div>';
     }
   }
-  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort();
+  const allRooms=[...new Set([...DB.rooms,...DB.students.map(x=>x.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
   const filterSel=document.getElementById('filter-room-manage');
   if(filterSel){
     const cur=filterSel.value;
@@ -4223,14 +4223,11 @@ async function confirmXLImport(){
     await sbImportStudents(newStudents);
     const newRooms=[...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
     if(newRooms.length){
-      DB.rooms=[...new Set([...DB.rooms,...newRooms])].sort();
+      DB.rooms=[...new Set([...DB.rooms,...newRooms])].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
       await sbSaveSettings('rooms', DB.rooms);
     }
     // sort ห้องเรียนอัตโนมัติ
-    DB.rooms = [...new Set([...DB.rooms, ...newStudents.map(s=>s.room)])].filter(Boolean).sort((a,b)=>{
-      // เรียงแบบ natural sort (ม.1/1 ก่อน ม.1/2 ก่อน ม.2/1)
-      return a.localeCompare(b, 'th', {numeric:true, sensitivity:'base'});
-    });
+    DB.rooms = [...new Set([...DB.rooms, ...newStudents.map(s=>s.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
     await sbSaveSettings('rooms', DB.rooms);
     cancelXLImport();renderManage();
     if(_lastImportedStudents.length>0)document.getElementById('qr-gen-card').style.display='';
