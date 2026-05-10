@@ -191,6 +191,8 @@ await checkAndNotifyExpiry(teacher);
     populateScanSelects();
     renderDashboard();
     await checkAndNotifyExpiry(teacher);
+    await checkAndDowngradePremium();
+    checkLockedDataOnLoad();
     return true;
   }catch(e){ 
     console.error('[tryRestoreSession]', e);
@@ -1252,6 +1254,7 @@ function filterTeachers(q) {
 
 function renderTeacherList(teachers){
   _cachedTeachers = teachers;
+  renderSAStats(teachers);
   const pending=teachers.filter(t=>t.status==='pending');
   const slipUploaded=teachers.filter(t=>t.status==='slip_uploaded');
   const approved=teachers.filter(t=>t.status==='approved');
@@ -2501,6 +2504,7 @@ function renderManage(){
   const hwList=document.getElementById('hw-card-list');
   if(hwList)hwList.innerHTML=DB.homeworks.length
     ?DB.homeworks.map(h=>{
+        const locked = isHWLocked(h);
         const now=new Date();
         let dlBadge='<span class="deadline-badge dl-none">ไม่มีกำหนด</span>';
         if(h.deadline){
@@ -2511,7 +2515,10 @@ function renderManage(){
           else dlBadge=`<span class="deadline-badge dl-ok">${dl.toLocaleDateString('th-TH',{day:'numeric',month:'short'})}</span>`;
         }
         const submitted=Object.keys(DB.submissions).filter(k=>k.endsWith('_'+h.num)).length;
-        return `<div class="hw-card-item"><div class="hw-card-num">${h.num}</div><div class="hw-card-info"><div class="hw-card-title">${h.title}</div><div class="hw-card-sub">${h.subject||''} · เต็ม ${h.maxScore||100} · ส่ง ${submitted}/${DB.students.length} · ${dlBadge}</div>${h.fileUrl?'<div style="margin-top:4px;display:flex;align-items:center;gap:6px;"><span style="font-size:12px;">'+ getFileIcon(h.fileName)+'</span><span style="font-size:11px;color:var(--green-dark);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">'+(h.fileName||'ไฟล์แนบ')+'</span><button onclick="removeHWFile('+ h.num+')" style="padding:2px 6px;font-size:10px;border-radius:6px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบไฟล์</button></div>':''}</div><button onclick="openEditHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;margin-right:4px;white-space:nowrap;">แก้ไข</button><button onclick="delHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;">ลบ</button></div>`;
+        const lockedOverlay = locked ? `<div style="position:absolute;inset:0;background:rgba(239,68,68,0.08);border-radius:12px;display:flex;align-items:center;justify-content:flex-end;padding:0 10px;pointer-events:none;"><span style="font-size:11px;font-weight:700;color:var(--red);background:#FEE2E2;padding:3px 8px;border-radius:20px;border:1px solid #FCA5A5;">🔒 ล็อค</span></div>` : '';
+        const wrapStyle = locked ? 'position:relative;opacity:0.7;' : 'position:relative;';
+        return `<div class="hw-card-item" style="${wrapStyle}">${lockedOverlay}<div class="hw-card-num" style="${locked?'background:#FEE2E2;color:var(--red);':''}">
+${h.num}</div><div class="hw-card-info"><div class="hw-card-title">${h.title}${locked?' <span style="font-size:11px;color:var(--red);">🔒</span>':''}</div><div class="hw-card-sub">${h.subject||''} · เต็ม ${h.maxScore||100} · ส่ง ${submitted}/${DB.students.length} · ${dlBadge}</div>${h.fileUrl?'<div style="margin-top:4px;display:flex;align-items:center;gap:6px;"><span style="font-size:12px;">'+ getFileIcon(h.fileName)+'</span><span style="font-size:11px;color:var(--green-dark);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">'+(h.fileName||'ไฟล์แนบ')+'</span><button onclick="removeHWFile('+ h.num+')" style="padding:2px 6px;font-size:10px;border-radius:6px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบไฟล์</button></div>':''}</div>${locked?'<button onclick="openRenewalFlow()" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#FEE2E2;color:var(--red);cursor:pointer;white-space:nowrap;">💳 ต่ออายุ</button>':'<button onclick="openEditHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;margin-right:4px;white-space:nowrap;">แก้ไข</button><button onclick="delHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;">ลบ</button>'}</div>`;
       }).join('')
     :'<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">ยังไม่มีชิ้นงาน</div>';
 }
@@ -3477,7 +3484,7 @@ function populateHWDropdown() {
   hwDd.innerHTML = '<option value="">— เลือกชิ้นงาน —</option>';
   
   DB.homeworks
-    .filter(h => !filterVal || h.subject === filterVal)
+    .filter(h => (!filterVal || h.subject === filterVal) && !isHWLocked(h))
     .forEach(h => {
       const opt = document.createElement('option');
       opt.value = h.num;
@@ -4895,4 +4902,294 @@ ${stuStats.sort((a,b)=>b.avgScore-a.avgScore).slice(0,10).map(s=>`- ${s.name}: $
   } finally {
     if(btn) { btn.disabled = false; btn.innerHTML = '✨ สร้างรายงาน AI'; }
   }
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  PREMIUM EXPIRY & LOCKED DATA SYSTEM                ║
+// ╚══════════════════════════════════════════════════════╝
+
+async function checkAndDowngradePremium() {
+  if(!CURRENT_TEACHER || !SB) return;
+  if(CURRENT_TEACHER.plan !== 'premium') return;
+  const exp = CURRENT_TEACHER.plan_expires_at;
+  if(!exp || new Date(exp) > new Date()) return;
+
+  // Downgrade to free
+  try {
+    await SB.from('teachers').update({plan:'free'}).eq('id', CURRENT_TEACHER.id);
+    CURRENT_TEACHER.plan = 'free';
+    renderPlanBanner();
+    // Check locked HWs
+    const locked = getLockedHomeworks();
+    if(locked.length > 0) {
+      showLockedDataBanner(locked.length);
+    } else {
+      toast('แผน Premium หมดอายุแล้ว — เปลี่ยนเป็น Free Plan', 'warn');
+    }
+  } catch(e) { console.error('downgrade error', e); }
+}
+
+function isHWLocked(hw) {
+  if(isPremium()) return false;
+  const sorted = [...DB.homeworks].sort((a,b) => a.num - b.num);
+  const idx = sorted.findIndex(h => h.num === hw.num);
+  return idx >= FREE_LIMITS.homeworks;
+}
+
+function getLockedHomeworks() {
+  if(isPremium()) return [];
+  return DB.homeworks.filter(hw => isHWLocked(hw));
+}
+
+function checkLockedDataOnLoad() {
+  if(isPremium()) return;
+  const locked = getLockedHomeworks();
+  if(locked.length > 0) showLockedDataBanner(locked.length);
+}
+
+function showLockedDataBanner(count) {
+  const existing = document.getElementById('locked-data-banner');
+  if(existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'locked-data-banner';
+  banner.style.cssText = 'position:fixed;top:64px;left:0;right:0;z-index:9000;padding:10px 16px;background:linear-gradient(135deg,#EF4444,#B91C1C);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;font-family:Sarabun,sans-serif;box-shadow:0 4px 12px rgba(239,68,68,0.4);';
+  banner.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:18px;">🔒</span>
+      <div>
+        <div style="font-size:13px;font-weight:700;">ชิ้นงาน ${count} ชิ้นถูกล็อค</div>
+        <div style="font-size:11px;opacity:0.85;">แผน Premium หมดอายุ — ชิ้นงานที่เกิน ${FREE_LIMITS.homeworks} ชิ้นถูกล็อคชั่วคราว</div>
+      </div>
+    </div>
+    <button onclick="openRenewalFlow()" style="padding:7px 14px;font-size:12px;font-weight:700;border-radius:10px;border:none;background:#fff;color:#B91C1C;cursor:pointer;white-space:nowrap;font-family:Sarabun,sans-serif;">💳 ต่ออายุ</button>`;
+  document.body.appendChild(banner);
+}
+
+// ============================================================
+//  RENEWAL FLOW
+// ============================================================
+let _renewalSlipFile = null;
+let _renewalPayInfo = null;
+
+async function openRenewalFlow() {
+  const modal = document.getElementById('renewal-modal');
+  if(!modal) return;
+
+  // Load payment info
+  try {
+    if(SB) {
+      const {data} = await SB.from('settings').select('value').eq('key','payment_info').maybeSingle();
+      _renewalPayInfo = data?.value || null;
+    }
+  } catch(e) {}
+
+  // Render locked HWs
+  const locked = getLockedHomeworks();
+  const lockedEl = document.getElementById('renewal-locked-list');
+  if(lockedEl) {
+    lockedEl.innerHTML = locked.length
+      ? locked.map(h => `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#FEE2E2;border-radius:8px;margin-bottom:4px;">
+          <span style="font-size:16px;">🔒</span>
+          <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--text);">งานครั้งที่ ${h.num}: ${h.title}</div>
+          <div style="font-size:11px;color:var(--text2);">${h.subject||'ไม่มีวิชา'} · เต็ม ${h.maxScore||100} คะแนน</div></div>
+        </div>`).join('')
+      : '<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">ไม่มีชิ้นงานที่ถูกล็อค</div>';
+  }
+
+  // Render payment info
+  const payEl = document.getElementById('renewal-pay-info');
+  if(payEl && _renewalPayInfo) {
+    const p = _renewalPayInfo;
+    const rawAmount = (p.amount || '').replace(/[^0-9.,]/g, '').replace(',','.');
+    payEl.innerHTML = `
+      <div style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border:1.5px solid #86EFAC;border-radius:12px;padding:14px;">
+        <div style="font-size:13px;font-weight:700;color:var(--green-dark);margin-bottom:8px;">💳 ข้อมูลการชำระเงิน</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;">
+          <span style="color:var(--text2);">ธนาคาร</span><span style="font-weight:600;">${p.bank||'-'}</span>
+          <span style="color:var(--text2);">เลขบัญชี</span><span style="font-weight:700;font-size:15px;letter-spacing:1px;">${p.account||'-'}</span>
+          <span style="color:var(--text2);">ชื่อบัญชี</span><span style="font-weight:600;">${p.name||'-'}</span>
+          <span style="color:var(--text2);">ยอดชำระ</span><span style="font-weight:800;font-size:16px;color:var(--green-dark);">${p.amount||'-'}</span>
+        </div>
+      </div>`;
+  } else if(payEl) {
+    payEl.innerHTML = '<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">ยังไม่ได้ตั้งค่าข้อมูลการชำระเงิน</div>';
+  }
+
+  // Reset slip area
+  _renewalSlipFile = null;
+  const previewEl = document.getElementById('renewal-slip-preview');
+  if(previewEl) previewEl.innerHTML = '';
+  const statusEl = document.getElementById('renewal-verify-status');
+  if(statusEl) statusEl.innerHTML = '';
+  const submitBtn = document.getElementById('renewal-submit-btn');
+  if(submitBtn) submitBtn.style.display = 'none';
+
+  modal.style.display = 'flex';
+}
+
+function closeRenewalFlow() {
+  const modal = document.getElementById('renewal-modal');
+  if(modal) modal.style.display = 'none';
+}
+
+function handleRenewalSlipSelect(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  _renewalSlipFile = file;
+  const preview = document.getElementById('renewal-slip-preview');
+  if(preview) {
+    const url = URL.createObjectURL(file);
+    preview.innerHTML = `<img src="${url}" style="width:100%;max-height:180px;object-fit:contain;border-radius:10px;border:1.5px solid var(--border);">
+      <div style="font-size:12px;color:var(--text3);margin-top:4px;text-align:center;">${file.name}</div>`;
+  }
+  const submitBtn = document.getElementById('renewal-submit-btn');
+  if(submitBtn) submitBtn.style.display = 'block';
+  const statusEl = document.getElementById('renewal-verify-status');
+  if(statusEl) statusEl.innerHTML = '';
+}
+
+async function submitRenewalSlip() {
+  if(!_renewalSlipFile) { toast('กรุณาเลือกสลิปก่อน','err'); return; }
+  if(!ANTHROPIC_KEY) { toast('ระบบยังไม่ได้ตั้งค่า API Key — กรุณาติดต่อแอดมิน','err'); return; }
+
+  const btn = document.getElementById('renewal-submit-btn');
+  const statusEl = document.getElementById('renewal-verify-status');
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ กำลังตรวจสอบ...'; }
+  if(statusEl) statusEl.innerHTML = '<div style="text-align:center;padding:8px;font-size:13px;color:var(--text2);">🤖 AI กำลังอ่านสลิป...</div>';
+
+  try {
+    // Read file as base64
+    const base64 = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result.split(',')[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(_renewalSlipFile);
+    });
+    const mediaType = _renewalSlipFile.type || 'image/jpeg';
+
+    // Parse required amount from payment info
+    const rawAmount = (_renewalPayInfo?.amount || '').replace(/[^0-9.]/g, '');
+    const requiredAmount = parseFloat(rawAmount) || 0;
+
+    // AI verify slip
+    const readAmount = await verifySlipAmountWithAI(base64, mediaType);
+
+    const match = requiredAmount > 0 && readAmount > 0 && Math.abs(readAmount - requiredAmount) <= 10;
+
+    if(statusEl) {
+      statusEl.innerHTML = `
+        <div style="padding:12px;border-radius:10px;text-align:center;background:${match?'#DCFCE7':'#FEE2E2'};border:1.5px solid ${match?'#86EFAC':'#FCA5A5'};">
+          <div style="font-size:20px;margin-bottom:4px;">${match?'✅':'❌'}</div>
+          <div style="font-size:13px;font-weight:700;color:${match?'var(--green-dark)':'var(--red)'};">
+            ${match ? 'ยอดตรงกัน! กำลังปลดล็อค...' : `ยอดไม่ตรง (AI อ่านได้: ฿${readAmount} · ต้องการ: ฿${requiredAmount})`}
+          </div>
+        </div>`;
+    }
+
+    if(match) {
+      // Upload slip & unlock premium
+      await activatePremiumAfterPayment(base64, mediaType);
+    } else {
+      if(btn) { btn.disabled = false; btn.textContent = '🤖 ตรวจสอบสลิปอีกครั้ง'; }
+    }
+  } catch(err) {
+    if(statusEl) statusEl.innerHTML = `<div style="padding:10px;border-radius:8px;background:#FEE2E2;color:var(--red);font-size:13px;text-align:center;">เกิดข้อผิดพลาด: ${err.message}</div>`;
+    if(btn) { btn.disabled = false; btn.textContent = '🤖 ตรวจสอบสลิป'; }
+  }
+}
+
+async function verifySlipAmountWithAI(base64, mediaType) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01'},
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 100,
+      messages: [{role:'user', content:[
+        {type:'image', source:{type:'base64', media_type: mediaType, data: base64}},
+        {type:'text', text:'ดูสลิปการโอนเงินนี้ แล้วบอกยอดเงินที่โอน ตอบเฉพาะตัวเลขเป็นบาทเท่านั้น เช่น 299 หรือ 1490 ห้ามใส่ข้อความอื่นใด'}
+      ]}]
+    })
+  });
+  if(!res.ok) throw new Error('API Error '+res.status);
+  const data = await res.json();
+  const text = data.content?.[0]?.text?.trim() || '0';
+  return parseFloat(text.replace(/[^0-9.]/g, '')) || 0;
+}
+
+async function activatePremiumAfterPayment(base64, mediaType) {
+  try {
+    // Upload slip to storage
+    const path = `slips/${CURRENT_TEACHER.id}_renewal_${Date.now()}.jpg`;
+    let slipUrl = '';
+    if(SB) {
+      const blob = await (await fetch(`data:${mediaType};base64,${base64}`)).blob();
+      const {data:upData} = await SB.storage.from('slips').upload(path, blob, {upsert:true, contentType:mediaType});
+      if(upData) {
+        const {data:urlData} = SB.storage.from('slips').getPublicUrl(path);
+        slipUrl = urlData?.publicUrl || '';
+      }
+      // Set plan back to premium (30 days default)
+      const newExpiry = new Date();
+      newExpiry.setDate(newExpiry.getDate() + 30);
+      await SB.from('teachers').update({
+        plan: 'premium',
+        plan_expires_at: newExpiry.toISOString(),
+        plan_requested: null,
+        slip_url: slipUrl || undefined,
+        slip_uploaded_at: new Date().toISOString()
+      }).eq('id', CURRENT_TEACHER.id);
+      CURRENT_TEACHER.plan = 'premium';
+      CURRENT_TEACHER.plan_expires_at = newExpiry.toISOString();
+    }
+    // Remove banner & close modal
+    setTimeout(() => {
+      const banner = document.getElementById('locked-data-banner');
+      if(banner) banner.remove();
+      closeRenewalFlow();
+      renderPlanBanner();
+      renderManage();
+      populateHWDropdown();
+      toast('🎉 ปลดล็อคสำเร็จ! ใช้งาน Premium ต่อได้เลย');
+    }, 1500);
+  } catch(err) {
+    console.error('activate premium error', err);
+    toast('เกิดข้อผิดพลาดในการปลดล็อค: '+err.message, 'err');
+  }
+}
+
+// ============================================================
+//  ADMIN UI STATS
+// ============================================================
+function renderSAStats(teachers) {
+  const el = document.getElementById('sa-stats-row');
+  if(!el) return;
+  const total = teachers.length;
+  const approved = teachers.filter(t=>t.status==='approved').length;
+  const premium = teachers.filter(t=>t.plan==='premium').length;
+  const pending = teachers.filter(t=>t.status==='pending'||t.status==='slip_uploaded').length;
+  const expired = teachers.filter(t=>{
+    if(t.plan!=='premium') return false;
+    return t.plan_expires_at && new Date(t.plan_expires_at) < new Date();
+  }).length;
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">
+      <div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:10px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:var(--blue);">${total}</div>
+        <div style="font-size:11px;color:var(--text2);">ทั้งหมด</div>
+      </div>
+      <div style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border:1.5px solid #86EFAC;border-radius:12px;padding:10px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:var(--green-dark);">${approved}</div>
+        <div style="font-size:11px;color:var(--green-dark);">อนุมัติแล้ว</div>
+      </div>
+      <div style="background:linear-gradient(135deg,#FAF5FF,#EDE9FE);border:1.5px solid #C4B5FD;border-radius:12px;padding:10px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:var(--purple);">${premium}</div>
+        <div style="font-size:11px;color:var(--purple);">💎 Premium</div>
+      </div>
+      <div style="background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border:1.5px solid #FCD34D;border-radius:12px;padding:10px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:#B45309;">${pending}</div>
+        <div style="font-size:11px;color:#B45309;">รออนุมัติ</div>
+      </div>
+    </div>
+    ${expired > 0 ? `<div style="background:#FEE2E2;border:1.5px solid #FCA5A5;border-radius:10px;padding:8px 12px;font-size:13px;color:var(--red);font-weight:700;margin-bottom:12px;">⚠️ มี ${expired} บัญชีที่ Premium หมดอายุแล้ว</div>` : ''}`;
 }
