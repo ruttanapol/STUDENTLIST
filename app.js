@@ -4646,6 +4646,7 @@ window.addEventListener('load', () => {
 
   document.addEventListener('keydown', function(e) {
     // ไม่รับถ้ากำลังพิมพ์ใน input หรือ textarea
+    if(!document.activeElement) return;
     const tag = document.activeElement.tagName;
     if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
@@ -4712,4 +4713,166 @@ function initMobileModals(){
       }
     }, {passive:true});
   });
+}
+// ╔══════════════════════════════════════════════════════╗
+// ║  SECTION J: AI REPORT (Premium)                     ║
+// ╚══════════════════════════════════════════════════════╝
+
+let ANTHROPIC_KEY = '';
+
+async function loadAnthropicKey() {
+  if(!SB) return;
+  try {
+    const { data } = await SB.from('settings').select('value').eq('key','anthropic_key').single();
+    ANTHROPIC_KEY = data?.value || '';
+  } catch(e) {
+    ANTHROPIC_KEY = '';
+  }
+}
+
+function openAIReport() {
+  if(!isPremium()) {
+    showUpgradeModal('ฟีเจอร์ AI สรุปรายงาน สำหรับ Premium เท่านั้น');
+    return;
+  }
+  const modal = document.getElementById('ai-report-modal');
+  if(!modal) return;
+  modal.style.display = 'flex';
+
+  // Populate room dropdown
+  const roomSel = document.getElementById('ai-room-sel');
+  if(roomSel) {
+    roomSel.innerHTML = '<option value="">ทุกห้อง</option>';
+    DB.rooms.forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r; opt.textContent = r;
+      roomSel.appendChild(opt);
+    });
+  }
+
+  // Populate subject dropdown
+  const subjSel = document.getElementById('ai-subj-sel');
+  if(subjSel) {
+    subjSel.innerHTML = '<option value="">ทุกวิชา</option>';
+    getSubjectNames().forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      subjSel.appendChild(opt);
+    });
+  }
+
+  // Reset content
+  const content = document.getElementById('ai-report-content');
+  if(content) {
+    content.innerHTML = '<div style="text-align:center;padding:32px 16px;color:var(--text3);"><div style="font-size:40px;margin-bottom:12px;">🤖</div><div style="font-size:14px;">กดปุ่ม "สร้างรายงาน AI" เพื่อวิเคราะห์ข้อมูลห้องเรียน</div></div>';
+  }
+}
+
+function closeAIReport() {
+  const modal = document.getElementById('ai-report-modal');
+  if(modal) modal.style.display = 'none';
+}
+
+async function generateAIReport() {
+  if(!isPremium()) { showUpgradeModal('ฟีเจอร์ AI สรุปรายงาน สำหรับ Premium เท่านั้น'); return; }
+  if(!ANTHROPIC_KEY) {
+    toast('ยังไม่ได้ตั้งค่า Anthropic API Key — ตั้งได้ที่ Super Admin', 'err');
+    return;
+  }
+
+  const room = document.getElementById('ai-room-sel')?.value || '';
+  const subj = document.getElementById('ai-subj-sel')?.value || '';
+  const lang = document.getElementById('ai-lang-sel')?.value || 'th';
+
+  const btn = document.getElementById('ai-generate-btn');
+  const content = document.getElementById('ai-report-content');
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ กำลังวิเคราะห์...'; }
+  if(content) content.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text3);">⏳ AI กำลังวิเคราะห์ข้อมูล...</div>';
+
+  try {
+    // Build data
+    let students = DB.students;
+    if(room) students = students.filter(s => s.room === room);
+
+    let homeworks = DB.homeworks;
+    if(subj) homeworks = homeworks.filter(h => h.subject === subj);
+
+    const hwNums = new Set(homeworks.map(h => h.num));
+    const subs = Object.values(DB.submissions).filter(s =>
+      hwNums.has(s.hwNum) && (!room || s.room === room)
+    );
+
+    // Stats per student
+    const stuStats = students.map(stu => {
+      const stuSubs = subs.filter(s => s.sid === stu.id);
+      const submitted = stuSubs.length;
+      const avgScore = submitted > 0
+        ? Math.round(stuSubs.reduce((a,s) => a + (s.score/s.maxScore*100), 0) / submitted)
+        : 0;
+      return { name: stu.name, room: stu.room, submitted, total: homeworks.length, avgScore };
+    });
+
+    // Overall stats
+    const totalStu = stuStats.length;
+    const avgSubmit = totalStu > 0 ? (stuStats.reduce((a,s)=>a+s.submitted,0)/totalStu).toFixed(1) : 0;
+    const avgScore = totalStu > 0 ? Math.round(stuStats.reduce((a,s)=>a+s.avgScore,0)/totalStu) : 0;
+    const atRisk = stuStats.filter(s => s.submitted < homeworks.length * 0.5).length;
+
+    const langPrompt = lang === 'th'
+      ? 'ตอบเป็นภาษาไทย ใช้ภาษาที่เข้าใจง่าย เหมาะกับครูไทย'
+      : 'Reply in English. Keep it clear and professional.';
+
+    const prompt = `${langPrompt}
+
+คุณเป็น AI ผู้ช่วยครู วิเคราะห์ข้อมูลการส่งงานนักเรียนต่อไปนี้และสร้างรายงานสรุปห้องเรียน:
+
+**ข้อมูลภาพรวม:**
+- ${room ? `ห้อง: ${room}` : 'ทุกห้อง'} | ${subj ? `วิชา: ${subj}` : 'ทุกวิชา'}
+- จำนวนนักเรียน: ${totalStu} คน
+- จำนวนงานทั้งหมด: ${homeworks.length} ชิ้น
+- ส่งงานเฉลี่ย: ${avgSubmit} ชิ้น/คน
+- คะแนนเฉลี่ย: ${avgScore}%
+- นักเรียนเสี่ยง (ส่งงานน้อยกว่า 50%): ${atRisk} คน
+
+**รายชื่อนักเรียนที่น่าเป็นห่วง (ส่งงานน้อยกว่า 50%):**
+${stuStats.filter(s=>s.submitted < homeworks.length*0.5).map(s=>`- ${s.name} (${s.room}): ส่ง ${s.submitted}/${s.total} ชิ้น คะแนนเฉลี่ย ${s.avgScore}%`).join('\n') || 'ไม่มี'}
+
+**สรุปภาพรวมนักเรียน (top 10 ตามคะแนน):**
+${stuStats.sort((a,b)=>b.avgScore-a.avgScore).slice(0,10).map(s=>`- ${s.name}: ${s.submitted}/${s.total} ชิ้น (${s.avgScore}%)`).join('\n')}
+
+กรุณาสร้างรายงานประกอบด้วย:
+1. สรุปภาพรวมห้องเรียน
+2. จุดเด่นและข้อดี
+3. ปัญหาและจุดที่ต้องปรับปรุง
+4. นักเรียนที่ต้องติดตามเป็นพิเศษ
+5. ข้อเสนอแนะสำหรับครู
+
+ใช้ emoji เพื่อให้อ่านง่าย ตอบในรูปแบบที่อ่านสบาย ไม่ต้องใช้ markdown heading`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if(!res.ok) throw new Error('API Error: ' + res.status);
+    const data = await res.json();
+    const text = data.content?.[0]?.text || 'ไม่สามารถสร้างรายงานได้';
+
+    if(content) {
+      content.innerHTML = `
+        <div style="font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;font-family:Sarabun,sans-serif;">${text}</div>
+        <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);text-align:center;">
+          สร้างโดย Claude AI · ${new Date().toLocaleString('th-TH')}
+        </div>`;
+    }
+  } catch(err) {
+    if(content) content.innerHTML = `<div style="text-align:center;padding:24px;color:#EF4444;"><div style="font-size:24px;">⚠️</div><div style="margin-top:8px;">เกิดข้อผิดพลาด: ${err.message}</div></div>`;
+  } finally {
+    if(btn) { btn.disabled = false; btn.innerHTML = '✨ สร้างรายงาน AI'; }
+  }
 }
