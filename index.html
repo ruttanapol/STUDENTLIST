@@ -1594,103 +1594,240 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     <!-- Premium Gate -->
     <div id="grade-premium-gate" style="display:none;text-align:center;padding:32px 16px;">
       <div style="font-size:48px;margin-bottom:12px;">💎</div>
-      <div style="font-size:17px;font-weight:800;color:var(--text);margin-bottom:8px;">Template คะแนนรายเทอม</div>
+      <div style="font-size:17px;font-weight:800;color:var(--text);margin-bottom:8px;">ระบบจัดการเกรด</div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.7;">
-        กำหนดสัดส่วนคะแนน · Import คะแนนสอบ<br>ตัดเกรดอัตโนมัติจาก 100 คะแนน
+        คำนวณเกรดประถม-มัธยม · Import คะแนนสอบ<br>ตัดเกรดอัตโนมัติตามเกณฑ์ที่กำหนด
       </div>
-      <button onclick="showUpgradeModal('Template คะแนนรายเทอม เฉพาะ Premium 🔒')"
+      <button onclick="showUpgradeModal('ระบบจัดการเกรด เฉพาะ Premium 🔒')"
         style="padding:14px 28px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
         💎 อัปเกรดเป็น Premium
       </button>
     </div>
 
-    <!-- Grade Content (Premium only) -->
+    <!-- Grade Main Content -->
     <div id="grade-content">
 
-      <!-- สัดส่วนคะแนน -->
-      <div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#FAFAFF,#F5F0FF);margin-bottom:12px;">
-        <div class="card-title" style="color:var(--purple);">📐 สัดส่วนคะแนน (รวม 100%)</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div>
-            <label class="lbl" style="margin-top:0;">งาน/ชิ้นงาน (%)</label>
-            <input type="number" id="grade-weight-hw" value="20" min="0" max="100" oninput="updateGradeWeights()"
-              style="text-align:center;font-weight:700;color:var(--purple);font-size:18px;">
-          </div>
-          <div>
-            <label class="lbl" style="margin-top:0;">สอบกลางภาค (%)</label>
-            <input type="number" id="grade-weight-mid" value="30" min="0" max="100" oninput="updateGradeWeights()"
-              style="text-align:center;font-weight:700;color:var(--blue);font-size:18px;">
-          </div>
-          <div>
-            <label class="lbl" style="margin-top:0;">สอบปลายภาค (%)</label>
-            <input type="number" id="grade-weight-final" value="40" min="0" max="100" oninput="updateGradeWeights()"
-              style="text-align:center;font-weight:700;color:var(--green-dark);font-size:18px;">
-          </div>
-          <div>
-            <label class="lbl" style="margin-top:0;">อื่นๆ/จิตพิสัย (%)</label>
-            <input type="number" id="grade-weight-other" value="10" min="0" max="100" oninput="updateGradeWeights()"
-              style="text-align:center;font-weight:700;color:var(--yellow);font-size:18px;">
-          </div>
+      <!-- LEVEL SELECTOR: ประถม / มัธยม -->
+      <div id="grade-level-selector">
+        <div style="text-align:center;margin-bottom:16px;">
+          <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px;">🎓 เลือกระดับการศึกษา</div>
+          <div style="font-size:12px;color:var(--text2);">ระบบจะปรับรูปแบบการคำนวณเกรดให้เหมาะสม</div>
         </div>
-        <div id="grade-weight-status" style="text-align:center;font-size:14px;font-weight:700;padding:8px;border-radius:10px;background:var(--green-light);color:var(--green-dark);">
-          ✅ รวม 100%
-        </div>
-      </div>
-
-      <!-- เกณฑ์ตัดเกรด -->
-      <div class="card" style="margin-bottom:12px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <div class="card-title" style="margin:0;">🎓 เกณฑ์ตัดเกรด</div>
-          <button onclick="resetGradeCriteria()" style="padding:5px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;color:var(--text2);">รีเซ็ต</button>
-        </div>
-        <div id="grade-criteria-list">
-          <!-- render by JS -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div onclick="selectGradeLevel('primary')"
+            style="border:2px solid var(--border);border-radius:16px;padding:24px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;"
+            id="grade-level-primary-card"
+            onmouseover="this.style.borderColor='var(--green)';this.style.background='var(--green-light)'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.background='#fff'">
+            <div style="font-size:36px;margin-bottom:10px;">🏫</div>
+            <div style="font-size:16px;font-weight:800;color:var(--green-dark);">ประถมศึกษา</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.6;">
+              ตัดเกรด A-F<br>Import คะแนนสอบได้
+            </div>
+          </div>
+          <div onclick="selectGradeLevel('secondary')"
+            style="border:2px solid var(--border);border-radius:16px;padding:24px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;"
+            id="grade-level-secondary-card"
+            onmouseover="this.style.borderColor='var(--purple)';this.style.background='var(--purple-light)'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.background='#fff'">
+            <div style="font-size:36px;margin-bottom:10px;">🏛️</div>
+            <div style="font-size:16px;font-weight:800;color:var(--purple);">มัธยมศึกษา</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:6px;line-height:1.6;">
+              แบ่งเทอม 1-2<br>สัดส่วนคะแนนแบบกำหนดเอง
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- เลือกวิชา + ห้อง -->
-      <div class="card" style="margin-bottom:12px;">
-        <div class="card-title">📊 คำนวณเกรดรายห้อง</div>
-        <div style="display:flex;gap:8px;margin-bottom:12px;">
-          <div style="flex:1;">
-            <label class="lbl" style="margin-top:0;">วิชา</label>
-            <select id="grade-subj-sel" style="font-size:14px;" onchange="renderGradeTable()">
-              <option value="">— ทุกวิชา —</option>
-            </select>
-          </div>
-          <div style="flex:1;">
-            <label class="lbl" style="margin-top:0;">ห้อง</label>
-            <select id="grade-room-sel" style="font-size:14px;" onchange="renderGradeTable()">
-              <option value="">— ทุกห้อง —</option>
-            </select>
+      <!-- ===== ประถมศึกษา ===== -->
+      <div id="grade-primary-section" style="display:none;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+          <button onclick="backToLevelSelector()" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;">← กลับ</button>
+          <div style="font-size:15px;font-weight:800;color:var(--green-dark);">🏫 ประถมศึกษา — ตัดเกรด</div>
+        </div>
+
+        <!-- Filter -->
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-title">🔍 เลือกห้อง / วิชา</div>
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;"><label class="lbl" style="margin-top:0;">ห้อง</label>
+              <select id="pri-room-sel" style="font-size:14px;" onchange="renderPrimaryGrade()">
+                <option value="">ทุกห้อง</option>
+              </select></div>
+            <div style="flex:1;"><label class="lbl" style="margin-top:0;">วิชา</label>
+              <select id="pri-subj-sel" style="font-size:14px;" onchange="renderPrimaryGrade()">
+                <option value="">ทุกวิชา</option>
+              </select></div>
           </div>
         </div>
 
         <!-- Import คะแนนสอบ -->
-        <div style="background:var(--blue-light);border-radius:12px;padding:12px;margin-bottom:12px;">
-          <div style="font-size:13px;font-weight:700;color:var(--blue-dark);margin-bottom:8px;">📥 Import คะแนนสอบ (ไม่บังคับ)</div>
-          <div style="display:flex;gap:8px;margin-bottom:8px;">
-            <div style="flex:1;">
-              <label class="lbl" style="margin-top:0;color:var(--blue-dark);">คะแนนกลางภาค (เต็ม <span id="mid-max-label">100</span>)</label>
-              <input type="number" id="grade-mid-score" placeholder="กรอกคะแนน..." min="0"
-                style="font-size:14px;" oninput="renderGradeTable()">
-            </div>
-            <div style="flex:1;">
-              <label class="lbl" style="margin-top:0;color:var(--blue-dark);">คะแนนปลายภาค (เต็ม <span id="final-max-label">100</span>)</label>
-              <input type="number" id="grade-final-score" placeholder="กรอกคะแนน..." min="0"
-                style="font-size:14px;" oninput="renderGradeTable()">
-            </div>
+        <div class="card" style="border-color:#86EFAC;background:linear-gradient(135deg,#F0FDF4,#DCFCE7);margin-bottom:12px;">
+          <div class="card-title" style="color:var(--green-dark);">📥 Import คะแนนสอบ (Excel)</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.7;">
+            Format: คอลัมน์ A = ชื่อ, B = คะแนน (หรือ A = รหัส, B = ชื่อ, C = คะแนน)<br>
+            ระบบจะจับคู่ชื่อนักเรียนอัตโนมัติ
           </div>
-          <div style="font-size:11px;color:var(--blue-dark);">💡 กรอกคะแนนสอบเป็นของทั้งห้อง ระบบจะนำไปคำนวณรวมกับคะแนนชิ้นงาน</div>
+          <label style="display:block;border:2px dashed #86EFAC;border-radius:10px;padding:14px;text-align:center;cursor:pointer;background:#fff;transition:all .2s;"
+            onmouseover="this.style.borderColor='var(--green-dark)'" onmouseout="this.style.borderColor='#86EFAC'">
+            <input type="file" id="pri-score-file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="importPrimaryScores(this)">
+            <div id="pri-score-label" style="font-size:13px;color:var(--green-dark);font-weight:600;">📂 คลิกเพื่อเลือกไฟล์ Excel คะแนนสอบ</div>
+          </label>
+          <div id="pri-import-result" style="margin-top:8px;font-size:12px;"></div>
+        </div>
+
+        <!-- เกณฑ์ตัดเกรด -->
+        <div class="card" style="margin-bottom:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div class="card-title" style="margin:0;">🎓 เกณฑ์ตัดเกรด (A-F)</div>
+            <button onclick="resetGradeCriteria();renderPrimaryGrade();" style="padding:4px 10px;font-size:11px;font-weight:700;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;color:var(--text2);">รีเซ็ต</button>
+          </div>
+          <div id="grade-criteria-list"></div>
         </div>
 
         <!-- ตารางเกรด -->
-        <div id="grade-table-wrap" style="overflow-x:auto;"></div>
+        <div class="card" style="margin-bottom:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div class="card-title" style="margin:0;">📊 ผลการคำนวณเกรด</div>
+            <button onclick="exportPrimaryGradeExcel()" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:linear-gradient(135deg,#16A34A,#15803D);color:#fff;cursor:pointer;">📊 Export</button>
+          </div>
+          <div id="pri-grade-table"></div>
+        </div>
       </div>
 
-    </div>
-  </div>
+      <!-- ===== มัธยมศึกษา ===== -->
+      <div id="grade-secondary-section" style="display:none;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+          <button onclick="backToLevelSelector()" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;">← กลับ</button>
+          <div style="font-size:15px;font-weight:800;color:var(--purple);">🏛️ มัธยมศึกษา — เลือกเทอม</div>
+        </div>
 
+        <!-- เลือกเทอม -->
+        <div id="sec-term-selector" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+          <div onclick="selectSecTerm(1)"
+            style="border:2px solid var(--border);border-radius:16px;padding:20px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;"
+            onmouseover="this.style.borderColor='var(--blue)';this.style.background='var(--blue-light)'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.background='#fff'">
+            <div style="font-size:32px;margin-bottom:8px;">1️⃣</div>
+            <div style="font-size:15px;font-weight:800;color:var(--blue-dark);">เทอม 1</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px;">ก่อนกลาง · กลาง · หลังกลาง · ปลาย</div>
+          </div>
+          <div onclick="selectSecTerm(2)"
+            style="border:2px solid var(--border);border-radius:16px;padding:20px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;"
+            onmouseover="this.style.borderColor='var(--purple)';this.style.background='var(--purple-light)'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.background='#fff'">
+            <div style="font-size:32px;margin-bottom:8px;">2️⃣</div>
+            <div style="font-size:15px;font-weight:800;color:var(--purple);">เทอม 2</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px;">ก่อนกลาง · กลาง · หลังกลาง · ปลาย</div>
+          </div>
+        </div>
+
+        <!-- Term Detail (เทอม 1 / เทอม 2 ใช้ HTML เดียวกัน) -->
+        <div id="sec-term-detail" style="display:none;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <button onclick="backToTermSelector()" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;">← เทอม</button>
+            <div id="sec-term-title" style="font-size:14px;font-weight:800;color:var(--purple);">เทอม 1</div>
+          </div>
+
+          <!-- Filter -->
+          <div class="card" style="margin-bottom:12px;">
+            <div class="card-title">🔍 เลือกห้อง / วิชา</div>
+            <div style="display:flex;gap:8px;">
+              <div style="flex:1;"><label class="lbl" style="margin-top:0;">ห้อง</label>
+                <select id="sec-room-sel" style="font-size:14px;" onchange="renderSecGrade()"><option value="">ทุกห้อง</option></select></div>
+              <div style="flex:1;"><label class="lbl" style="margin-top:0;">วิชา</label>
+                <select id="sec-subj-sel" style="font-size:14px;" onchange="renderSecGrade()"><option value="">ทุกวิชา</option></select></div>
+            </div>
+          </div>
+
+          <!-- สัดส่วนคะแนน -->
+          <div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#FAFAFF,#F5F0FF);margin-bottom:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div class="card-title" style="margin:0;color:var(--purple);">📐 สัดส่วนคะแนน (รวม 100%)</div>
+              <div id="sec-weight-status" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--green-light);color:var(--green-dark);">✅ 100%</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:#fff;border-radius:10px;padding:10px;">
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">📝 ก่อนกลางภาค (ชิ้นงาน)</div>
+                <input type="number" id="sec-w-pre" value="20" min="0" max="100" oninput="updateSecWeights()"
+                  style="text-align:center;font-weight:800;color:var(--purple);font-size:20px;border:none;width:100%;padding:4px;">
+              </div>
+              <div style="background:#fff;border-radius:10px;padding:10px;">
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">📋 สอบกลางภาค</div>
+                <input type="number" id="sec-w-mid" value="30" min="0" max="100" oninput="updateSecWeights()"
+                  style="text-align:center;font-weight:800;color:var(--blue);font-size:20px;border:none;width:100%;padding:4px;">
+              </div>
+              <div style="background:#fff;border-radius:10px;padding:10px;">
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">📝 หลังกลางภาค (ชิ้นงาน)</div>
+                <input type="number" id="sec-w-post" value="20" min="0" max="100" oninput="updateSecWeights()"
+                  style="text-align:center;font-weight:800;color:var(--green-dark);font-size:20px;border:none;width:100%;padding:4px;">
+              </div>
+              <div style="background:#fff;border-radius:10px;padding:10px;">
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">📋 สอบปลายภาค</div>
+                <input type="number" id="sec-w-final" value="30" min="0" max="100" oninput="updateSecWeights()"
+                  style="text-align:center;font-weight:800;color:var(--red);font-size:20px;border:none;width:100%;padding:4px;">
+              </div>
+            </div>
+          </div>
+
+          <!-- Import คะแนนสอบ -->
+          <div class="card" style="border-color:#BFDBFE;background:linear-gradient(135deg,#EFF6FF,#DBEAFE);margin-bottom:12px;">
+            <div class="card-title" style="color:var(--blue-dark);">📥 Import คะแนนสอบ (Excel)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <div style="font-size:12px;font-weight:700;color:var(--blue-dark);margin-bottom:6px;">กลางภาค</div>
+                <label style="display:block;border:2px dashed #BFDBFE;border-radius:10px;padding:10px;text-align:center;cursor:pointer;background:#fff;">
+                  <input type="file" id="sec-mid-file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="importSecScores(this,'mid')">
+                  <div id="sec-mid-label" style="font-size:11px;color:var(--blue);font-weight:600;">📂 เลือกไฟล์</div>
+                </label>
+                <div id="sec-mid-result" style="font-size:11px;margin-top:4px;color:var(--text2);"></div>
+              </div>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px;">ปลายภาค</div>
+                <label style="display:block;border:2px dashed #FCA5A5;border-radius:10px;padding:10px;text-align:center;cursor:pointer;background:#fff;">
+                  <input type="file" id="sec-final-file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="importSecScores(this,'final')">
+                  <div id="sec-final-label" style="font-size:11px;color:var(--red);font-weight:600;">📂 เลือกไฟล์</div>
+                </label>
+                <div id="sec-final-result" style="font-size:11px;margin-top:4px;color:var(--text2);"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ชิ้นงาน config -->
+          <div class="card" style="margin-bottom:12px;">
+            <div class="card-title">📝 ชิ้นงาน — กำหนดช่วงก่อน/หลังกลางภาค</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">กำหนดว่าชิ้นงานครั้งที่เท่าไหร่ถือเป็น "ก่อนกลางภาค" และหลังจากนั้นเป็น "หลังกลางภาค"</div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <label class="lbl" style="margin:0;white-space:nowrap;">ก่อนกลางภาค: ชิ้นที่ 1 —</label>
+              <input type="number" id="sec-hw-mid-cutoff" value="5" min="1"
+                style="width:70px;text-align:center;font-weight:700;color:var(--purple);font-size:16px;"
+                onchange="renderSecGrade()">
+              <label class="lbl" style="margin:0;color:var(--text2);">| หลังกลางภาค: ที่เหลือทั้งหมด</label>
+            </div>
+          </div>
+
+          <!-- เกณฑ์ตัดเกรด -->
+          <div class="card" style="margin-bottom:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div class="card-title" style="margin:0;">🎓 เกณฑ์ตัดเกรด</div>
+              <button onclick="resetGradeCriteria();renderSecGrade();" style="padding:4px 10px;font-size:11px;font-weight:700;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;color:var(--text2);">รีเซ็ต</button>
+            </div>
+            <div id="grade-criteria-list-sec"></div>
+          </div>
+
+          <!-- ตารางเกรด -->
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div class="card-title" style="margin:0;">📊 ผลการคำนวณเกรด</div>
+              <button onclick="exportSecGradeExcel()" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:linear-gradient(135deg,var(--purple),#4F8EF7);color:#fff;cursor:pointer;">📊 Export</button>
+            </div>
+            <div id="sec-grade-table"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end grade-content -->
+  </div>
   <div id="mtab-reset" class="mtab-page" style="display:none;">
     <div class="card">
       <div class="card-title">⚠️ รีเซ็ตข้อมูล</div>
@@ -6420,6 +6557,9 @@ function renderPlanLimitBadges() {
 // ╔══════════════════════════════════════════════════════╗
 // ║  SECTION J: PREMIUM FEATURES (AI / GRADE)          ║
 // ╚══════════════════════════════════════════════════════╝
+// ╔══════════════════════════════════════════════════════╗
+// ║  SECTION H: SUBJECT & GRADE MANAGEMENT             ║
+// ╚══════════════════════════════════════════════════════╝
 // ===== GRADE TEMPLATE SYSTEM =====
 
 const DEFAULT_GRADE_CRITERIA = [
@@ -6433,11 +6573,17 @@ const DEFAULT_GRADE_CRITERIA = [
   {grade:'F', min:0,  gpa:0.0},
 ];
 
-let gradeCriteria = JSON.parse(localStorage.getItem('grade_criteria') || 'null') || [...DEFAULT_GRADE_CRITERIA];
-let gradeWeights = JSON.parse(localStorage.getItem('grade_weights') || 'null') || {hw:20, mid:30, final:40, other:10};
+let gradeCriteria = JSON.parse(localStorage.getItem('grade_criteria')||'null') || [...DEFAULT_GRADE_CRITERIA];
+
+// ข้อมูลคะแนนสอบที่ import มา
+let _priExamScores = {};   // {ชื่อนักเรียน: คะแนน}
+let _secMidScores = {};    // {ชื่อนักเรียน: คะแนน}
+let _secFinalScores = {};  // {ชื่อนักเรียน: คะแนน}
+let _currentSecTerm = 1;
+
+// ==================== NAVIGATION ====================
 
 function openGradeTab() {
-  // แสดง/ซ่อน premium gate
   const gate = document.getElementById('grade-premium-gate');
   const content = document.getElementById('grade-content');
   if(gate && content) {
@@ -6446,76 +6592,60 @@ function openGradeTab() {
     content.style.display = isPrem ? 'block' : 'none';
     if(!isPrem) return;
   }
-  // โหลด weights จาก input
-  if(gradeWeights) {
-    const hw = document.getElementById('grade-weight-hw');
-    const mid = document.getElementById('grade-weight-mid');
-    const fin = document.getElementById('grade-weight-final');
-    const oth = document.getElementById('grade-weight-other');
-    if(hw) hw.value = gradeWeights.hw;
-    if(mid) mid.value = gradeWeights.mid;
-    if(fin) fin.value = gradeWeights.final;
-    if(oth) oth.value = gradeWeights.other;
+  // แสดง level selector
+  showGradeView('level-selector');
+  renderGradeCriteria('grade-criteria-list');
+  renderGradeCriteria('grade-criteria-list-sec');
+}
+
+function showGradeView(view) {
+  ['grade-level-selector','grade-primary-section','grade-secondary-section'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.style.display = 'none';
+  });
+  if(view === 'level-selector') {
+    document.getElementById('grade-level-selector').style.display = 'block';
+  } else if(view === 'primary') {
+    document.getElementById('grade-primary-section').style.display = 'block';
+    populatePrimarySelects();
+    renderPrimaryGrade();
+  } else if(view === 'secondary') {
+    document.getElementById('grade-secondary-section').style.display = 'block';
+    document.getElementById('sec-term-selector').style.display = 'grid';
+    document.getElementById('sec-term-detail').style.display = 'none';
   }
-  renderGradeCriteria();
-  populateGradeSelects();
-  renderGradeTable();
 }
 
-function updateGradeWeights() {
-  const hw = parseFloat(document.getElementById('grade-weight-hw')?.value)||0;
-  const mid = parseFloat(document.getElementById('grade-weight-mid')?.value)||0;
-  const fin = parseFloat(document.getElementById('grade-weight-final')?.value)||0;
-  const oth = parseFloat(document.getElementById('grade-weight-other')?.value)||0;
-  const total = hw + mid + fin + oth;
-  const statusEl = document.getElementById('grade-weight-status');
-  if(statusEl) {
-    if(Math.round(total) === 100) {
-      statusEl.style.background = 'var(--green-light)';
-      statusEl.style.color = 'var(--green-dark)';
-      statusEl.textContent = '✅ รวม 100%';
-    } else {
-      statusEl.style.background = 'var(--red-light)';
-      statusEl.style.color = 'var(--red)';
-      statusEl.textContent = '⚠️ รวม ' + total + '% (ต้องรวมเป็น 100%)';
-    }
-  }
-  gradeWeights = {hw, mid, fin, final:fin, other:oth};
-  localStorage.setItem('grade_weights', JSON.stringify(gradeWeights));
-  renderGradeTable();
+function selectGradeLevel(level) {
+  showGradeView(level);
 }
 
-function renderGradeCriteria() {
-  const el = document.getElementById('grade-criteria-list');
-  if(!el) return;
-  el.innerHTML = gradeCriteria.map((c,i) => `
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
-      <div style="width:36px;text-align:center;font-size:15px;font-weight:800;color:${getGradeColor(c.grade)};">${c.grade}</div>
-      <div style="font-size:12px;color:var(--text2);flex-shrink:0;">คะแนน ≥</div>
-      <input type="number" value="${c.min}" min="0" max="100"
-        style="width:70px;text-align:center;font-weight:700;padding:6px;font-size:14px;"
-        onchange="updateGradeCriteria(${i},'min',this.value)">
-      <div style="font-size:12px;color:var(--text2);flex-shrink:0;">GPA</div>
-      <input type="number" value="${c.gpa}" min="0" max="4" step="0.5"
-        style="width:60px;text-align:center;font-weight:700;padding:6px;font-size:14px;"
-        onchange="updateGradeCriteria(${i},'gpa',this.value)">
-    </div>
-  `).join('');
+function backToLevelSelector() {
+  showGradeView('level-selector');
 }
 
-function updateGradeCriteria(idx, field, val) {
-  gradeCriteria[idx][field] = parseFloat(val);
-  gradeCriteria.sort((a,b) => b.min - a.min);
-  localStorage.setItem('grade_criteria', JSON.stringify(gradeCriteria));
-  renderGradeCriteria();
-  renderGradeTable();
+function selectSecTerm(term) {
+  _currentSecTerm = term;
+  document.getElementById('sec-term-selector').style.display = 'none';
+  document.getElementById('sec-term-detail').style.display = 'block';
+  document.getElementById('sec-term-title').textContent = '🏛️ มัธยมศึกษา — เทอม ' + term;
+  populateSecSelects();
+  renderSecGrade();
+  renderGradeCriteria('grade-criteria-list-sec');
 }
+
+function backToTermSelector() {
+  document.getElementById('sec-term-selector').style.display = 'grid';
+  document.getElementById('sec-term-detail').style.display = 'none';
+}
+
+// ==================== GRADE CRITERIA ====================
 
 function resetGradeCriteria() {
   gradeCriteria = [...DEFAULT_GRADE_CRITERIA];
   localStorage.setItem('grade_criteria', JSON.stringify(gradeCriteria));
-  renderGradeCriteria();
-  renderGradeTable();
+  renderGradeCriteria('grade-criteria-list');
+  renderGradeCriteria('grade-criteria-list-sec');
 }
 
 function getGradeColor(grade) {
@@ -6525,482 +6655,360 @@ function getGradeColor(grade) {
 
 function calculateGrade(score100) {
   const sorted = [...gradeCriteria].sort((a,b)=>b.min-a.min);
-  for(const c of sorted) {
-    if(score100 >= c.min) return c;
-  }
-  return sorted[sorted.length-1] || {grade:'F',gpa:0};
+  for(const c of sorted) { if(score100 >= c.min) return c; }
+  return {grade:'F', gpa:0.0};
 }
 
-function populateGradeSelects() {
-  const subjSel = document.getElementById('grade-subj-sel');
-  const roomSel = document.getElementById('grade-room-sel');
-  if(subjSel) {
-    const cur = subjSel.value;
-    subjSel.innerHTML = '<option value="">— ทุกวิชา —</option>' +
-      getSubjectNames().map(n=>`<option>${n}</option>`).join('');
-    if(cur) subjSel.value = cur;
-  }
-  if(roomSel) {
-    const cur = roomSel.value;
-    roomSel.innerHTML = '<option value="">— ทุกห้อง —</option>' +
-      DB.rooms.map(r=>`<option>${r}</option>`).join('');
-    if(cur) roomSel.value = cur;
-  }
+function renderGradeCriteria(elId) {
+  const el = document.getElementById(elId||'grade-criteria-list');
+  if(!el) return;
+  el.innerHTML = gradeCriteria.map((c,i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+      <div style="width:34px;text-align:center;font-size:14px;font-weight:800;color:${getGradeColor(c.grade)};flex-shrink:0;">${c.grade}</div>
+      <div style="font-size:12px;color:var(--text2);flex-shrink:0;">คะแนน ≥</div>
+      <input type="number" value="${c.min}" min="0" max="100"
+        style="width:64px;text-align:center;font-weight:700;padding:5px;font-size:13px;border-radius:8px;"
+        onchange="gradeCriteria[${i}].min=parseFloat(this.value);gradeCriteria.sort((a,b)=>b.min-a.min);localStorage.setItem('grade_criteria',JSON.stringify(gradeCriteria));renderGradeCriteria('${elId||'grade-criteria-list'}');renderPrimaryGrade();renderSecGrade();">
+      <div style="font-size:12px;color:var(--text2);flex-shrink:0;margin-left:4px;">GPA</div>
+      <input type="number" value="${c.gpa}" min="0" max="4" step="0.5"
+        style="width:56px;text-align:center;font-weight:700;padding:5px;font-size:13px;border-radius:8px;"
+        onchange="gradeCriteria[${i}].gpa=parseFloat(this.value);localStorage.setItem('grade_criteria',JSON.stringify(gradeCriteria));">
+    </div>
+  `).join('');
 }
 
-function renderGradeTable() {
-  const wrap = document.getElementById('grade-table-wrap');
-  if(!wrap) return;
+// ==================== EXCEL IMPORT SCORES ====================
 
-  const filterSubj = document.getElementById('grade-subj-sel')?.value || '';
-  const filterRoom = document.getElementById('grade-room-sel')?.value || '';
-  const midScore = parseFloat(document.getElementById('grade-mid-score')?.value) || null;
-  const finalScore = parseFloat(document.getElementById('grade-final-score')?.value) || null;
+function parseScoreExcel(file, callback) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      const result = {};
+      rows.forEach((row, ri) => {
+        if(ri === 0) return; // skip header
+        const cols = row.map(c => String(c).trim());
+        if(cols.length < 2) return;
+        let name = '', score = null;
+        // auto-detect: 2 cols = name|score, 3 cols = id|name|score
+        if(cols.length >= 3 && !isNaN(parseFloat(cols[2]))) {
+          name = cols[1]; score = parseFloat(cols[2]);
+        } else if(!isNaN(parseFloat(cols[1]))) {
+          name = cols[0]; score = parseFloat(cols[1]);
+        }
+        if(name && score !== null && !isNaN(score)) result[name] = score;
+      });
+      callback(result, Object.keys(result).length);
+    } catch(e) { toast('อ่านไฟล์ไม่สำเร็จ: '+e.message, 'err'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
 
-  const wHW = (parseFloat(document.getElementById('grade-weight-hw')?.value)||20) / 100;
-  const wMid = (parseFloat(document.getElementById('grade-weight-mid')?.value)||30) / 100;
-  const wFinal = (parseFloat(document.getElementById('grade-weight-final')?.value)||40) / 100;
-  const wOther = (parseFloat(document.getElementById('grade-weight-other')?.value)||10) / 100;
+function matchScoreToStudents(students, scoreMap) {
+  // จับคู่ชื่อ (ตรง + trimmed + partial)
+  const matched = {};
+  students.forEach(s => {
+    const sName = s.name.trim();
+    if(scoreMap[sName] !== undefined) {
+      matched[s.id] = scoreMap[sName]; return;
+    }
+    // ลอง partial match
+    const key = Object.keys(scoreMap).find(k =>
+      k.includes(sName) || sName.includes(k) ||
+      k.replace(/s/g,'') === sName.replace(/s/g,'')
+    );
+    if(key) matched[s.id] = scoreMap[key];
+  });
+  return matched;
+}
 
-  // กรอง HW ตามวิชา
-  const hws = filterSubj ? DB.homeworks.filter(h=>h.subject===filterSubj) : DB.homeworks;
-  const students = DB.students.filter(s => !filterRoom || s.room === filterRoom);
+function importPrimaryScores(input) {
+  const file = input.files[0];
+  if(!file) return;
+  parseScoreExcel(file, (scores, count) => {
+    _priExamScores = scores;
+    const label = document.getElementById('pri-score-label');
+    const result = document.getElementById('pri-import-result');
+    if(label) label.innerHTML = '✅ ' + file.name + ' (' + count + ' รายการ)';
+    if(result) {
+      const students = getFilteredStudentsPri();
+      const matched = matchScoreToStudents(students, scores);
+      result.innerHTML = '<span style="color:var(--green-dark);font-weight:700;">✅ จับคู่ได้ ' + Object.keys(matched).length + '/' + students.length + ' คน</span>';
+    }
+    renderPrimaryGrade();
+  });
+}
 
-  if(!students.length) { wrap.innerHTML = '<div class="empty">ไม่พบนักเรียน</div>'; return; }
+function importSecScores(input, type) {
+  const file = input.files[0];
+  if(!file) return;
+  parseScoreExcel(file, (scores, count) => {
+    const label = document.getElementById('sec-'+type+'-label');
+    const result = document.getElementById('sec-'+type+'-result');
+    if(type === 'mid') _secMidScores = scores;
+    else _secFinalScores = scores;
+    if(label) label.innerHTML = '✅ ' + file.name + ' (' + count + ')';
+    const students = getFilteredStudentsSec();
+    const matched = matchScoreToStudents(students, scores);
+    if(result) result.innerHTML = '<span style="color:var(--green-dark);font-weight:700;">✅ จับคู่ ' + Object.keys(matched).length + '/' + students.length + ' คน</span>';
+    renderSecGrade();
+  });
+}
+
+// ==================== ประถมศึกษา ====================
+
+function populatePrimarySelects() {
+  const roomSel = document.getElementById('pri-room-sel');
+  const subjSel = document.getElementById('pri-subj-sel');
+  if(roomSel) { const c=roomSel.value; roomSel.innerHTML='<option value="">ทุกห้อง</option>'+DB.rooms.map(r=>`<option>${r}</option>`).join(''); if(c)roomSel.value=c; }
+  if(subjSel) { const c=subjSel.value; subjSel.innerHTML='<option value="">ทุกวิชา</option>'+getSubjectNames().map(n=>`<option>${n}</option>`).join(''); if(c)subjSel.value=c; }
+}
+
+function getFilteredStudentsPri() {
+  const room = document.getElementById('pri-room-sel')?.value||'';
+  return DB.students.filter(s=>!room||s.room===room);
+}
+
+function renderPrimaryGrade() {
+  const el = document.getElementById('pri-grade-table');
+  if(!el) return;
+  const filterSubj = document.getElementById('pri-subj-sel')?.value||'';
+  const students = getFilteredStudentsPri();
+  if(!students.length) { el.innerHTML='<div class="empty">ไม่พบนักเรียน</div>'; return; }
+
+  const hws = (DB.homeworks||[]).filter(h=>!filterSubj||h.subject===filterSubj);
+  const examMatched = matchScoreToStudents(students, _priExamScores);
 
   const rows = students.map(s => {
     // คะแนนชิ้นงาน
-    let hwTotal = 0, hwMax = 0;
+    let hwTotal=0, hwMax=0;
     hws.forEach(h => {
       const sub = DB.submissions[s.id+'_'+h.num];
-      if(sub && sub.score !== null && sub.score !== undefined) {
-        hwTotal += parseFloat(sub.score)||0;
-        hwMax += parseFloat(sub.maxScore||h.maxScore||100);
-      } else if(sub) {
-        hwMax += parseFloat(h.maxScore||100);
-      }
+      if(sub?.score!=null){hwTotal+=parseFloat(sub.score)||0;hwMax+=parseFloat(sub.maxScore||h.maxScore||100);}
+      else hwMax+=parseFloat(h.maxScore||100);
     });
-    const hwPct = hwMax > 0 ? (hwTotal/hwMax)*100 : 0;
+    const hwPct = hwMax>0?(hwTotal/hwMax)*100:0;
+    const examScore = examMatched[s.id]??null;
 
-    // คำนวณคะแนนรวม 100
-    let total = hwPct * wHW;
-    if(midScore !== null) total += midScore * wMid;
-    if(finalScore !== null) total += finalScore * wFinal;
-    // other = 100% ของ other weight ถ้าไม่มีข้อมูล
-    total += 100 * wOther;
+    // รวมคะแนน: ถ้ามีคะแนนสอบ ใช้เฉลี่ย 50:50
+    let total;
+    if(examScore!==null) total = (hwPct*0.5) + (examScore*0.5);
+    else total = hwPct;
 
     const grade = calculateGrade(total);
-    return {s, hwPct, hwTotal, hwMax, total, grade};
-  }).sort((a,b) => b.total - a.total);
+    return {s, hwPct, examScore, total, grade};
+  }).sort((a,b)=>b.total-a.total);
 
-  // สรุปเกรด
   const gradeSummary = {};
-  gradeCriteria.forEach(c => gradeSummary[c.grade] = 0);
-  rows.forEach(r => { if(gradeSummary[r.grade.grade] !== undefined) gradeSummary[r.grade.grade]++; });
-  const avgScore = rows.reduce((s,r)=>s+r.total,0)/rows.length;
+  gradeCriteria.forEach(c=>gradeSummary[c.grade]=0);
+  rows.forEach(r=>{ if(gradeSummary[r.grade.grade]!==undefined) gradeSummary[r.grade.grade]++; });
+  const avg = rows.reduce((s,r)=>s+r.total,0)/rows.length;
 
-  wrap.innerHTML = `
-    <!-- Summary -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-      ${gradeCriteria.map(c=>`
-        <div style="text-align:center;background:#fff;border-radius:10px;padding:6px 12px;border:1.5px solid var(--border);min-width:48px;">
-          <div style="font-size:14px;font-weight:800;color:${getGradeColor(c.grade)};">${c.grade}</div>
-          <div style="font-size:16px;font-weight:700;">${gradeSummary[c.grade]||0}</div>
-        </div>
-      `).join('')}
-      <div style="text-align:center;background:var(--blue-light);border-radius:10px;padding:6px 12px;border:1.5px solid #BFDBFE;min-width:60px;">
+  el.innerHTML = `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      ${gradeCriteria.map(c=>`<div style="text-align:center;background:#fff;border-radius:8px;padding:5px 10px;border:1.5px solid var(--border);">
+        <div style="font-size:13px;font-weight:800;color:${getGradeColor(c.grade)};">${c.grade}</div>
+        <div style="font-size:15px;font-weight:700;">${gradeSummary[c.grade]||0}</div>
+      </div>`).join('')}
+      <div style="text-align:center;background:var(--blue-light);border-radius:8px;padding:5px 10px;border:1.5px solid #BFDBFE;margin-left:auto;">
         <div style="font-size:11px;color:var(--blue-dark);font-weight:600;">เฉลี่ย</div>
-        <div style="font-size:16px;font-weight:700;color:var(--blue-dark);">${avgScore.toFixed(1)}</div>
+        <div style="font-size:15px;font-weight:700;color:var(--blue-dark);">${avg.toFixed(1)}</div>
       </div>
     </div>
-
-    <!-- ปุ่ม Export -->
-    <button onclick="exportGradeExcel()" style="width:100%;padding:10px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,#16A34A,#15803D);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;margin-bottom:10px;">
-      📊 Export ตารางเกรด (Excel)
-    </button>
-
-    <!-- ตาราง -->
-    <div style="overflow-x:auto;border-radius:12px;border:1.5px solid var(--border);">
-      <table class="mini-tbl" style="min-width:500px;">
-        <thead>
-          <tr>
-            <th style="width:32px;">#</th>
-            <th>ชื่อ</th>
-            <th style="width:60px;">ห้อง</th>
-            <th style="width:80px;">งาน (${Math.round(wHW*100)}%)</th>
-            ${midScore!==null?'<th style="width:80px;">กลาง ('+Math.round(wMid*100)+'%)</th>':''}
-            ${finalScore!==null?'<th style="width:80px;">ปลาย ('+Math.round(wFinal*100)+'%)</th>':''}
-            <th style="width:70px;">รวม</th>
-            <th style="width:50px;">เกรด</th>
-            <th style="width:50px;">GPA</th>
-          </tr>
-        </thead>
+    <div style="overflow-x:auto;border-radius:10px;border:1.5px solid var(--border);">
+      <table class="mini-tbl" style="min-width:420px;">
+        <thead><tr>
+          <th>#</th><th>ชื่อ</th><th>ห้อง</th>
+          <th>งาน%</th><th>สอบ</th><th>รวม</th><th>เกรด</th><th>GPA</th>
+        </tr></thead>
         <tbody>
-          ${rows.map((r,i)=>`
-            <tr style="background:${i%2===0?'#fff':'#FAFAFA'};">
-              <td style="color:var(--text3);">${i+1}</td>
-              <td style="font-weight:600;">${r.s.name}</td>
-              <td><span class="room-pill">${r.s.room}</span></td>
-              <td style="text-align:center;color:var(--purple);font-weight:700;">${r.hwPct.toFixed(1)}</td>
-              ${midScore!==null?`<td style="text-align:center;color:var(--blue);font-weight:700;">${midScore}</td>`:''}
-              ${finalScore!==null?`<td style="text-align:center;color:var(--green-dark);font-weight:700;">${finalScore}</td>`:''}
-              <td style="text-align:center;font-weight:800;color:${r.total>=80?'var(--green-dark)':r.total>=60?'var(--blue)':'var(--red)'};">${r.total.toFixed(1)}</td>
-              <td style="text-align:center;font-size:15px;font-weight:800;color:${getGradeColor(r.grade.grade)};">${r.grade.grade}</td>
-              <td style="text-align:center;font-weight:700;">${r.grade.gpa.toFixed(1)}</td>
-            </tr>
-          `).join('')}
+          ${rows.map((r,i)=>`<tr style="background:${i%2===0?'#fff':'#FAFAFA'};">
+            <td style="color:var(--text3);">${i+1}</td>
+            <td style="font-weight:600;">${r.s.name}</td>
+            <td><span class="room-pill">${r.s.room}</span></td>
+            <td style="text-align:center;color:var(--purple);font-weight:700;">${r.hwPct.toFixed(1)}</td>
+            <td style="text-align:center;color:var(--blue);font-weight:700;">${r.examScore!==null?r.examScore.toFixed(1):'—'}</td>
+            <td style="text-align:center;font-weight:800;color:${r.total>=80?'var(--green-dark)':r.total>=60?'var(--blue)':'var(--red)'};">${r.total.toFixed(1)}</td>
+            <td style="text-align:center;font-size:14px;font-weight:800;color:${getGradeColor(r.grade.grade)};">${r.grade.grade}</td>
+            <td style="text-align:center;font-weight:700;">${r.grade.gpa.toFixed(1)}</td>
+          </tr>`).join('')}
         </tbody>
       </table>
-    </div>
-  `;
+    </div>`;
 }
 
-async function exportGradeExcel() {
-  if(!isPremium()) { showUpgradeModal('Export Excel เฉพาะ Premium 🔒'); return; }
-  const filterSubj = document.getElementById('grade-subj-sel')?.value || 'ทุกวิชา';
-  const filterRoom = document.getElementById('grade-room-sel')?.value || 'ทุกห้อง';
-  const midScore = parseFloat(document.getElementById('grade-mid-score')?.value) || null;
-  const finalScore = parseFloat(document.getElementById('grade-final-score')?.value) || null;
-  const wHW = (parseFloat(document.getElementById('grade-weight-hw')?.value)||20)/100;
-  const wMid = (parseFloat(document.getElementById('grade-weight-mid')?.value)||30)/100;
-  const wFinal = (parseFloat(document.getElementById('grade-weight-final')?.value)||40)/100;
-  const wOther = (parseFloat(document.getElementById('grade-weight-other')?.value)||10)/100;
-
-  const hws = filterSubj!=='ทุกวิชา' ? DB.homeworks.filter(h=>h.subject===filterSubj) : DB.homeworks;
-  const students = DB.students.filter(s => filterRoom==='ทุกห้อง'||s.room===filterRoom);
-
-  const wb = XLSX.utils.book_new();
-  const wsData = [
-    ['ลำดับ','รหัส','ชื่อ','ห้อง','คะแนนงาน%','กลางภาค','ปลายภาค','รวม','เกรด','GPA'],
-    ...students.map((s,i) => {
+async function exportPrimaryGradeExcel() {
+  if(!isPremium()){showUpgradeModal('Export Excel เฉพาะ Premium 🔒');return;}
+  const filterSubj=document.getElementById('pri-subj-sel')?.value||'ทุกวิชา';
+  const students=getFilteredStudentsPri();
+  const hws=(DB.homeworks||[]).filter(h=>!filterSubj||filterSubj==='ทุกวิชา'||h.subject===filterSubj);
+  const examMatched=matchScoreToStudents(students,_priExamScores);
+  const wb=XLSX.utils.book_new();
+  const wsData=[['ลำดับ','รหัส','ชื่อ','ห้อง','คะแนนงาน%','คะแนนสอบ','รวม','เกรด','GPA'],
+    ...students.map((s,i)=>{
       let hwTotal=0,hwMax=0;
-      hws.forEach(h=>{
-        const sub=DB.submissions[s.id+'_'+h.num];
-        if(sub&&sub.score!=null){hwTotal+=parseFloat(sub.score)||0;hwMax+=parseFloat(sub.maxScore||h.maxScore||100);}
-        else if(sub)hwMax+=parseFloat(h.maxScore||100);
-      });
+      hws.forEach(h=>{const sub=DB.submissions[s.id+'_'+h.num];if(sub?.score!=null){hwTotal+=parseFloat(sub.score)||0;hwMax+=parseFloat(sub.maxScore||h.maxScore||100);}else hwMax+=parseFloat(h.maxScore||100);});
       const hwPct=hwMax>0?(hwTotal/hwMax)*100:0;
-      let total=hwPct*wHW+(midScore||0)*wMid+(finalScore||0)*wFinal+100*wOther;
+      const exam=examMatched[s.id]??null;
+      const total=exam!==null?(hwPct*0.5+exam*0.5):hwPct;
       const grade=calculateGrade(total);
-      return [i+1,s.id,s.name,s.room,hwPct.toFixed(1),midScore||'',finalScore||'',total.toFixed(1),grade.grade,grade.gpa];
+      return[i+1,s.id,s.name,s.room,hwPct.toFixed(1),exam??'',total.toFixed(1),grade.grade,grade.gpa];
     })
   ];
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  XLSX.utils.book_append_sheet(wb, ws, 'เกรด');
-  XLSX.writeFile(wb, 'เกรด_'+filterSubj+'_'+filterRoom+'_'+new Date().toLocaleDateString('th-TH')+'.xlsx');
-  toast('Export เกรดสำเร็จ ✅');
+  const ws=XLSX.utils.aoa_to_sheet(wsData);
+  XLSX.utils.book_append_sheet(wb,ws,'เกรดประถม');
+  XLSX.writeFile(wb,'เกรดประถม_'+new Date().toLocaleDateString('th-TH')+'.xlsx');
+  toast('Export สำเร็จ ✅');
 }
 
+// ==================== มัธยมศึกษา ====================
 
-// ===== AI REPORT SYSTEM =====
+function populateSecSelects() {
+  const roomSel=document.getElementById('sec-room-sel');
+  const subjSel=document.getElementById('sec-subj-sel');
+  if(roomSel){const c=roomSel.value;roomSel.innerHTML='<option value="">ทุกห้อง</option>'+DB.rooms.map(r=>`<option>${r}</option>`).join('');if(c)roomSel.value=c;}
+  if(subjSel){const c=subjSel.value;subjSel.innerHTML='<option value="">ทุกวิชา</option>'+getSubjectNames().map(n=>`<option>${n}</option>`).join('');if(c)subjSel.value=c;}
+}
 
-function openAIReport() {
-  if(!isPremium()) {
-    showUpgradeModal('AI สรุปรายงานห้องเรียน เฉพาะ Premium 🔒');
-    return;
+function getFilteredStudentsSec() {
+  const room=document.getElementById('sec-room-sel')?.value||'';
+  return DB.students.filter(s=>!room||s.room===room);
+}
+
+function updateSecWeights() {
+  const pre=parseFloat(document.getElementById('sec-w-pre')?.value)||0;
+  const mid=parseFloat(document.getElementById('sec-w-mid')?.value)||0;
+  const post=parseFloat(document.getElementById('sec-w-post')?.value)||0;
+  const fin=parseFloat(document.getElementById('sec-w-final')?.value)||0;
+  const total=pre+mid+post+fin;
+  const st=document.getElementById('sec-weight-status');
+  if(st){
+    if(Math.round(total)===100){st.style.background='var(--green-light)';st.style.color='var(--green-dark)';st.textContent='✅ 100%';}
+    else{st.style.background='var(--red-light)';st.style.color='var(--red)';st.textContent='⚠️ '+total+'%';}
   }
-  // populate selects
-  const roomSel = document.getElementById('ai-room-sel');
-  const subjSel = document.getElementById('ai-subj-sel');
-  if(roomSel) {
-    roomSel.innerHTML = '<option value="">ทุกห้อง</option>' +
-      DB.rooms.map(r=>`<option>${r}</option>`).join('');
-  }
-  if(subjSel) {
-    subjSel.innerHTML = '<option value="">ทุกวิชา</option>' +
-      getSubjectNames().map(n=>`<option>${n}</option>`).join('');
-  }
-  // reset content
-  document.getElementById('ai-report-content').innerHTML = `
-    <div style="text-align:center;padding:32px 16px;color:var(--text3);">
-      <div style="font-size:40px;margin-bottom:12px;">🤖</div>
-      <div style="font-size:14px;">กดปุ่ม "สร้างรายงาน AI" เพื่อวิเคราะห์ข้อมูลห้องเรียน</div>
-    </div>`;
-  document.getElementById('ai-report-modal').style.display = 'flex';
+  renderSecGrade();
 }
 
-function closeAIReport() {
-  document.getElementById('ai-report-modal').style.display = 'none';
-}
+function renderSecGrade() {
+  const el=document.getElementById('sec-grade-table');
+  if(!el) return;
+  const filterSubj=document.getElementById('sec-subj-sel')?.value||'';
+  const cutoff=parseInt(document.getElementById('sec-hw-mid-cutoff')?.value)||5;
+  const wPre=(parseFloat(document.getElementById('sec-w-pre')?.value)||20)/100;
+  const wMid=(parseFloat(document.getElementById('sec-w-mid')?.value)||30)/100;
+  const wPost=(parseFloat(document.getElementById('sec-w-post')?.value)||20)/100;
+  const wFin=(parseFloat(document.getElementById('sec-w-final')?.value)||30)/100;
 
-function buildAIPrompt(filterRoom, filterSubj, lang) {
-  const students = (DB.students||[]).filter(s => !filterRoom || s.room === filterRoom);
-  const hws = (DB.homeworks||[]).filter(h => !filterSubj || h.subject === filterSubj);
-  const teacher = CURRENT_TEACHER;
+  const students=getFilteredStudentsSec();
+  if(!students.length){el.innerHTML='<div class="empty">ไม่พบนักเรียน</div>';return;}
 
-  // คำนวณสถิติแต่ละคน
-  if(!students.length) return "ไม่มีข้อมูลนักเรียน";
-  const studentStats = students.map(s => {
-    const done = hws.filter(h => {
-      const sub = DB.submissions[s.id+'_'+h.num];
-      return sub !== undefined && sub !== null;
-    });
-    const scores = done.map(h => {
-      const sub = DB.submissions[s.id+'_'+h.num];
-      return sub?.score != null ? parseFloat(sub.score) : null;
-    }).filter(x => x !== null);
-    const avgScore = scores.length > 0 ? scores.reduce((a,b)=>a+b,0)/scores.length : null;
-    const maxScore = hws.length > 0 && done.length > 0
-      ? done.map(h => parseFloat(h.maxScore||100)).reduce((a,b)=>a+b,0)/done.length : null;
-    const submitRate = hws.length > 0 ? (done.length/hws.length*100).toFixed(0) : 0;
-    return {
-      name: s.name, id: s.id, room: s.room,
-      submitted: done.length, total: hws.length, submitRate,
-      avgScore: avgScore ? avgScore.toFixed(1) : null,
-    };
-  });
+  const allHws=(DB.homeworks||[]).filter(h=>!filterSubj||h.subject===filterSubj);
+  const preHws=allHws.filter(h=>h.num<=cutoff);
+  const postHws=allHws.filter(h=>h.num>cutoff);
+  const midMatched=matchScoreToStudents(students,_secMidScores);
+  const finMatched=matchScoreToStudents(students,_secFinalScores);
 
-  // กลุ่มเสี่ยง (ส่งงานน้อยกว่า 50%)
-  const atRisk = studentStats.filter(s => parseFloat(s.submitRate) < 50);
-  // กลุ่มดีเลิศ (ส่งงาน 100%)
-  const excellent = studentStats.filter(s => parseFloat(s.submitRate) === 100);
-  // ค่าเฉลี่ยห้อง
-  const avgSubmit = students.length > 0
-    ? (studentStats.reduce((a,s)=>a+parseFloat(s.submitRate),0)/students.length).toFixed(1) : 0;
+  const rows=students.map(s=>{
+    // คะแนนก่อนกลาง
+    let pre=0,preMax=0;
+    preHws.forEach(h=>{const sub=DB.submissions[s.id+'_'+h.num];if(sub?.score!=null){pre+=parseFloat(sub.score)||0;preMax+=parseFloat(sub.maxScore||h.maxScore||100);}else preMax+=parseFloat(h.maxScore||100);});
+    const prePct=preMax>0?(pre/preMax)*100:0;
 
-  // subject stats
-  const subjStats = (getSubjectNames()||[]).filter(n => !filterSubj || n===filterSubj).map(subj => {
-    const subjHWs = hws.filter(h=>h.subject===subj);
-    if(!subjHWs.length) return null;
-    const allSubs = students.flatMap(s => subjHWs.map(h => DB.submissions[s.id+'_'+h.num])).filter(Boolean);
-    const submitCount = allSubs.length;
-    const totalPossible = students.length * subjHWs.length;
-    const rate = totalPossible > 0 ? (submitCount/totalPossible*100).toFixed(0) : 0;
-    return {subj, hwCount: subjHWs.length, submitRate: rate};
-  }).filter(Boolean);
+    // คะแนนหลังกลาง
+    let post=0,postMax=0;
+    postHws.forEach(h=>{const sub=DB.submissions[s.id+'_'+h.num];if(sub?.score!=null){post+=parseFloat(sub.score)||0;postMax+=parseFloat(sub.maxScore||h.maxScore||100);}else postMax+=parseFloat(h.maxScore||100);});
+    const postPct=postMax>0?(post/postMax)*100:0;
 
-  const thPrompt = `คุณเป็นผู้เชี่ยวชาญด้านการวิเคราะห์ข้อมูลการศึกษา กรุณาวิเคราะห์ข้อมูลต่อไปนี้และสรุปเป็นรายงานภาษาไทยที่ชัดเจน เข้าใจง่าย
+    const midScore=midMatched[s.id]??null;
+    const finScore=finMatched[s.id]??null;
 
-**ข้อมูลห้องเรียน:**
-- ครูผู้สอน: ${teacher?.display_name || 'ไม่ระบุ'}
-- ห้องที่วิเคราะห์: ${filterRoom || 'ทุกห้อง'}
-- วิชา: ${filterSubj || 'ทุกวิชา'}
-- จำนวนนักเรียน: ${students.length} คน
-- จำนวนชิ้นงานทั้งหมด: ${hws.length} ชิ้น
-- อัตราการส่งงานเฉลี่ย: ${avgSubmit}%
+    let total=prePct*wPre+postPct*wPost;
+    if(midScore!==null) total+=midScore*wMid;
+    if(finScore!==null) total+=finScore*wFin;
 
-**สถิติรายวิชา:**
-${subjStats.map(s=>`- ${s.subj}: ${s.hwCount} ชิ้นงาน, ส่งงาน ${s.submitRate}%`).join('\n') || '- ไม่มีข้อมูลวิชา'}
+    const grade=calculateGrade(total);
+    return {s,prePct,midScore,postPct,finScore,total,grade};
+  }).sort((a,b)=>b.total-a.total);
 
-**กลุ่มเสี่ยง (ส่งงานน้อยกว่า 50%):** ${atRisk.length} คน
-${atRisk.slice(0,5).map(s=>`- ${s.name} (ห้อง ${s.room}): ส่ง ${s.submitRate}%`).join('\n') || '- ไม่มี'}
+  const gradeSummary={};
+  gradeCriteria.forEach(c=>gradeSummary[c.grade]=0);
+  rows.forEach(r=>{if(gradeSummary[r.grade.grade]!==undefined)gradeSummary[r.grade.grade]++;});
+  const avg=rows.reduce((s,r)=>s+r.total,0)/rows.length;
 
-**กลุ่มดีเลิศ (ส่งงาน 100%):** ${excellent.length} คน
-
-กรุณาสรุปในหัวข้อ:
-1. ภาพรวมห้องเรียน
-2. จุดแข็ง
-3. จุดที่ควรพัฒนา
-4. กลุ่มนักเรียนที่ต้องให้ความสนใจเป็นพิเศษ
-5. ข้อเสนอแนะสำหรับครู
-
-ตอบเป็นภาษาไทย กระชับ ได้ใจความ ใช้ Markdown formatting`;
-
-  const enPrompt = `You are an educational data analysis expert. Analyze the following classroom data and provide a clear, actionable report.
-
-**Classroom Data:**
-- Teacher: ${teacher?.display_name || 'Unknown'}
-- Room: ${filterRoom || 'All rooms'}
-- Subject: ${filterSubj || 'All subjects'}
-- Students: ${students.length}
-- Total assignments: ${hws.length}
-- Average submission rate: ${avgSubmit}%
-
-**At-risk students (< 50% submission):** ${atRisk.length}
-${atRisk.slice(0,5).map(s=>`- ${s.name} (Room ${s.room}): ${s.submitRate}% submitted`).join('\n') || '- None'}
-
-**Excellent students (100% submission):** ${excellent.length}
-
-Please provide analysis covering:
-1. Classroom overview
-2. Strengths
-3. Areas for improvement
-4. Students needing special attention
-5. Recommendations for the teacher
-
-Use Markdown formatting`;
-
-  return lang === 'en' ? enPrompt : thPrompt;
-}
-
-function renderMarkdown(text) {
-  if(!text) return '';
-  return text
-    // Headers
-    .replace(/^#### (.+)$/gm, '<h4 style="font-size:13px;font-weight:800;color:var(--text2);margin:12px 0 4px;">$1</h4>')
-    .replace(/^### (.+)$/gm, '<h3 style="font-size:14px;font-weight:800;color:var(--purple);margin:14px 0 5px;">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 style="font-size:15px;font-weight:800;color:var(--blue-dark);margin:16px 0 6px;">$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1 style="font-size:17px;font-weight:800;color:var(--text);margin:16px 0 8px;">$1</h1>')
-    // Bold & Italic
-    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Horizontal rule
-    .replace(/^---+$/gm, '<hr style="border:none;border-top:1.5px solid var(--border);margin:12px 0;">')
-    // Numbered lists
-    .replace(/^(\d+)\. (.+)$/gm, '<div style="display:flex;gap:8px;margin:4px 0;"><span style="color:var(--purple);font-weight:700;flex-shrink:0;">$1.</span><span>$2</span></div>')
-    // Bullet lists
-    .replace(/^[\-\*] (.+)$/gm, '<div style="display:flex;gap:8px;margin:4px 0;padding-left:8px;"><span style="color:var(--blue);flex-shrink:0;">•</span><span>$1</span></div>')
-    // Inline code
-    .replace(/`(.+?)`/g, '<code style="background:var(--bg);padding:1px 6px;border-radius:4px;font-family:monospace;font-size:12px;">$1</code>')
-    // Line breaks
-    .replace(/\n\n/g, '<div style="margin:8px 0;"></div>')
-    .replace(/\n/g, '<br>');
-}
-
-
-async function generateAIReport() {
-  const filterRoom = document.getElementById('ai-room-sel')?.value || '';
-  const filterSubj = document.getElementById('ai-subj-sel')?.value || '';
-  const lang = document.getElementById('ai-lang-sel')?.value || 'th';
-  const btn = document.getElementById('ai-generate-btn');
-  const content = document.getElementById('ai-report-content');
-
-  // ตรวจ API Key ก่อน
-  const apiKey = getAnthropicKey();
-  if(!apiKey) {
-    content.innerHTML = `<div style="text-align:center;padding:24px;"><div style="font-size:36px;margin-bottom:12px;">🔑</div><div style="font-size:15px;font-weight:700;color:var(--red);margin-bottom:8px;">ไม่พบ API Key</div><div style="font-size:13px;color:var(--text2);">Super Admin ต้องบันทึก Anthropic API Key ในหน้าตั้งค่าก่อน</div></div>`;
-    return;
-  }
-  btn.disabled = true;
-  btn.textContent = '⏳ กำลังวิเคราะห์...';
-  content.innerHTML = `
-    <div style="text-align:center;padding:40px 16px;">
-      <div style="font-size:40px;margin-bottom:16px;animation:spin 1s linear infinite;">⚙️</div>
-      <div style="font-size:15px;font-weight:700;color:var(--purple);margin-bottom:8px;">AI กำลังวิเคราะห์ข้อมูล...</div>
-      <div style="font-size:13px;color:var(--text2);">อาจใช้เวลา 10-30 วินาที</div>
+  el.innerHTML=`
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      ${gradeCriteria.map(c=>`<div style="text-align:center;background:#fff;border-radius:8px;padding:5px 10px;border:1.5px solid var(--border);">
+        <div style="font-size:13px;font-weight:800;color:${getGradeColor(c.grade)};">${c.grade}</div>
+        <div style="font-size:15px;font-weight:700;">${gradeSummary[c.grade]||0}</div>
+      </div>`).join('')}
+      <div style="text-align:center;background:var(--purple-light);border-radius:8px;padding:5px 10px;border:1.5px solid #C4B5FD;margin-left:auto;">
+        <div style="font-size:11px;color:var(--purple);font-weight:600;">เฉลี่ย</div>
+        <div style="font-size:15px;font-weight:700;color:var(--purple);">${avg.toFixed(1)}</div>
+      </div>
     </div>
-    <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>`;
-
-  try {
-    const prompt = buildAIPrompt(filterRoom, filterSubj, lang);
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-        'x-api-key': apiKey
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 1500,
-        system: lang==='th'
-          ? 'คุณเป็นผู้เชี่ยวชาญด้านการศึกษา ตอบเป็นภาษาไทย กระชับ ชัดเจน ใช้ Markdown'
-          : 'You are an education expert. Be concise, clear, and use Markdown formatting.',
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-
-    if(!resp.ok) {
-      const err = await resp.json();
-      throw new Error(err.error?.message || 'API Error '+resp.status);
-    }
-
-    const data = await resp.json();
-    const reportText = data.content?.[0]?.text || 'ไม่ได้รับข้อมูลจาก AI';
-
-    // แสดง metadata
-    const filterRoom_ = filterRoom || (lang==='th'?'ทุกห้อง':'All rooms');
-    const filterSubj_ = filterSubj || (lang==='th'?'ทุกวิชา':'All subjects');
-    const now = new Date().toLocaleString('th-TH');
-
-    content.innerHTML = `
-      <div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:1.5px solid #C4B5FD;border-radius:12px;padding:12px 14px;margin-bottom:14px;">
-        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--purple);">
-          <span>🏫 ${filterRoom_}</span>
-          <span>📚 ${filterSubj_}</span>
-          <span>👥 ${DB.students.filter(s=>!filterRoom||s.room===filterRoom).length} คน</span>
-          <span>📝 ${DB.homeworks.filter(h=>!filterSubj||h.subject===filterSubj).length} ชิ้นงาน</span>
-          <span style="margin-left:auto;color:var(--text3);">🕐 ${now}</span>
-        </div>
-      </div>
-      <div style="font-size:14px;line-height:1.8;color:var(--text);">
-        <p style="margin:8px 0;">${renderMarkdown(reportText)}</p>
-      </div>
-      <div style="margin-top:16px;display:flex;gap:8px;">
-        <button onclick="copyAIReport()" style="flex:1;padding:10px;font-size:13px;font-weight:700;border-radius:10px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
-          📋 คัดลอก
-        </button>
-        <button onclick="generateAIReport()" style="flex:1;padding:10px;font-size:13px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
-          🔄 สร้างใหม่
-        </button>
-      </div>`;
-
-  } catch(e) {
-    content.innerHTML = `
-      <div style="text-align:center;padding:24px 16px;">
-        <div style="font-size:36px;margin-bottom:12px;">❌</div>
-        <div style="font-size:15px;font-weight:700;color:var(--red);margin-bottom:8px;">เกิดข้อผิดพลาด</div>
-        <div style="font-size:13px;color:var(--text2);margin-bottom:16px;">${e.message}</div>
-        <div style="font-size:12px;color:var(--text3);background:var(--bg);border-radius:10px;padding:10px;text-align:left;">
-          💡 ตรวจสอบ: API Key ถูกต้องไหม? มี internet ไหม?
-        </div>
-        <button onclick="generateAIReport()" style="margin-top:12px;padding:10px 24px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
-          🔄 ลองใหม่
-        </button>
-      </div>`;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '✨ สร้างรายงาน AI';
-  }
+    <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">
+      สัดส่วน: ก่อนกลาง ${Math.round(wPre*100)}% · กลาง ${Math.round(wMid*100)}% · หลังกลาง ${Math.round(wPost*100)}% · ปลาย ${Math.round(wFin*100)}%
+    </div>
+    <div style="overflow-x:auto;border-radius:10px;border:1.5px solid var(--border);">
+      <table class="mini-tbl" style="min-width:520px;">
+        <thead><tr>
+          <th>#</th><th>ชื่อ</th><th>ห้อง</th>
+          <th>ก่อนกลาง</th><th>กลางภาค</th><th>หลังกลาง</th><th>ปลายภาค</th>
+          <th>รวม</th><th>เกรด</th><th>GPA</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map((r,i)=>`<tr style="background:${i%2===0?'#fff':'#FAFAFA'};">
+            <td style="color:var(--text3);">${i+1}</td>
+            <td style="font-weight:600;">${r.s.name}</td>
+            <td><span class="room-pill">${r.s.room}</span></td>
+            <td style="text-align:center;color:var(--purple);font-weight:700;">${r.prePct.toFixed(1)}</td>
+            <td style="text-align:center;color:var(--blue);font-weight:700;">${r.midScore!==null?r.midScore.toFixed(1):'—'}</td>
+            <td style="text-align:center;color:var(--green-dark);font-weight:700;">${r.postPct.toFixed(1)}</td>
+            <td style="text-align:center;color:var(--red);font-weight:700;">${r.finScore!==null?r.finScore.toFixed(1):'—'}</td>
+            <td style="text-align:center;font-weight:800;color:${r.total>=80?'var(--green-dark)':r.total>=60?'var(--blue)':'var(--red)'};">${r.total.toFixed(1)}</td>
+            <td style="text-align:center;font-size:14px;font-weight:800;color:${getGradeColor(r.grade.grade)};">${r.grade.grade}</td>
+            <td style="text-align:center;font-weight:700;">${r.grade.gpa.toFixed(1)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }
 
-function copyAIReport() {
-  const content = document.getElementById('ai-report-content');
-  const text = content?.innerText || '';
-  navigator.clipboard.writeText(text).then(()=>toast('คัดลอกแล้ว ✅')).catch(()=>toast('คัดลอกไม่สำเร็จ','err'));
+async function exportSecGradeExcel() {
+  if(!isPremium()){showUpgradeModal('Export Excel เฉพาะ Premium 🔒');return;}
+  const filterSubj=document.getElementById('sec-subj-sel')?.value||'ทุกวิชา';
+  const cutoff=parseInt(document.getElementById('sec-hw-mid-cutoff')?.value)||5;
+  const wPre=(parseFloat(document.getElementById('sec-w-pre')?.value)||20)/100;
+  const wMid=(parseFloat(document.getElementById('sec-w-mid')?.value)||30)/100;
+  const wPost=(parseFloat(document.getElementById('sec-w-post')?.value)||20)/100;
+  const wFin=(parseFloat(document.getElementById('sec-w-final')?.value)||30)/100;
+  const students=getFilteredStudentsSec();
+  const allHws=(DB.homeworks||[]).filter(h=>!filterSubj||filterSubj==='ทุกวิชา'||h.subject===filterSubj);
+  const preHws=allHws.filter(h=>h.num<=cutoff);
+  const postHws=allHws.filter(h=>h.num>cutoff);
+  const midMatched=matchScoreToStudents(students,_secMidScores);
+  const finMatched=matchScoreToStudents(students,_secFinalScores);
+  const wb=XLSX.utils.book_new();
+  const wsData=[['ลำดับ','รหัส','ชื่อ','ห้อง','ก่อนกลาง%','กลางภาค','หลังกลาง%','ปลายภาค','รวม','เกรด','GPA'],
+    ...students.map((s,i)=>{
+      let pre=0,preMax=0; preHws.forEach(h=>{const sub=DB.submissions[s.id+'_'+h.num];if(sub?.score!=null){pre+=parseFloat(sub.score)||0;preMax+=parseFloat(sub.maxScore||h.maxScore||100);}else preMax+=parseFloat(h.maxScore||100);});
+      const prePct=preMax>0?(pre/preMax)*100:0;
+      let post=0,postMax=0; postHws.forEach(h=>{const sub=DB.submissions[s.id+'_'+h.num];if(sub?.score!=null){post+=parseFloat(sub.score)||0;postMax+=parseFloat(sub.maxScore||h.maxScore||100);}else postMax+=parseFloat(h.maxScore||100);});
+      const postPct=postMax>0?(post/postMax)*100:0;
+      const mid=midMatched[s.id]??null; const fin=finMatched[s.id]??null;
+      let total=prePct*wPre+postPct*wPost+(mid!==null?mid*wMid:0)+(fin!==null?fin*wFin:0);
+      const grade=calculateGrade(total);
+      return[i+1,s.id,s.name,s.room,prePct.toFixed(1),mid??'',postPct.toFixed(1),fin??'',total.toFixed(1),grade.grade,grade.gpa];
+    })
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(wsData);
+  XLSX.utils.book_append_sheet(wb,ws,'เกรดมัธยม เทอม'+_currentSecTerm);
+  XLSX.writeFile(wb,'เกรดมัธยม_เทอม'+_currentSecTerm+'_'+new Date().toLocaleDateString('th-TH')+'.xlsx');
+  toast('Export สำเร็จ ✅');
 }
 
-
-// ===== ANTHROPIC API KEY =====
-let _anthropicKey = '';
-
-async function loadAnthropicKey() {
-  if(!SB) return;
-  try {
-    // ค้นหา key ที่มี 'anthropic_key' ใน key name (ทั้ง global และ scoped)
-    const {data, error} = await SB.from('settings').select('key,value').like('key','%anthropic_key%');
-    if(error) { console.log('loadAnthropicKey error:', error); return; }
-    if(data && data.length > 0) {
-      _anthropicKey = data[0].value;
-      console.log('✅ Anthropic key loaded from:', data[0].key, 'length:', _anthropicKey.length);
-      const el = document.getElementById('sa-anthropic-key');
-      if(el) el.value = _anthropicKey;
-      const st = document.getElementById('sa-api-key-status');
-      if(st) st.innerHTML = '<span style="color:var(--green-dark);font-weight:700;">✅ ตั้งค่าแล้ว: '+_anthropicKey.substring(0,12)+'...</span>';
-    } else {
-      console.log('No anthropic key found in settings');
-    }
-  } catch(e) { console.log('loadAnthropicKey exception:', e); }
-}
-
-function toggleApiKeyVisibility() {
-  const input = document.getElementById('sa-anthropic-key');
-  const btn = document.getElementById('api-key-toggle');
-  if(!input||!btn) return;
-  input.type = input.type==='password' ? 'text' : 'password';
-  btn.textContent = input.type==='password' ? 'แสดง' : 'ซ่อน';
-}
-
-async function saveAnthropicKey() {
-  const key = document.getElementById('sa-anthropic-key')?.value.trim();
-  if(!key){ toast('กรอก API Key ก่อน','warn'); return; }
-  if(!key.startsWith('sk-ant-')){ toast('API Key ต้องขึ้นต้นด้วย sk-ant-','warn'); return; }
-  if(!SB){ toast('ไม่ได้เชื่อมต่อ Supabase','err'); return; }
-  showActionPopup('กำลังบันทึก API Key','','add');
-  try {
-    // บันทึกเป็น global key เสมอ
-    const {error} = await SB.from('settings').upsert({key:'anthropic_key', value:key},{onConflict:'key'});
-    if(error) throw error;
-    _anthropicKey = key;
-    const st = document.getElementById('sa-api-key-status');
-    if(st) st.innerHTML = '<span style="color:var(--green-dark);font-weight:700;">✅ ตั้งค่าแล้ว: '+key.substring(0,12)+'...</span>';
-    setTimeout(()=>actionPopupDone('บันทึก API Key แล้ว ✅','','add'),100);
-  } catch(e){ actionPopupError('บันทึกไม่สำเร็จ: '+e.message); }
-}
-
-function getAnthropicKey(){ return _anthropicKey || ''; }
 
 // ╔══════════════════════════════════════════════════════╗
 // ║  SECTION L: APP INITIALIZATION                     ║
