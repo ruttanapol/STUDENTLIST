@@ -4203,9 +4203,29 @@ let _currentSecTerm = 1;
 
 // ==================== NAVIGATION ====================
 
+function isGradeAllowed() {
+  return CURRENT_TEACHER?.username === 'test';
+}
+
 function openGradeTab() {
   const gate = document.getElementById('grade-premium-gate');
   const content = document.getElementById('grade-content');
+
+  // 🔒 ล็อกชั่วคราว — เฉพาะ username 'test' เท่านั้น
+  if(!isGradeAllowed()) {
+    if(gate) gate.style.display = 'none';
+    if(content) {
+      content.style.display = 'block';
+      content.innerHTML = `
+        <div style="text-align:center;padding:48px 24px;color:var(--text2);">
+          <div style="font-size:48px;margin-bottom:16px;">🚧</div>
+          <div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px;">กำลังพัฒนา</div>
+          <div style="font-size:14px;color:var(--text3);">ระบบเกรดอยู่ระหว่างการพัฒนา<br>จะเปิดให้ใช้งานเร็วๆ นี้</div>
+        </div>`;
+    }
+    return;
+  }
+
   if(gate && content) {
     const isPrem = isPremium();
     gate.style.display = isPrem ? 'none' : 'block';
