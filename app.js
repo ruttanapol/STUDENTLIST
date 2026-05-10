@@ -4670,7 +4670,7 @@ window.addEventListener('load', () => {
     }
 
     // รับเฉพาะตัวเลขและตัวอักษร
-    if(e.key.length === 1) {
+    if(e.key && e.key.length === 1) {
       barcodeBuffer += e.key;
       clearTimeout(barcodeTimer);
       // ถ้าไม่มี input ใหม่ใน 50ms ถือว่าสแกนเสร็จ
