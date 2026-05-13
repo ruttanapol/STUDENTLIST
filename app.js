@@ -1869,8 +1869,13 @@ async function refreshStudentView(){
   renderStudentView(_currentStuDB.student, _currentStuDB);
 }
 function showAP(id,btn){
+  // Premium gate for attendance
+  if(id==='attend' && !isPremium()) {
+    showUpgradeModal('🔒 ฟีเจอร์เช็คชื่อสำหรับ Premium เท่านั้น');
+    return;
+  }
   // sync sidebar nav items
-  ['scan','dash','manage'].forEach(function(p){
+  ['scan','dash','manage','attend'].forEach(function(p){
     var sn = document.getElementById('snav-'+p);
     if(sn) sn.classList.toggle('on', p===id);
   });
@@ -1878,8 +1883,9 @@ function showAP(id,btn){
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('on'));
   document.getElementById('ap-'+id).classList.add('on');
   btn.classList.add('on');
-  if(id==='dash')renderDashboard();
-  if(id==='manage')renderManage();
+  if(id==='dash') renderDashboard();
+  if(id==='manage') renderManage();
+  if(id==='attend') initAttendanceTab();
 }
 
 function ts(){return new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});}
@@ -2642,7 +2648,6 @@ function switchManageTab(tab, btn){
   if(tab==='subjects') renderSubjectsFull();
   if(tab==='homework') renderManage();
   if(tab==='grade') openGradeTab();
-  if(tab==='attend') initAttendanceTab();
 }
 
 // ╔══════════════════════════════════════════════════════╗
@@ -5604,10 +5609,11 @@ let _attRecords = {};   // {studentId: status}
 let _attLoaded = false;
 
 const ATT_STATUS = {
-  present: { label:'มา',   icon:'✅', bg:'#DCFCE7', color:'#15803D', border:'#86EFAC' },
-  absent:  { label:'ขาด',  icon:'❌', bg:'#FEE2E2', color:'#B91C1C', border:'#FCA5A5' },
-  late:    { label:'สาย',  icon:'⏰', bg:'#FEF3C7', color:'#B45309', border:'#FCD34D' },
-  leave:   { label:'ลา',   icon:'🏥', bg:'#DBEAFE', color:'#1D4ED8', border:'#93C5FD' },
+  present:  { label:'มา',     icon:'✅', bg:'#DCFCE7', color:'#15803D', border:'#86EFAC' },
+  absent:   { label:'ขาด',    icon:'❌', bg:'#FEE2E2', color:'#B91C1C', border:'#FCA5A5' },
+  late:     { label:'สาย',    icon:'⏰', bg:'#FEF3C7', color:'#B45309', border:'#FCD34D' },
+  sick:     { label:'ลาป่วย', icon:'🤒', bg:'#FFF1F2', color:'#BE123C', border:'#FDA4AF' },
+  personal: { label:'ลากิจ',  icon:'📋', bg:'#F5F3FF', color:'#6D28D9', border:'#C4B5FD' },
 };
 
 function initAttendanceTab() {
@@ -5658,9 +5664,9 @@ async function loadAttendanceForDate(date, room) {
 
   _attRecords = {};
   if(data?.value?.records) {
-    data.value.records.forEach(r => { _attRecords[r.id] = r.status; });
+    // migrate old 'leave' → 'sick'
+    data.value.records.forEach(r => { _attRecords[r.id] = r.status === 'leave' ? 'sick' : r.status; });
   } else {
-    // default all present
     DB.students.filter(s=>s.room===room).forEach(s => _attRecords[s.id] = 'present');
   }
   _attLoaded = true;
@@ -5720,7 +5726,7 @@ function setAllAttStatus(status) {
 function updateAttSummary() {
   const el = document.getElementById('att-summary');
   if(!el) return;
-  const counts = { present:0, absent:0, late:0, leave:0 };
+  const counts = { present:0, absent:0, late:0, sick:0, personal:0 };
   Object.values(_attRecords).forEach(s => { if(counts[s]!==undefined) counts[s]++; });
   el.innerHTML = Object.entries(ATT_STATUS).map(([k,cfg]) =>
     `<div style="flex:1;text-align:center;padding:7px 4px;border-radius:8px;background:${cfg.bg};border:1.5px solid ${cfg.border};">
@@ -5747,7 +5753,7 @@ async function saveAttendance() {
 
   const students = DB.students.filter(s=>s.room===room);
   const records = students.map(s => ({ id:s.id, name:s.name, status:_attRecords[s.id]||'present' }));
-  const counts = { present:0, absent:0, late:0, leave:0 };
+  const counts = { present:0, absent:0, late:0, sick:0, personal:0 };
   records.forEach(r => { if(counts[r.status]!==undefined) counts[r.status]++; });
 
   const dateKey = date.replace(/-/g,'');
@@ -5815,4 +5821,114 @@ function loadHistoryRecord(date, room) {
   if(roomSel) roomSel.value = room;
   renderAttendanceList();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  ATTENDANCE EXPORT (Excel + PDF)                    ║
+// ╚══════════════════════════════════════════════════════╝
+
+function _buildAttExportRows() {
+  const room = document.getElementById('att-room-sel')?.value || '';
+  const date = document.getElementById('att-date')?.value || '';
+  const students = DB.students.filter(s=>s.room===room)
+    .sort((a,b)=>a.name.localeCompare(b.name,'th'));
+  const dateDisplay = date ? new Date(date).toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '';
+  const rows = students.map((s,i) => {
+    const st = _attRecords[s.id] || 'present';
+    const cfg = ATT_STATUS[st];
+    return { เลขที่:i+1, รหัส:s.id, ชื่อ:s.name, ห้อง:s.room, สถานะ:`${cfg.icon} ${cfg.label}`, ประเภท:cfg.label };
+  });
+  const counts = {};
+  Object.keys(ATT_STATUS).forEach(k => counts[k] = rows.filter(r=>r.ประเภท===ATT_STATUS[k].label).length);
+  return { room, date, dateDisplay, students, rows, counts };
+}
+
+function exportAttendanceExcel() {
+  if(!isPremium()) { showUpgradeModal('Export Excel เฉพาะ Premium 🔒'); return; }
+  if(typeof XLSX === 'undefined') { toast('กำลังโหลด Excel library...','warn'); return; }
+  const { room, dateDisplay, rows, counts } = _buildAttExportRows();
+  const ws_data = [
+    [`รายงานการเช็คชื่อ — ${room} — ${dateDisplay}`],
+    [],
+    ['เลขที่','รหัส','ชื่อ-นามสกุล','ห้อง','สถานะ'],
+    ...rows.map(r=>[r.เลขที่, r.รหัส, r.ชื่อ, r.ห้อง, r.สถานะ]),
+    [],
+    ['สรุป','','มา','ขาด','สาย','ลาป่วย','ลากิจ'],
+    ['','',counts.present||0, counts.absent||0, counts.late||0, counts.sick||0, counts.personal||0],
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  ws['!cols'] = [{wch:6},{wch:14},{wch:28},{wch:10},{wch:12}];
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:4}}];
+  XLSX.utils.book_append_sheet(wb, ws, room);
+  XLSX.writeFile(wb, `เช็คชื่อ_${room}_${(document.getElementById('att-date')?.value||'').replace(/-/g,'')}.xlsx`);
+  toast('✅ Export Excel เช็คชื่อสำเร็จ');
+}
+
+function exportAttendancePDF() {
+  if(!isPremium()) { showUpgradeModal('Export PDF เฉพาะ Premium 🔒'); return; }
+  if(typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') { toast('กำลังโหลด PDF library...','warn'); return; }
+  const { room, dateDisplay, rows, counts } = _buildAttExportRows();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'pt', format:'a4' });
+
+  // Header
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(14);
+  doc.text(`Attendance Report`, 40, 40);
+  doc.setFontSize(11);
+  doc.setFont('helvetica','normal');
+  doc.text(`Room: ${room}  |  Date: ${dateDisplay}`, 40, 58);
+
+  // Summary
+  doc.setFillColor(240,253,244);
+  doc.roundedRect(40, 68, 515, 28, 4, 4, 'F');
+  doc.setFontSize(10);
+  const sumText = `✅ มา: ${counts.present||0}  ❌ ขาด: ${counts.absent||0}  ⏰ สาย: ${counts.late||0}  🤒 ลาป่วย: ${counts.sick||0}  📋 ลากิจ: ${counts.personal||0}`;
+  doc.text(sumText, 48, 86);
+
+  // Status color mapping for text
+  const statusColor = { present:[21,128,61], absent:[185,28,28], late:[180,83,9], sick:[190,18,60], personal:[109,40,217] };
+
+  // Table
+  const tableY = 108;
+  const rowH = 22;
+  const cols = [40, 90, 110, 390, 455];
+  const headers = ['#', 'รหัส', 'ชื่อ-นามสกุล', 'ห้อง', 'สถานะ'];
+
+  // Header row
+  doc.setFillColor(30, 58, 138);
+  doc.rect(40, tableY, 515, rowH, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(9);
+  doc.setFont('helvetica','bold');
+  headers.forEach((h,i) => doc.text(h, cols[i]+4, tableY+15));
+
+  // Data rows
+  doc.setFont('helvetica','normal');
+  rows.forEach((r,i) => {
+    const y = tableY + rowH*(i+1);
+    if(y > 780) return; // page overflow guard
+    doc.setFillColor(i%2===0?248:255, i%2===0?250:255, i%2===0?252:255);
+    doc.rect(40, y, 515, rowH, 'F');
+    doc.setTextColor(0,0,0);
+    doc.text(String(r.เลขที่), cols[0]+4, y+15);
+    doc.text(String(r.รหัส||''), cols[1]+4, y+15);
+    doc.text((r.ชื่อ||'').substring(0,28), cols[2]+4, y+15);
+    doc.text(String(r.ห้อง||''), cols[3]+4, y+15);
+    const st = Object.keys(_attRecords).length ? (Object.entries(_attRecords).find(([id])=>id===r.รหัส)?.[1]||'present') : 'present';
+    const [rr,gg,bb] = statusColor[st] || [0,0,0];
+    doc.setTextColor(rr,gg,bb);
+    doc.setFont('helvetica','bold');
+    doc.text(r.ประเภท||'', cols[4]+4, y+15);
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(0,0,0);
+  });
+
+  // Border
+  doc.setDrawColor(200,200,200);
+  doc.rect(40, tableY, 515, rowH*(rows.length+1));
+
+  doc.save(`เช็คชื่อ_${room}_${(document.getElementById('att-date')?.value||'').replace(/-/g,'')}.pdf`);
+  toast('✅ Export PDF เช็คชื่อสำเร็จ');
 }
