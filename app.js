@@ -1947,7 +1947,7 @@ async function recordScan(sid, scoreOverride){
     const scoreText=score!==null&&!isNaN(score)?score:null;
     try {
       await sbRecordSubmission({sid,hwNum,hwTitle,room:stu.room,score:scoreText,maxScore});
-      const scoreBadge=scoreText!==null?` · <b style="color:var(--purple);">${scoreText}/${maxScore}</b>`:'';
+      const scoreBadge=scoreText!==null?` · <b style="color:var(--purple);">${scoreText}/${maxScore||100}</b>`:'';
       item.innerHTML=`<div class="log-main"><div style="font-weight:700;">${stu.name} <span class="room-pill">${stu.room}</span></div><div class="log-sub">ชิ้นที่ ${hwNum}: ${hwTitle}${scoreBadge} · ${now}</div></div><span class="badge b-ok">✓ บันทึก</span>`;
       log.prepend(item);
       toast('บันทึก '+stu.name+(scoreText!==null?' ('+scoreText+'/'+maxScore+')':'')+'✅');
@@ -3697,12 +3697,9 @@ function populateHWDropdown() {
     .forEach(h => {
       const opt = document.createElement('option');
       opt.value = h.num;
-      const subjObj = getSubjectObj(h.subject);
-      const perHW = subjObj && subjObj.hwCount > 0 
-        ? Math.round((subjObj.total/subjObj.hwCount)*100)/100 
-        : (h.maxScore||100);
+      const perHW = h.maxScore || 100;
       const dl = h.deadline ? ' · ส่ง ' + new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '';
-      opt.textContent = 'ครั้งที่ ' + h.num + ' — ' + h.title + ' (' + perHW + ' คะแนน)' + dl;
+      opt.textContent = 'ครั้งที่ ' + h.num + ' — ' + h.title + ' (เต็ม ' + perHW + ')' + dl;
       hwDd.appendChild(opt);
     });
   
@@ -3732,11 +3729,8 @@ function selectHWFromDropdown(numStr) {
   const hw = DB.homeworks.find(h => h.num === num);
   if(!hw) return;
 
-  // คำนวณคะแนนจากวิชา
-  const subjObj = getSubjectObj(hw.subject);
-  const scorePerHW = subjObj && subjObj.hwCount > 0
-    ? Math.round((subjObj.total / subjObj.hwCount) * 100) / 100
-    : (hw.maxScore || 100);
+  // ใช้ maxScore ของชิ้นงานโดยตรง (ระบบใหม่กำหนดคะแนนต่อชิ้นงาน)
+  const scorePerHW = hw.maxScore || 100;
 
   // set inputs
   document.getElementById('hw-num-input').value = hw.num;
