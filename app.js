@@ -5684,14 +5684,15 @@ function _buildStudentList(students) {
     const btns = Object.entries(ATT_STATUS).map(([key, cfg]) => {
       const isActive = cur === key;
       return `<button onclick="setAttStatus('${s.id}',this,'${key}')"
-        style="flex:1;padding:5px 2px;font-size:11px;font-weight:700;border-radius:7px;border:1.5px solid ${isActive?cfg.border:'#E2E8F0'};background:${isActive?cfg.bg:'#F8FAFC'};color:${isActive?cfg.color:'#94A3B8'};cursor:pointer;font-family:Sarabun,sans-serif;transition:all .1s;">
-        ${cfg.icon}<br>${cfg.label}
+        title="${cfg.label}"
+        style="width:36px;height:36px;font-size:13px;border-radius:7px;border:1.5px solid ${isActive?cfg.border:'#E2E8F0'};background:${isActive?cfg.bg:'#F8FAFC'};color:${isActive?cfg.color:'#94A3B8'};cursor:pointer;font-family:Sarabun,sans-serif;display:flex;align-items:center;justify-content:center;">
+        ${cfg.icon}
       </button>`;
     }).join('');
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fff;border-radius:10px;margin-bottom:5px;border:1.5px solid #F1F5F9;">
-      <div style="width:24px;text-align:center;font-size:12px;color:var(--text3);flex-shrink:0;">${idx+1}</div>
-      <div style="flex:1;font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div>
-      <div style="display:flex;gap:4px;flex-shrink:0;">${btns}</div>
+    return `<div style="display:flex;align-items:center;gap:6px;padding:6px 4px;border-bottom:1px solid #F1F5F9;">
+      <div style="width:20px;text-align:center;font-size:11px;color:var(--text3);flex-shrink:0;">${idx+1}</div>
+      <div style="flex:1;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div>
+      <div style="display:flex;gap:3px;flex-shrink:0;">${btns}</div>
     </div>`;
   }).join('');
 }

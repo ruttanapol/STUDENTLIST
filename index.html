@@ -1311,59 +1311,70 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   <!-- ap-attend: ATTENDANCE PAGE                    -->
   <!-- ══════════════════════════════════════════════ -->
   <div id="ap-attend" class="page">
-    <div style="padding:16px 24px 100px;max-width:860px;margin:0 auto;">
+    <div style="padding:12px 16px 80px;">
 
-      <!-- Header card -->
-      <div class="card" style="margin-bottom:12px;">
-        <div class="card-title" style="margin-bottom:12px;">📋 เช็คชื่อ</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <!-- Top bar: ห้อง + วันที่ + quick actions + summary ในแถวเดียว -->
+      <div style="background:#fff;border-radius:14px;border:1.5px solid var(--border);padding:12px 14px;margin-bottom:10px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <select id="att-room-sel" onchange="renderAttendanceList()"
-            style="flex:1;min-width:120px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;font-family:Sarabun,sans-serif;background:#fff;">
+            style="padding:7px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:Sarabun,sans-serif;background:#fff;font-weight:700;min-width:100px;">
           </select>
           <input type="date" id="att-date" onchange="onAttDateChange()"
-            style="flex:1;min-width:130px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;font-family:Sarabun,sans-serif;">
+            style="padding:7px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;font-family:Sarabun,sans-serif;">
+          <button onclick="setAllAttStatus('present')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#DCFCE7;color:#15803D;cursor:pointer;font-family:Sarabun,sans-serif;white-space:nowrap;">✅ มาทุกคน</button>
+          <button onclick="setAllAttStatus('absent')"  style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#FEE2E2;color:#B91C1C;cursor:pointer;font-family:Sarabun,sans-serif;white-space:nowrap;">❌ ขาดทุกคน</button>
         </div>
-        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
-          <button onclick="setAllAttStatus('present')" style="flex:1;padding:8px 6px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#DCFCE7;color:#15803D;cursor:pointer;font-family:Sarabun,sans-serif;">✅ มาทุกคน</button>
-          <button onclick="setAllAttStatus('absent')"  style="flex:1;padding:8px 6px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#FEE2E2;color:#B91C1C;cursor:pointer;font-family:Sarabun,sans-serif;">❌ ขาดทุกคน</button>
-          <button onclick="setAllAttStatus('late')"    style="flex:1;padding:8px 6px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#FEF3C7;color:#B45309;cursor:pointer;font-family:Sarabun,sans-serif;">⏰ สายทุกคน</button>
-        </div>
-        <div id="att-summary" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+        <!-- Summary strip -->
+        <div id="att-summary" style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;"></div>
       </div>
 
-      <!-- Student list -->
-      <div class="card" style="margin-bottom:12px;">
-        <div class="card-title" style="margin-bottom:10px;">👤 รายชื่อนักเรียน</div>
-        <div id="att-student-list"></div>
-      </div>
-
-      <!-- Save + Export -->
-      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-        <button onclick="saveAttendance()" id="att-save-btn"
-          style="flex:2;min-width:140px;padding:13px;font-size:14px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
-          💾 บันทึกเช็คชื่อ
-        </button>
-        <button onclick="exportAttendanceExcel()"
-          style="flex:1;min-width:90px;padding:13px;font-size:13px;font-weight:700;border-radius:12px;border:1.5px solid #86EFAC;background:#F0FDF4;color:#15803D;cursor:pointer;font-family:Sarabun,sans-serif;">
-          📊 Excel
-        </button>
-        <button onclick="exportAttendancePDF()"
-          style="flex:1;min-width:90px;padding:13px;font-size:13px;font-weight:700;border-radius:12px;border:1.5px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-family:Sarabun,sans-serif;">
-          📄 PDF
-        </button>
-      </div>
-      <div id="att-save-status" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:10px;font-size:13px;font-weight:700;text-align:center;"></div>
-
-      <!-- History -->
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div class="card-title" style="margin:0;">📅 ประวัติเช็คชื่อ</div>
-          <button onclick="loadAttendanceHistory()" style="padding:5px 12px;font-size:12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;color:var(--text2);">🔄 โหลด</button>
+      <!-- 2-column layout on desktop, single on mobile -->
+      <div style="display:grid;grid-template-columns:1fr 280px;gap:10px;align-items:start;">
+        <!-- LEFT: รายชื่อนักเรียน -->
+        <div style="background:#fff;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;">
+          <div style="padding:10px 14px;border-bottom:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-size:14px;font-weight:700;color:var(--text);">👤 รายชื่อนักเรียน</div>
+            <button onclick="setAllAttStatus('late')" style="padding:4px 10px;font-size:11px;font-weight:700;border-radius:6px;border:none;background:#FEF3C7;color:#B45309;cursor:pointer;font-family:Sarabun,sans-serif;">⏰ สายทุกคน</button>
+          </div>
+          <div id="att-student-list" style="padding:6px 10px;"></div>
         </div>
-        <div id="att-history-list"></div>
+
+        <!-- RIGHT: บันทึก + ประวัติ -->
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <!-- Save + Export -->
+          <div style="background:#fff;border-radius:14px;border:1.5px solid var(--border);padding:12px;">
+            <button onclick="saveAttendance()" id="att-save-btn"
+              style="width:100%;padding:11px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;margin-bottom:8px;">
+              💾 บันทึกเช็คชื่อ
+            </button>
+            <div style="display:flex;gap:6px;">
+              <button onclick="exportAttendanceExcel()" style="flex:1;padding:9px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid #86EFAC;background:#F0FDF4;color:#15803D;cursor:pointer;font-family:Sarabun,sans-serif;">📊 Excel</button>
+              <button onclick="exportAttendancePDF()"   style="flex:1;padding:9px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-family:Sarabun,sans-serif;">📄 PDF</button>
+            </div>
+            <div id="att-save-status" style="display:none;margin-top:8px;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:700;text-align:center;"></div>
+          </div>
+
+          <!-- ประวัติ -->
+          <div style="background:#fff;border-radius:14px;border:1.5px solid var(--border);padding:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:13px;font-weight:700;color:var(--text);">📅 ประวัติ</div>
+              <button onclick="loadAttendanceHistory()" style="padding:3px 8px;font-size:11px;border-radius:6px;border:1.5px solid var(--border);background:#fff;cursor:pointer;color:var(--text2);">🔄</button>
+            </div>
+            <div id="att-history-list" style="max-height:320px;overflow-y:auto;"></div>
+          </div>
+        </div>
       </div>
 
     </div>
+
+    <!-- Mobile: stack grid to single column -->
+    <style>
+      @media(max-width:700px){
+        #ap-attend [style*="grid-template-columns:1fr 280px"]{
+          grid-template-columns:1fr !important;
+        }
+      }
+    </style>
   </div>
 
   <div class="bnav">
