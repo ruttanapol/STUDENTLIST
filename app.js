@@ -804,30 +804,22 @@ async function loginTeacher(){
     // ดึงข้อมูลครูจาก teachers table
     const {data:teacher,error:tErr}=await SB.from('teachers').select('*').eq('id',uid).single();
     if(tErr||!teacher){errEl.textContent='ไม่พบข้อมูลครูในระบบ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
-    if(teacher.status==='pending'){
-  // ยังไม่ส่งสลิป — ไปหน้าอัพโหลดสลิป
-  CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,
-    username:teacher.username||'',slip_url:teacher.slip_url||null,
-    slip_uploaded_at:teacher.slip_uploaded_at||null,status:teacher.status};
-  showSlipScreen(CURRENT_TEACHER);
-  return;
-}
-if(teacher.status==='slip_uploaded'){
-  // ส่งสลิปแล้วแต่ยังรอ — ไปหน้าแสดงสถานะ
-  CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,
-    username:teacher.username||'',slip_url:teacher.slip_url||null,
-    slip_uploaded_at:teacher.slip_uploaded_at||null,status:teacher.status};
-  showSlipScreen(CURRENT_TEACHER);
-  return;
-}
-    if(teacher.status==='rejected'){errEl.textContent='บัญชีถูกปฏิเสธ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
-    if(teacher.status==='expired'){errEl.textContent='บัญชีหมดอายุ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
-// เช็ค expiry อัตโนมัติ
-if(teacher.expires_at && new Date(teacher.expires_at) < new Date()){
-  await SB.from('teachers').update({status:'expired'}).eq('id',uid);
-  errEl.textContent='บัญชีหมดอายุ กรุณาติดต่อแอดมิน';
-  await SB.auth.signOut();return;
-}
+    // rejected → แจ้งให้สมัครใหม่ (ใช้อีเมลเดิมได้)
+    if(teacher.status==='rejected'){
+      errEl.textContent='บัญชีนี้ถูกปฏิเสธ — คุณสามารถสมัครใหม่ด้วยอีเมลเดิมได้';
+      await SB.auth.signOut();return;
+    }
+    // plan_expires_at หมดอายุ → downgrade เป็น free แต่ยังเข้าได้ปกติ
+    if(teacher.plan_expires_at && new Date(teacher.plan_expires_at) < new Date()){
+      await SB.from('teachers').update({plan:'free', plan_expires_at:null}).eq('id',uid);
+      teacher.plan = 'free'; teacher.plan_expires_at = null;
+      toast('แพลน Premium หมดอายุแล้ว — ดาวน์เกรดเป็น Free อัตโนมัติ','warn');
+    }
+    // expires_at (legacy) หมดอายุ → downgrade แต่ไม่บล็อก
+    if(teacher.expires_at && new Date(teacher.expires_at) < new Date()){
+      await SB.from('teachers').update({status:'approved', plan:'free', expires_at:null}).eq('id',uid);
+      teacher.plan = 'free'; teacher.expires_at = null;
+    }
     // เข้าสู่ระบบสำเร็จ
     // เช็ค maintenance mode — bypass accounts ผ่านได้
     const {data:maintData} = await SB.from('settings').select('value').eq('key','maintenance_mode').maybeSingle();
@@ -874,51 +866,80 @@ async function registerTeacher(){
   if(pw!==pw2){errEl.textContent='รหัสผ่านไม่ตรงกัน';return;}
   if(pw.length<6){errEl.textContent='รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';return;}
   if(!USE_SUPABASE){errEl.textContent='ต้องเชื่อมต่อ Supabase';return;}
+
+  const displayName='ครู'+firstName+' '+lastName;
+
   try{
-    // ตรวจ username ซ้ำ
-    const {data:existing}=await SB.from('teachers').select('id').eq('username',username);
-    if(existing&&existing.length>0){errEl.textContent='Username นี้ถูกใช้แล้ว';return;}
-    const displayName='ครู'+firstName+' '+lastName;
-    // สร้าง user ใน Supabase Auth
+    // ตรวจ username ซ้ำกับคนอื่น (ไม่นับอีเมลเดิมของตัวเอง)
+    const {data:uCheck}=await SB.from('teachers').select('id,email').eq('username',username);
+    if(uCheck&&uCheck.length>0&&uCheck[0].email!==email){
+      errEl.textContent='Username นี้ถูกใช้แล้ว';return;
+    }
+
+    // --- ลองสมัครใหม่ผ่าน Supabase Auth ---
     const {data:authData,error:authErr}=await SB.auth.signUp({
       email, password:pw,
       options:{data:{display_name:displayName,username,first_name:firstName,last_name:lastName}}
     });
+
+    let uid = authData?.user?.id;
+
     if(authErr){
-      if(authErr.message.includes('already registered'))errEl.textContent='อีเมลนี้ถูกใช้แล้ว';
-      else errEl.textContent='เกิดข้อผิดพลาด: '+authErr.message;
-      return;
+      // อีเมลมีอยู่แล้วใน Auth → ลอง signIn เพื่อดู status ในตาราง teachers
+      if(authErr.message.includes('already registered') || authErr.message.includes('User already registered')){
+        const {data:signInData,error:signInErr}=await SB.auth.signInWithPassword({email,password:pw});
+        if(signInErr){
+          // password ผิด → อีเมลถูกใช้โดยคนอื่นจริง
+          errEl.textContent='อีเมลนี้ถูกใช้แล้ว หากเป็นบัญชีของคุณ กรุณาเข้าสู่ระบบ';return;
+        }
+        uid = signInData.user.id;
+        // ดูสถานะในตาราง teachers
+        const {data:oldTeacher}=await SB.from('teachers').select('id,status').eq('id',uid).maybeSingle();
+        if(oldTeacher && oldTeacher.status !== 'rejected'){
+          // บัญชีปกติอยู่ → ไม่ให้สมัครซ้ำ
+          errEl.textContent='อีเมลนี้ถูกใช้แล้ว กรุณาเข้าสู่ระบบ';
+          await SB.auth.signOut();return;
+        }
+        // status=rejected หรือไม่มีใน teachers → ล้างข้อมูลเดิมแล้วสมัครใหม่
+        await SB.from('teachers').delete().eq('id',uid);
+        // อัปเดต password ใหม่ (user กำลัง sign in อยู่)
+        await SB.auth.updateUser({password:pw});
+      } else {
+        errEl.textContent='เกิดข้อผิดพลาด: '+authErr.message;return;
+      }
     }
-    // บันทึกลง teachers table (status=pending)
-    const uid=authData.user.id;
-    const {error:insertErr}=await SB.from('teachers').insert({
+
+    // บันทึกลง teachers table — status='approved', plan='free' ใช้งานได้ทันที
+    const {error:upsertErr}=await SB.from('teachers').upsert({
       id:uid, email, username, first_name:firstName, last_name:lastName,
-      display_name:displayName, status:'pending'
-    });
-    if(insertErr&&!insertErr.message.includes('duplicate'))throw insertErr;
-    
-    // แสดงหน้าชำระเงินทันที
-CURRENT_TEACHER = {
-  id: uid,
-  display_name: displayName,
-  email: email,
-  username: username,
-  status: 'pending',
-  slip_url: null,
-  slip_uploaded_at: null
-};
+      display_name:displayName, status:'approved', plan:'free',
+      plan_expires_at:null, expires_at:null, slip_url:null, slip_uploaded_at:null
+    },{onConflict:'id'});
+    if(upsertErr) throw upsertErr;
 
-// อัพโหลดรูปโปรไฟล์ถ้ามี
-const avatarFile = document.getElementById('reg-avatar-input').files[0];
-if(avatarFile) {
-  const avatarUrl = await uploadAvatar(avatarFile, uid);
-  if(avatarUrl) {
-    await SB.from('teachers').update({avatar_url: avatarUrl}).eq('id', uid);
-  }
-}
+    // อัพโหลดรูปโปรไฟล์ถ้ามี
+    const avatarFile = document.getElementById('reg-avatar-input').files[0];
+    if(avatarFile){
+      const avatarUrl = await uploadAvatar(avatarFile, uid);
+      if(avatarUrl) await SB.from('teachers').update({avatar_url:avatarUrl}).eq('id',uid);
+    }
 
-await SB.auth.signOut();
-showSlipScreen(CURRENT_TEACHER);
+    // เข้าสู่ระบบได้เลย
+    CURRENT_TEACHER={
+      id:uid, display_name:displayName, email, username,
+      status:'approved', plan:'free', plan_expires_at:null
+    };
+    await loadFromSupabase();
+    setTimeout(()=>setupRealtime(),500);
+    document.getElementById('teacher-topbar-name').textContent=displayName;
+    document.getElementById('teacher-topbar-email').textContent=email;
+    document.getElementById('teacher-email-input').value='';
+    document.getElementById('teacher-pw-input').value='';
+    showScreen('s-admin');
+    populateScanSelects();
+    renderDashboard();
+    renderPlanBanner();
+
   }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
 }
 
