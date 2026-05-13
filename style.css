@@ -55,8 +55,9 @@ body { background:var(--bg); overscroll-behavior:none; }
   /* admin content area */
   #s-admin-body {
     flex: 1;
-    overflow-y: auto;
+    overflow: hidden;  /* ให้ s-admin-main จัดการ scroll แทน */
     display: flex;
+    height: 100%;
   }
   
   /* desktop sidebar nav */
@@ -73,7 +74,9 @@ body { background:var(--bg); overscroll-behavior:none; }
   #s-admin-main {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 0;
+    height: 100%;
   }
   
   /* superadmin scroll area */
