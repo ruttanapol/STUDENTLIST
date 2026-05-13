@@ -4157,6 +4157,21 @@ async function confirmSetPlan() {
       updateData.plan_expires_at = null;
     }
 
+    // ถ้าไอดีนี้ status=expired ให้ reactivate เป็น approved ด้วย
+    const teacher = (_cachedTeachers || []).find(t => t.id === tid);
+    const isExpiredAcc = teacher && (
+      teacher.status === 'expired' ||
+      (teacher.status === 'approved' && teacher.expires_at && new Date(teacher.expires_at) < new Date())
+    );
+    if(isExpiredAcc) {
+      updateData.status = 'approved';
+      // ต่ออายุบัญชี: ใช้ plan_expires_at ถ้าเป็น premium ไม่งั้นให้ 365 วัน
+      const newExpiry = planExpiresAt
+        ? new Date(planExpiresAt)
+        : new Date(Date.now() + 365 * 86400000);
+      updateData.expires_at = newExpiry.toISOString();
+    }
+
     const { data, error } = await SB.from('teachers').update(updateData).eq('id', tid).select();
     if(error) throw error;
 
@@ -4166,11 +4181,14 @@ async function confirmSetPlan() {
       if(idx >= 0) {
         _cachedTeachers[idx].plan = plan;
         _cachedTeachers[idx].plan_expires_at = updateData.plan_expires_at;
+        if(updateData.status) _cachedTeachers[idx].status = updateData.status;
+        if(updateData.expires_at) _cachedTeachers[idx].expires_at = updateData.expires_at;
       }
     }
 
     closeSetPlanModal();
-    toast2(`✅ เปลี่ยน Plan เป็น ${plan === 'premium' ? '💎 Premium' : '🎁 Free'} แล้ว`);
+    const reactivated = isExpiredAcc ? ' · เปิดใช้งานอีกครั้งแล้ว ✨' : '';
+    toast2(`✅ เปลี่ยน Plan เป็น ${plan === 'premium' ? '💎 Premium' : '🎁 Free'} แล้ว${reactivated}`);
     loadSuperAdminPanel();
   } catch(e) {
     console.error('[confirmSetPlan] error:', e);
