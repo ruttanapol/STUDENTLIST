@@ -6,7 +6,8 @@
 // ╔══════════════════════════════════════════════════════╗
 // ║  SECTION A: CONSTANTS & CONFIGURATION               ║
 // ╚══════════════════════════════════════════════════════╝
-// Credentials moved to Supabase settings
+const SUPER_ADMIN_PW = null; // ย้ายไป Supabase แล้ว  //
+const ADMIN_PW = 'teacher123';  // เหลือไว้ compatibility (ไม่ใช้แล้ว)
 
 // ╔══════════════════════════════════════════════════════╗
 // ║  SECTION B: SUPABASE + LOCAL STORAGE LAYER          ║
@@ -185,10 +186,11 @@ async function tryRestoreSession(){
     document.getElementById('teacher-topbar-name').textContent=teacher.display_name;if(teacher.avatar_url) updateTopbarAvatar(teacher.avatar_url);
     document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
     // เช็คและแจ้งเตือนอายุการใช้งาน
-    await checkAndNotifyExpiry(teacher);
+await checkAndNotifyExpiry(teacher);
     showScreen('s-admin');
     populateScanSelects();
     renderDashboard();
+    await checkAndNotifyExpiry(teacher);
     await checkAndDowngradePremium();
     checkLockedDataOnLoad();
     return true;
@@ -247,6 +249,7 @@ async function connectSupabase(silent = false) {
     if(!restored) setTimeout(() => setupRealtime(), 500);
     setTimeout(()=>loadTeacherListForStudent(), 200);
     setTimeout(()=>loadContactLinksForLogin(), 400);setTimeout(()=>checkMaintenanceMode(), 600);
+    setTimeout(()=>checkAnnouncement(), 800);
     setTimeout(() => {
       document.getElementById('setup-overlay').style.display = 'none';
     }, silent ? 0 : 600);
@@ -265,6 +268,7 @@ async function connectSupabase(silent = false) {
       if(!restored) setTimeout(() => setupRealtime(), 500);
       setTimeout(()=>loadTeacherListForStudent(), 200);
       setTimeout(()=>loadContactLinksForLogin(), 400);setTimeout(()=>checkMaintenanceMode(), 600);
+      setTimeout(()=>checkAnnouncement(), 800);
       setTimeout(() => { document.getElementById('setup-overlay').style.display = 'none'; }, silent ? 0 : 600);
       return;
     }
@@ -1204,21 +1208,21 @@ async function loadSuperAdminPanel(){
       +'<div style="font-size:13px;color:#B45309;">กรุณากลับไปตั้งค่าก่อน หรือรีโหลดหน้าเว็บ</div>'
       +'<button onclick="logout()" style="margin-top:12px;padding:8px 20px;border-radius:20px;border:1.5px solid #B45309;background:#FEF3C7;color:#92400E;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">← กลับหน้าหลัก</button>'
       +'</div>';
-    const allEl3 = document.getElementById('sa-all-list');
-    if(allEl3) allEl3.innerHTML = notConn;
-    const pb3 = document.getElementById('sa-pending-badge');
-    if(pb3) pb3.style.display = 'none';
+    document.getElementById('sa-pending-list').innerHTML = notConn;
+    document.getElementById('sa-approved-list').innerHTML = '';
+    document.getElementById('sa-rejected-list').innerHTML = '';
+    document.getElementById('sa-pending-badge').style.display = 'none';
     return;
   }
   try{
     // แสดง loading
-    const allEl3b = document.getElementById('sa-all-list');
-    if(allEl3b) allEl3b.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);">⏳ กำลังโหลด...</div>';
+    document.getElementById('sa-pending-list').innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);">⏳ กำลังโหลด...</div>';
     const {data,error}=await SB.from('teachers').select('id,email,username,first_name,last_name,display_name,status,created_at,expires_at,slip_url,slip_uploaded_at,plan,plan_expires_at').order('created_at');
     if(error)throw error;
     renderTeacherList(data||[]);
     loadContactSettings();
     loadMaintenanceStatus();
+    loadAnnouncementSettings();
   }catch(e){
     const msg = e.message||String(e);
     const isNoTable = msg.includes('does not exist')||msg.includes('relation');
@@ -1228,8 +1232,9 @@ async function loadSuperAdminPanel(){
         +'<div style="font-size:15px;font-weight:700;color:#B91C1C;margin-bottom:4px;">ยังไม่ได้สร้าง Tables</div>'
         +'<div style="font-size:13px;color:#991B1B;">กรุณาไปรัน SQL ใน Supabase SQL Editor ก่อน</div></div>'
       : '<div style="background:#FEE2E2;border-radius:12px;padding:16px;text-align:center;font-size:13px;color:#B91C1C;">❌ '+msg+'</div>';
-    const allEl3c = document.getElementById('sa-all-list');
-    if(allEl3c) allEl3c.innerHTML = errHtml;
+    document.getElementById('sa-pending-list').innerHTML = errHtml;
+    document.getElementById('sa-approved-list').innerHTML = '';
+    document.getElementById('sa-rejected-list').innerHTML = '';
   }
 }
 
@@ -3559,9 +3564,10 @@ function onSubjChangeInHW() {
   const subj = getSubjectObj(subjName);
   if(!subj) return;
   const maxEl = document.getElementById('n-hwmaxscore');
-  // auto-fill max score จาก subject total (ค่าเก็บ)
-  const per = subj.total || 100;
-  if(maxEl && !maxEl.value) maxEl.value = per;
+  if(!maxEl || maxEl.value == subj.scorePerHW) return;
+  // คำนวณ scorePerHW
+  const per = subj.hwCount > 0 ? Math.round((subj.total / subj.hwCount) * 100) / 100 : subj.total;
+  if(maxEl) maxEl.value = per;
 }
 
 async function addSubjectFull() {
@@ -3612,7 +3618,7 @@ async function updateSubjectScore(name, total, hwCount) {
   if(!subj) return;
   if(typeof subj === 'object') {
     subj.total = parseFloat(total) || 100;
-    // hwCount is now auto-derived from actual homeworks, no longer stored
+    subj.hwCount = parseInt(hwCount) || 10;
   }
   await sbSaveSettings('subjects', DB.subjects);
   renderSubjectsFull();
@@ -4986,19 +4992,6 @@ async function loadAnthropicKey() {
   try {
     const { data } = await SB.from('settings').select('value').eq('key','anthropic_key').single();
     ANTHROPIC_KEY = data?.value || '';
-    // Update SA panel status if visible
-    const statusEl = document.getElementById('sa-api-key-status');
-    const inp = document.getElementById('sa-anthropic-key');
-    if(statusEl) {
-      if(ANTHROPIC_KEY) {
-        statusEl.textContent = '✅ ตั้งค่าแล้ว · ' + ANTHROPIC_KEY.slice(0,12) + '...';
-        statusEl.style.color = 'var(--green-dark)';
-        if(inp) inp.value = ANTHROPIC_KEY;
-      } else {
-        statusEl.textContent = 'ยังไม่ได้ตั้งค่า';
-        statusEl.style.color = 'var(--text3)';
-      }
-    }
   } catch(e) {
     ANTHROPIC_KEY = '';
   }
@@ -5442,48 +5435,130 @@ function renderSAStats(teachers) {
 }
 
 // ╔══════════════════════════════════════════════════════╗
-// ║  SECTION SA: MISSING SUPER ADMIN FUNCTIONS          ║
+// ║  ANNOUNCEMENT SYSTEM                                ║
 // ╚══════════════════════════════════════════════════════╝
 
-function toggleApiKeyVisibility() {
-  const inp = document.getElementById('sa-anthropic-key');
-  const btn = document.getElementById('api-key-toggle');
-  if(!inp) return;
-  const isHidden = inp.type === 'password';
-  inp.type = isHidden ? 'text' : 'password';
-  if(btn) btn.textContent = isHidden ? 'ซ่อน' : 'แสดง';
+let _announceType = 'info';
+let _announceData = null;
+
+const ANNOUNCE_THEMES = {
+  info:        { bg:'linear-gradient(135deg,#DBEAFE,#BFDBFE)', color:'#1D4ED8', icon:'ℹ️', label:'ประกาศข้อมูล',  btnBg:'#2563EB', title:'ประกาศจากแอดมิน' },
+  update:      { bg:'linear-gradient(135deg,#DCFCE7,#BBF7D0)', color:'#15803D', icon:'🚀', label:'อัพเดตใหม่',    btnBg:'#16A34A', title:'มีการอัพเดต' },
+  warning:     { bg:'linear-gradient(135deg,#FEF3C7,#FDE68A)', color:'#B45309', icon:'⚠️', label:'แจ้งเตือน',    btnBg:'#D97706', title:'แจ้งเตือนสำคัญ' },
+  maintenance: { bg:'linear-gradient(135deg,#FEE2E2,#FECACA)', color:'#B91C1C', icon:'🔧', label:'ปิดปรับปรุง',  btnBg:'#DC2626', title:'แจ้งปิดปรับปรุงระบบ' },
+};
+
+function setAnnounceType(type, btn) {
+  _announceType = type;
+  document.querySelectorAll('.ann-type-btn').forEach(b => {
+    b.style.borderColor = 'var(--border)';
+    b.style.background = '#fff';
+    b.style.color = 'var(--text2)';
+  });
+  if(btn) {
+    const th = ANNOUNCE_THEMES[type] || ANNOUNCE_THEMES.info;
+    btn.style.borderColor = th.btnBg;
+    btn.style.background = th.bg;
+    btn.style.color = th.color;
+  }
 }
 
-async function saveAnthropicKey() {
-  const inp = document.getElementById('sa-anthropic-key');
-  const statusEl = document.getElementById('sa-api-key-status');
-  const key = inp?.value?.trim() || '';
-  if(!key) { toast2('กรุณากรอก API Key ก่อน', 'err'); return; }
-  if(!key.startsWith('sk-ant-')) { toast2('API Key ต้องขึ้นต้นด้วย sk-ant-', 'err'); return; }
+async function loadAnnouncementSettings() {
+  if(!SB) return;
   try {
-    await SB.from('settings').upsert({ key: 'anthropic_key', value: key }, { onConflict: 'key' });
-    ANTHROPIC_KEY = key;
-    if(statusEl) { statusEl.textContent = '✅ บันทึกแล้ว · ' + key.slice(0,12) + '...'; statusEl.style.color = 'var(--green-dark)'; }
-    toast2('✅ บันทึก API Key แล้ว');
+    const { data } = await SB.from('settings').select('value').eq('key','announcement').maybeSingle();
+    _announceData = data?.value || null;
+    if(_announceData) {
+      const el = document.getElementById('announce-text');
+      const cb = document.getElementById('announce-enabled');
+      if(el) el.value = _announceData.text || '';
+      if(cb) cb.checked = !!_announceData.enabled;
+      if(_announceData.type) {
+        _announceType = _announceData.type;
+        const btn = document.getElementById('ann-type-' + _announceData.type);
+        if(btn) setAnnounceType(_announceData.type, btn);
+      }
+    }
+  } catch(e) {}
+}
+
+function toggleAnnouncementEnabled(checked) {
+  // Auto-save toggle state
+  saveAnnouncement(checked);
+}
+
+async function saveAnnouncement(overrideEnabled) {
+  if(!SB) return;
+  const text = (document.getElementById('announce-text')?.value || '').trim();
+  const enabled = overrideEnabled !== undefined ? overrideEnabled : !!(document.getElementById('announce-enabled')?.checked);
+  if(!text && enabled) {
+    toast2('กรุณากรอกข้อความประกาศก่อนเปิดใช้งาน', 'err');
+    const cb = document.getElementById('announce-enabled');
+    if(cb) cb.checked = false;
+    return;
+  }
+  const data = { text, enabled, type: _announceType, updatedAt: new Date().toISOString() };
+  try {
+    await SB.from('settings').upsert({ key: 'announcement', value: data }, { onConflict: 'key' });
+    _announceData = data;
+    toast2(enabled ? '📢 บันทึกและเปิดประกาศแล้ว' : '💾 บันทึกประกาศแล้ว (ปิดอยู่)');
   } catch(e) {
     toast2('บันทึกไม่สำเร็จ: ' + e.message, 'err');
   }
 }
 
-async function changeSuperAdminPw() {
-  const pw1 = document.getElementById('new-sa-pw')?.value?.trim() || '';
-  const pw2 = document.getElementById('new-sa-pw2')?.value?.trim() || '';
-  const errEl = document.getElementById('sa-pw-err');
-  if(errEl) errEl.textContent = '';
-  if(!pw1) { if(errEl) errEl.textContent = 'กรุณากรอกรหัสผ่านใหม่'; return; }
-  if(pw1.length < 6) { if(errEl) errEl.textContent = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'; return; }
-  if(pw1 !== pw2) { if(errEl) errEl.textContent = 'รหัสผ่านไม่ตรงกัน'; return; }
+function previewAnnouncement() {
+  const text = (document.getElementById('announce-text')?.value || '').trim();
+  if(!text) { toast2('กรอกข้อความก่อนดูตัวอย่าง', 'warn'); return; }
+  showAnnouncementPopup({ text, type: _announceType, enabled: true, updatedAt: new Date().toISOString() });
+}
+
+async function checkAnnouncement() {
+  if(!SB) return;
+  // Show only once per browser session
+  if(sessionStorage.getItem('ann_dismissed')) return;
   try {
-    await SB.from('settings').upsert({ key: 'superadmin_pw', value: pw1 }, { onConflict: 'key' });
-    document.getElementById('new-sa-pw').value = '';
-    document.getElementById('new-sa-pw2').value = '';
-    toast2('✅ เปลี่ยนรหัสผ่าน Super Admin แล้ว');
-  } catch(e) {
-    if(errEl) errEl.textContent = 'บันทึกไม่สำเร็จ: ' + e.message;
+    const { data } = await SB.from('settings').select('value').eq('key','announcement').maybeSingle();
+    const ann = data?.value;
+    if(!ann || !ann.enabled || !ann.text) return;
+    // Check if same announcement was already dismissed this session
+    const lastSeen = sessionStorage.getItem('ann_seen_at');
+    if(lastSeen === ann.updatedAt) return;
+    showAnnouncementPopup(ann);
+  } catch(e) {}
+}
+
+function showAnnouncementPopup(ann) {
+  const overlay = document.getElementById('announcement-overlay');
+  if(!overlay) return;
+  const th = ANNOUNCE_THEMES[ann.type] || ANNOUNCE_THEMES.info;
+  // Header
+  const header = document.getElementById('announcement-header');
+  if(header) header.style.background = th.bg;
+  const icon = document.getElementById('announcement-icon');
+  if(icon) icon.textContent = th.icon;
+  const typeLabel = document.getElementById('announcement-type-label');
+  if(typeLabel) { typeLabel.textContent = th.label; typeLabel.style.color = th.color; }
+  const title = document.getElementById('announcement-title');
+  if(title) { title.textContent = th.title; title.style.color = '#1E293B'; }
+  // Body
+  const body = document.getElementById('announcement-body');
+  if(body) body.textContent = ann.text;
+  // Date
+  const dateEl = document.getElementById('announcement-date');
+  if(dateEl && ann.updatedAt) {
+    dateEl.textContent = 'ประกาศเมื่อ ' + new Date(ann.updatedAt).toLocaleString('th-TH', { day:'numeric', month:'short', year:'2-digit', hour:'2-digit', minute:'2-digit' });
   }
+  // Button
+  const btn = document.getElementById('announcement-close-btn');
+  if(btn) { btn.style.background = th.btnBg; btn.style.color = '#fff'; }
+  overlay.style.display = 'flex';
+  // Store seen state
+  if(ann.updatedAt) sessionStorage.setItem('ann_seen_at', ann.updatedAt);
+}
+
+function closeAnnouncement() {
+  const overlay = document.getElementById('announcement-overlay');
+  if(overlay) overlay.style.display = 'none';
+  sessionStorage.setItem('ann_dismissed', '1');
 }
