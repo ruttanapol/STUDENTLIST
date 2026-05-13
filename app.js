@@ -5488,7 +5488,7 @@ function toggleAnnouncementEnabled(checked) {
 }
 
 async function saveAnnouncement(overrideEnabled) {
-  if(!SB) return;
+  if(!USE_SUPABASE || !SB) { toast2('ต้องเชื่อมต่อ Supabase ก่อน', 'err'); return; }
   const text = (document.getElementById('announce-text')?.value || '').trim();
   const enabled = overrideEnabled !== undefined ? overrideEnabled : !!(document.getElementById('announce-enabled')?.checked);
   if(!text && enabled) {
@@ -5498,13 +5498,13 @@ async function saveAnnouncement(overrideEnabled) {
     return;
   }
   const data = { text, enabled, type: _announceType, updatedAt: new Date().toISOString() };
-  try {
-    await SB.from('settings').upsert({ key: 'announcement', value: data }, { onConflict: 'key' });
-    _announceData = data;
-    toast2(enabled ? '📢 บันทึกและเปิดประกาศแล้ว' : '💾 บันทึกประกาศแล้ว (ปิดอยู่)');
-  } catch(e) {
-    toast2('บันทึกไม่สำเร็จ: ' + e.message, 'err');
-  }
+  const { error } = await SB.from('settings').upsert(
+    { key: 'announcement', value: data },
+    { onConflict: 'key' }
+  );
+  if(error) { toast2('บันทึกไม่สำเร็จ: ' + error.message, 'err'); return; }
+  _announceData = data;
+  toast2(enabled ? '📢 บันทึกและเปิดประกาศแล้ว' : '💾 บันทึกประกาศแล้ว (ปิดอยู่)');
 }
 
 function previewAnnouncement() {
