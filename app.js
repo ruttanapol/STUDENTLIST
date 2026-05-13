@@ -566,7 +566,7 @@ async function sbAddHomework(hw) {
       subject: hw.subject||'',
       max_score: hw.maxScore||100,
       teacher_id: tid,
-      deadline: hw.deadline||null,
+      deadline: hw.deadline && hw.deadline.trim() !== '' ? hw.deadline : null,
       file_url: hw.fileUrl||null,
       file_name: hw.fileName||null
     });
@@ -634,7 +634,8 @@ async function sbSaveSettings(key, value) {
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
     const scopedKey = tid ? key+'_'+tid : key;
-    await SB.from('settings').upsert({key:scopedKey, value}, {onConflict: 'key'});
+    const {error} = await SB.from('settings').upsert({key:scopedKey, value}, {onConflict: 'key'});
+    if(error) throw error;
   } else {
     saveDB();
   }
@@ -3576,24 +3577,33 @@ async function addSubjectFull() {
 
   showActionPopup('กำลังเพิ่มวิชา',name,'add');
   DB.subjects.push(subjObj);
-  await sbSaveSettings('subjects', DB.subjects);
-
-  document.getElementById('ns-subj-name').value = '';
-
-  renderSubjectsFull();
-  renderManage();
-  populateHWDropdown();
-  actionPopupDone('เพิ่มวิชาแล้ว ✅',name,'add');
+  try {
+    await sbSaveSettings('subjects', DB.subjects);
+    document.getElementById('ns-subj-name').value = '';
+    renderSubjectsFull();
+    renderManage();
+    populateHWDropdown();
+    actionPopupDone('เพิ่มวิชาแล้ว ✅',name,'add');
+  } catch(e) {
+    DB.subjects.pop(); // rollback
+    actionPopupError('บันทึกวิชาไม่สำเร็จ: '+e.message);
+  }
 }
 
 async function deleteSubjectFull(name) {
   if(!confirm('ลบวิชา "' + name + '"?')) return;
+  const backup = [...DB.subjects];
   showActionPopup('กำลังลบวิชา',name,'delete');
   DB.subjects = DB.subjects.filter(s => (typeof s === 'string' ? s : s.name) !== name);
-  await sbSaveSettings('subjects', DB.subjects);
-  actionPopupDone('ลบวิชาแล้ว',name,'delete');
-  renderSubjectsFull();
-  renderManage();
+  try {
+    await sbSaveSettings('subjects', DB.subjects);
+    actionPopupDone('ลบวิชาแล้ว',name,'delete');
+    renderSubjectsFull();
+    renderManage();
+  } catch(e) {
+    DB.subjects = backup; // rollback
+    actionPopupError('ลบวิชาไม่สำเร็จ: '+e.message);
+  }
 }
 
 async function updateSubjectScore(name, total, hwCount) {
