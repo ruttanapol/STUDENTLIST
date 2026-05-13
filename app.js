@@ -1252,87 +1252,230 @@ function filterTeachers(q) {
   renderTeacherList(_cachedTeachers || []);
 }
 
-function renderTeacherList(teachers){
+// ============================================================
+// SA UNIFIED TEACHER LIST — filter + detail sheet
+// ============================================================
+let _saStatusFilter = 'pending';
+
+function setSAFilter(status, btn) {
+  _saStatusFilter = status;
+  // tab highlight
+  ['pending','active','expired','all'].forEach(k => {
+    const el = document.getElementById('sa-tab-' + k);
+    if(!el) return;
+    const isActive = k === status;
+    el.style.borderBottom = isActive ? '3px solid var(--blue)' : '3px solid transparent';
+    el.style.color = isActive ? 'var(--blue-dark)' : 'var(--text2)';
+    el.style.background = isActive ? 'var(--blue-light)' : '#fff';
+    if(k === 'pending') {
+      el.style.background = isActive ? '#FEF3C7' : '#fff';
+      el.style.borderBottom = isActive ? '3px solid #F59E0B' : '3px solid transparent';
+      el.style.color = isActive ? '#B45309' : 'var(--text2)';
+    }
+  });
+  renderTeacherList(_cachedTeachers);
+}
+
+function _filterByTab(teachers) {
+  const now = new Date();
+  switch(_saStatusFilter) {
+    case 'pending':
+      return teachers.filter(t => t.status === 'pending' || t.status === 'slip_uploaded');
+    case 'active':
+      return teachers.filter(t => {
+        if(t.status !== 'approved') return false;
+        if(t.expires_at && new Date(t.expires_at) < now) return false;
+        return true;
+      });
+    case 'expired':
+      return teachers.filter(t =>
+        t.status === 'expired' ||
+        t.status === 'rejected' ||
+        (t.status === 'approved' && t.expires_at && new Date(t.expires_at) < now) ||
+        (t.plan === 'premium' && t.plan_expires_at && new Date(t.plan_expires_at) < now)
+      );
+    default:
+      return teachers;
+  }
+}
+
+function _isPlanExpired(t) {
+  if(t.plan !== 'premium') return false;
+  return t.plan_expires_at && new Date(t.plan_expires_at) < new Date();
+}
+
+function renderTeacherList(teachers) {
   _cachedTeachers = teachers;
   renderSAStats(teachers);
-  const pending=teachers.filter(t=>t.status==='pending');
-  const slipUploaded=teachers.filter(t=>t.status==='slip_uploaded');
-  const approved=teachers.filter(t=>t.status==='approved');
-  const rejected=teachers.filter(t=>t.status==='rejected');
 
-  const html=(list)=>{
-    const filtered = list.filter(t =>
-      !_teacherSearchQuery ||
-      t.display_name.toLowerCase().includes(_teacherSearchQuery) ||
-      (t.email||'').toLowerCase().includes(_teacherSearchQuery) ||
-      (t.username||'').toLowerCase().includes(_teacherSearchQuery)
-    );
-    if(!filtered.length) return '<div style="font-size:13px;color:var(--text3);padding:12px 0;text-align:center;">ไม่พบ</div>';
-    return filtered.map(t=>{
-      const isPrem = t.plan === 'premium';
-      const cardBorder = isPrem ? '1.5px solid #C4B5FD' : '1.5px solid var(--border)';
-      const avatarBorder = isPrem ? '2px solid #A78BFA' : '2px solid transparent';
-      const planBadge = isPrem
-        ? `<span onclick="openSetPlan('${t.id}','premium')" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#EDE9FE,#DDD6FE);color:#6D28D9;border:1px solid #C4B5FD;cursor:pointer;white-space:nowrap;">💎 Premium</span>`
-        : `<span onclick="openSetPlan('${t.id}','free')" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#F1EFE8;color:#6B7280;border:1px solid #D1D5DB;cursor:pointer;white-space:nowrap;">🎁 Free</span>`;
-      return `
-      <div style="background:${isPrem?'linear-gradient(135deg,#FDFCFF,#FAF5FF)':'#fff'};border:${cardBorder};border-radius:12px;padding:12px 14px;margin-bottom:8px;">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <div style="position:relative;flex-shrink:0;">
-            ${t.avatar_url
-              ? `<img src="${t.avatar_url}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:${avatarBorder};">`
-              : `<div style="width:38px;height:38px;border-radius:50%;background:${isPrem?'linear-gradient(135deg,#EDE9FE,#DDD6FE)':'var(--blue-light)'};color:${isPrem?'#6D28D9':'var(--blue-dark)'};font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px;border:${avatarBorder};">${(t.display_name||'?').substring(0,2)}</div>`
-            }
-            ${isPrem?'<div style="position:absolute;bottom:-2px;right:-2px;width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#FDE68A,#F59E0B);display:flex;align-items:center;justify-content:center;font-size:8px;border:1.5px solid #fff;">💎</div>':''}
-          </div>
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-              <div style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.display_name}</div>
-              ${planBadge}
-            </div>
-            <div style="font-size:11px;color:var(--text2);margin-top:1px;">${t.email||'-'}${t.username?' · @'+t.username:''}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;flex-shrink:0;">
-            <span style="font-size:11px;padding:3px 8px;border-radius:20px;font-weight:700;white-space:nowrap;${
-              t.status==='pending'?'background:#FEF3C7;color:#B45309;':
-              t.status==='slip_uploaded'?'background:var(--blue-light);color:var(--blue-dark);':
-              t.status==='approved'?'background:var(--green-light);color:var(--green-dark);':
-              t.status==='expired'?'background:#F1F5F9;color:#64748B;':
-              'background:var(--red-light);color:var(--red);'
-            }">${
-              t.status==='pending'?'⏳ รอ':
-              t.status==='slip_uploaded'?'💳 ส่งสลิป':
-              t.status==='approved'?'✅ อนุมัติ':
-              t.status==='expired'?'🔒 หมดอายุ':'❌ ปฏิเสธ'
-            }</span>
-            ${t.status!=='approved'?`<button onclick="approveTeacher('${t.id}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;white-space:nowrap;">✅ อนุมัติ</button>`:''}
-            ${t.status!=='rejected'?`<button onclick="rejectTeacher('${t.id}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;">✕ ปฏิเสธ</button>`:''}
-            <button onclick="viewTeacherData('${t.id}','${t.display_name}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;white-space:nowrap;">👁 ข้อมูล</button>
-            <button onclick="openSetExpiry('${t.id}','${t.expires_at||''}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--yellow);background:var(--yellow-light);color:#B45309;cursor:pointer;white-space:nowrap;">⏱ อายุ</button>
-            <button onclick="openSetPlan('${t.id}','${t.plan||'free'}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid #C4B5FD;background:var(--purple-light);color:var(--purple);cursor:pointer;white-space:nowrap;">💎 Plan</button>
-            <button onclick="deleteTeacher('${t.id}')" style="padding:4px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid #FECACA;background:#FEE2E2;color:#B91C1C;cursor:pointer;white-space:nowrap;">🗑 ลบ</button>
-          </div>
-        </div>
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          ${renderExpireBadge(t.expires_at)}
-          ${t.plan_requested?renderPlanRequestedBadge(t.plan_requested):''}
-          ${t.slip_url?`<a href="${t.slip_url}" target="_blank" style="font-size:12px;color:var(--blue-dark);font-weight:600;text-decoration:none;">💳 ดูสลิป</a>`:''}
-        </div>
-      </div>`;
-    }).join('');
-  };
+  // Update pending badge
+  const pendingCount = teachers.filter(t => t.status === 'pending' || t.status === 'slip_uploaded').length;
+  const pb = document.getElementById('sa-pending-badge');
+  if(pb) { pb.textContent = pendingCount || ''; pb.style.display = pendingCount ? '' : 'none'; }
 
-  document.getElementById('sa-pending-list').innerHTML=html(pending);
-  document.getElementById('sa-approved-list').innerHTML=html(approved);
-  document.getElementById('sa-rejected-list').innerHTML=html(rejected);
-  document.getElementById('sa-slip-list').innerHTML=html(slipUploaded);
+  // Apply search + tab filter
+  const q = _teacherSearchQuery;
+  let list = q
+    ? teachers.filter(t =>
+        (t.display_name || '').toLowerCase().includes(q) ||
+        (t.username || '').toLowerCase().includes(q) ||
+        (t.email || '').toLowerCase().includes(q))
+    : teachers;
+  list = _filterByTab(list);
 
-  document.getElementById('sa-pending-badge').textContent=pending.length||'';
-  document.getElementById('sa-pending-badge').style.display=pending.length?'':'none';
-  const slipBadge=document.getElementById('sa-slip-badge');
-  if(slipBadge){slipBadge.textContent=slipUploaded.length||'';slipBadge.style.display=slipUploaded.length?'':'none';}
+  // Sort: slip_uploaded first, then pending, then by name
+  const order = { slip_uploaded:0, pending:1, approved:2, expired:3, rejected:4 };
+  list = [...list].sort((a,b) => (order[a.status]||9)-(order[b.status]||9) || (a.display_name||'').localeCompare(b.display_name||''));
+
+  const allEl = document.getElementById('sa-all-list');
+  if(!allEl) return;
+
+  if(!list.length) {
+    allEl.innerHTML = '<div style="text-align:center;padding:32px 16px;color:var(--text3);font-size:14px;">ไม่พบผู้ใช้งาน</div>';
+    return;
+  }
+
+  allEl.innerHTML = list.map(t => {
+    const isPrem = t.plan === 'premium';
+    const planExpired = _isPlanExpired(t);
+    const now = new Date();
+    const accExpired = t.expires_at && new Date(t.expires_at) < now;
+
+    // Status badge config
+    const statusCfg = {
+      pending:       { bg:'#FEF3C7', color:'#B45309', label:'⏳ รออนุมัติ' },
+      slip_uploaded: { bg:'#DBEAFE', color:'#1D4ED8', label:'💳 ส่งสลิปแล้ว' },
+      approved:      { bg:'#DCFCE7', color:'#15803D', label:'✅ ใช้งาน' },
+      expired:       { bg:'#F1F5F9', color:'#64748B', label:'🔒 หมดอายุ' },
+      rejected:      { bg:'#FEE2E2', color:'#B91C1C', label:'❌ ปฏิเสธ' },
+    };
+    const sCfg = (accExpired && t.status === 'approved')
+      ? { bg:'#F1F5F9', color:'#64748B', label:'🔒 บัญชีหมดอายุ' }
+      : (statusCfg[t.status] || statusCfg.pending);
+
+    // Plan badge
+    let planBadge = '';
+    if(t.status === 'approved' && !accExpired) {
+      if(isPrem && !planExpired) {
+        const daysLeft = t.plan_expires_at ? Math.ceil((new Date(t.plan_expires_at)-now)/86400000) : null;
+        planBadge = `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:linear-gradient(135deg,#EDE9FE,#DDD6FE);color:#6D28D9;border:1px solid #C4B5FD;white-space:nowrap;">💎 Premium${daysLeft!==null?' ('+daysLeft+'ว.)':''}</span>`;
+      } else if(isPrem && planExpired) {
+        planBadge = `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#FEE2E2;color:#B91C1C;border:1px solid #FCA5A5;white-space:nowrap;">💎 Premium หมดอายุ</span>`;
+      } else {
+        planBadge = `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#F1F5F9;color:#64748B;border:1px solid #E2E8F0;white-space:nowrap;">🎁 Free</span>`;
+      }
+    }
+
+    // Avatar
+    const avatarBg = isPrem ? 'linear-gradient(135deg,#EDE9FE,#DDD6FE)' : 'linear-gradient(135deg,#DBEAFE,#BFDBFE)';
+    const avatarColor = isPrem ? '#6D28D9' : '#1D4ED8';
+    const avatarHtml = t.avatar_url
+      ? `<img src="${t.avatar_url}" style="width:42px;height:42px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+      : `<div style="width:42px;height:42px;border-radius:50%;background:${avatarBg};color:${avatarColor};font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${(t.display_name||'?').substring(0,2)}</div>`;
+
+    return `<div onclick="openSADetail('${t.id}')"
+      style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:12px;margin-bottom:6px;cursor:pointer;border:1.5px solid #EFF1F5;transition:box-shadow .15s;"
+      onmouseover="this.style.boxShadow='0 2px 12px rgba(37,99,235,0.1)';this.style.borderColor='var(--blue)'"
+      onmouseout="this.style.boxShadow='';this.style.borderColor='#EFF1F5'">
+      ${avatarHtml}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.display_name||'-'}</div>
+        <div style="font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.username?'@'+t.username+' · ':''}${t.email||''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${sCfg.bg};color:${sCfg.color};white-space:nowrap;">${sCfg.label}</span>
+        ${planBadge}
+      </div>
+      <span style="font-size:16px;color:#CBD5E1;flex-shrink:0;">›</span>
+    </div>`;
+  }).join('');
 }
-  
+
+function openSADetail(tid) {
+  const t = (_cachedTeachers || []).find(x => x.id === tid);
+  if(!t) return;
+  const overlay = document.getElementById('sa-detail-overlay');
+  const content = document.getElementById('sa-detail-content');
+  if(!overlay || !content) return;
+
+  const now = new Date();
+  const isPrem = t.plan === 'premium';
+  const planExpired = _isPlanExpired(t);
+  const accExpired = t.expires_at && new Date(t.expires_at) < now;
+  const expInfo = getExpiryInfo(t.expires_at);
+  const planExpInfo = getExpiryInfo(t.plan_expires_at);
+
+  const statusLabel = accExpired && t.status==='approved' ? '🔒 บัญชีหมดอายุ'
+    : t.status==='pending' ? '⏳ รออนุมัติ'
+    : t.status==='slip_uploaded' ? '💳 ส่งสลิปแล้ว'
+    : t.status==='approved' ? '✅ ใช้งาน'
+    : t.status==='expired' ? '🔒 หมดอายุ' : '❌ ปฏิเสธ';
+
+  const avatarHtml = t.avatar_url
+    ? `<img src="${t.avatar_url}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:3px solid ${isPrem?'#A78BFA':'#BFDBFE'};">`
+    : `<div style="width:56px;height:56px;border-radius:50%;background:${isPrem?'linear-gradient(135deg,#EDE9FE,#DDD6FE)':'linear-gradient(135deg,#DBEAFE,#BFDBFE)'};color:${isPrem?'#6D28D9':'#1D4ED8'};font-weight:800;display:flex;align-items:center;justify-content:center;font-size:18px;">${(t.display_name||'?').substring(0,2)}</div>`;
+
+  content.innerHTML = `
+    <!-- Profile row -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+      ${avatarHtml}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:17px;font-weight:800;color:var(--text);">${t.display_name||'-'}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px;">${t.username?'@'+t.username+' · ':''}${t.email||''}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${
+            t.status==='approved'?'#DCFCE7':t.status==='pending'||t.status==='slip_uploaded'?'#FEF3C7':'#FEE2E2'
+          };color:${
+            t.status==='approved'?'#15803D':t.status==='pending'||t.status==='slip_uploaded'?'#B45309':'#B91C1C'
+          };">${statusLabel}</span>
+          ${isPrem && !planExpired
+            ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:linear-gradient(135deg,#EDE9FE,#DDD6FE);color:#6D28D9;border:1px solid #C4B5FD;">💎 Premium</span>`
+            : isPrem && planExpired
+            ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#FEE2E2;color:#B91C1C;">💎 Premium หมดอายุ</span>`
+            : `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#F1F5F9;color:#64748B;">🎁 Free</span>`
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Info rows -->
+    <div style="background:#F8FAFC;border-radius:12px;padding:12px 14px;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px;">
+        <span style="color:var(--text3);white-space:nowrap;">อายุบัญชี</span>
+        <span style="font-weight:600;">${renderExpireBadge(t.expires_at)}</span>
+        ${isPrem ? `<span style="color:var(--text3);white-space:nowrap;">Premium</span>
+        <span style="font-weight:600;">${renderExpireBadge(t.plan_expires_at)}</span>` : ''}
+        ${t.slip_url ? `<span style="color:var(--text3);">สลิป</span><a href="${t.slip_url}" target="_blank" style="color:var(--blue);font-weight:600;">💳 ดูสลิป</a>` : ''}
+        <span style="color:var(--text3);">สมัครเมื่อ</span>
+        <span>${t.created_at ? new Date(t.created_at).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '-'}</span>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">การดำเนินการ</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      ${t.status!=='approved'
+        ? `<button onclick="approveTeacher('${t.id}');closeSADetail()" style="padding:11px;font-size:13px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">✅ อนุมัติ</button>`
+        : `<button onclick="openSetExpiry('${t.id}','${t.expires_at||''}');closeSADetail()" style="padding:11px;font-size:13px;font-weight:700;border-radius:10px;border:1.5px solid var(--yellow);background:var(--yellow-light);color:#B45309;cursor:pointer;font-family:Sarabun,sans-serif;">⏱ ต่ออายุ</button>`
+      }
+      <button onclick="openSetPlan('${t.id}','${t.plan||'free'}');closeSADetail()" style="padding:11px;font-size:13px;font-weight:700;border-radius:10px;border:1.5px solid #C4B5FD;background:linear-gradient(135deg,#FAF5FF,#EDE9FE);color:#6D28D9;cursor:pointer;font-family:Sarabun,sans-serif;">💎 เปลี่ยน Plan</button>
+      <button onclick="viewTeacherData('${t.id}','${t.display_name}');closeSADetail()" style="padding:11px;font-size:13px;font-weight:700;border-radius:10px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;font-family:Sarabun,sans-serif;">👁 ดูข้อมูล</button>
+      ${t.status!=='rejected'
+        ? `<button onclick="rejectTeacher('${t.id}');closeSADetail()" style="padding:11px;font-size:13px;font-weight:700;border-radius:10px;border:1.5px solid #FCA5A5;background:#FFF5F5;color:#B91C1C;cursor:pointer;font-family:Sarabun,sans-serif;">✕ ปฏิเสธ</button>`
+        : '<div></div>'
+      }
+    </div>
+    <button onclick="deleteTeacher('${t.id}');closeSADetail()" style="width:100%;padding:10px;font-size:13px;font-weight:700;border-radius:10px;border:none;background:#FEE2E2;color:#B91C1C;cursor:pointer;font-family:Sarabun,sans-serif;">🗑 ลบบัญชีนี้</button>
+  `;
+
+  overlay.style.display = 'flex';
+}
+
+function closeSADetail() {
+  const overlay = document.getElementById('sa-detail-overlay');
+  if(overlay) overlay.style.display = 'none';
+}
+
 function toggleTeacherDetail(id) {
   const el = document.getElementById(id);
   if(!el) return;
