@@ -562,11 +562,12 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
           style="flex:1;padding:10px;font-size:13px;font-weight:700;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-family:Sarabun,sans-serif;">
           👁 ดูตัวอย่าง
         </button>
-        <button onclick="saveAnnouncement()"
+        <button id="announce-save-btn" onclick="saveAnnouncement()"
           style="flex:2;padding:10px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,#F59E0B,#D97706);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
           💾 บันทึกประกาศ
         </button>
       </div>
+      <div id="announce-status" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:700;text-align:center;"></div>
     </div>
 
     <!-- Cleanup Orphan Data -->

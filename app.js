@@ -5488,24 +5488,45 @@ function toggleAnnouncementEnabled(checked) {
 }
 
 async function saveAnnouncement(overrideEnabled) {
-  if(!USE_SUPABASE || !SB) { toast2('ต้องเชื่อมต่อ Supabase ก่อน', 'err'); return; }
+  const btn = document.getElementById('announce-save-btn');
+  const statusEl = document.getElementById('announce-status');
+  const showStatus = (msg, ok) => {
+    if(statusEl) {
+      statusEl.textContent = msg;
+      statusEl.style.display = 'block';
+      statusEl.style.background = ok ? '#DCFCE7' : '#FEE2E2';
+      statusEl.style.color = ok ? '#15803D' : '#B91C1C';
+    }
+    toast2(msg, ok ? 'ok' : 'err');
+  };
+
+  if(!USE_SUPABASE || !SB) { showStatus('❌ ต้องเชื่อมต่อ Supabase ก่อน', false); return; }
+
   const text = (document.getElementById('announce-text')?.value || '').trim();
   const enabled = overrideEnabled !== undefined ? overrideEnabled : !!(document.getElementById('announce-enabled')?.checked);
+
   if(!text && enabled) {
-    toast2('กรุณากรอกข้อความประกาศก่อนเปิดใช้งาน', 'err');
+    showStatus('❌ กรุณากรอกข้อความประกาศก่อนเปิดใช้งาน', false);
     const cb = document.getElementById('announce-enabled');
     if(cb) cb.checked = false;
     return;
   }
+
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...'; }
+  if(statusEl) statusEl.style.display = 'none';
+
   const data = { text, enabled, type: _announceType, updatedAt: new Date().toISOString() };
-  // ใช้ SELECT → INSERT/UPDATE แทน upsert เพื่อหลีกเลี่ยงปัญหา onConflict
   const { data: existing } = await SB.from('settings').select('key').eq('key','announcement').maybeSingle();
   const { error } = existing
     ? await SB.from('settings').update({ value: data }).eq('key','announcement')
     : await SB.from('settings').insert({ key: 'announcement', value: data });
-  if(error) { toast2('บันทึกไม่สำเร็จ: ' + error.message, 'err'); return; }
+
+  if(btn) { btn.disabled = false; btn.innerHTML = '💾 บันทึกประกาศ'; }
+
+  if(error) { showStatus('❌ บันทึกไม่สำเร็จ: ' + error.message, false); return; }
   _announceData = data;
-  toast2(enabled ? '📢 บันทึกและเปิดประกาศแล้ว' : '💾 บันทึกประกาศแล้ว (ปิดอยู่)');
+  showStatus(enabled ? '✅ บันทึกและเปิดประกาศแล้ว' : '✅ บันทึกประกาศแล้ว (ยังปิดอยู่)', true);
+  setTimeout(() => { if(statusEl) statusEl.style.display='none'; }, 4000);
 }
 
 function previewAnnouncement() {
