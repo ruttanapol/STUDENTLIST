@@ -584,10 +584,3 @@ a[download]:active { transform:scale(0.96); }
   cursor:pointer;transition:opacity .15s;
 }
 .plan-upgrade-banner:active{opacity:.85;}
-/* ===== ANNOUNCEMENT POPUP ===== */
-#announcement-overlay { display:flex; }
-@keyframes slideUp {
-  from { opacity:0; transform:translateY(24px) scale(.97); }
-  to   { opacity:1; transform:translateY(0) scale(1); }
-}
-#announcement-box { animation: slideUp .28s cubic-bezier(.22,1,.36,1); }

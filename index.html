@@ -1485,7 +1485,16 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     <input type="text" id="profile-email" disabled style="background:var(--bg);color:var(--text3);">
     <div class="err-msg" id="profile-err"></div>
     <div id="profile-success" style="display:none;background:#DCFCE7;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;color:#16A34A;margin-top:8px;">✅ บันทึกสำเร็จ!</div>
-    <button onclick="saveProfile()" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--blue),#7C3AED);color:#fff;cursor:pointer;margin-top:16px;font-family:Sarabun,sans-serif;">💾 บันทึกโปรไฟล์</button>
+    <!-- Plan Section in Profile -->
+    <div id="profile-plan-section" style="margin-top:16px;padding:14px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);">แพลนปัจจุบัน</div>
+        <div id="profile-plan-badge"></div>
+      </div>
+      <div id="profile-plan-desc" style="font-size:12px;color:var(--text2);margin-bottom:10px;"></div>
+      <button id="profile-upgrade-btn" onclick="closeProfileModal();openRenewalFlow();" style="width:100%;padding:11px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">💎 อัพเกรดเป็น Premium</button>
+    </div>
+    <button onclick="saveProfile()" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--blue),#7C3AED);color:#fff;cursor:pointer;margin-top:10px;font-family:Sarabun,sans-serif;">💾 บันทึกโปรไฟล์</button>
   </div>
 </div>
 
@@ -1662,20 +1671,22 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
 
 <!-- ===== APPROVE MODAL ===== -->
 <div id="approve-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)closeApproveModal()">
-  <div style="background:#fff;border-radius:20px;padding:24px 20px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);max-height:90vh;overflow-y:auto;">
+  <div style="background:#fff;border-radius:20px;padding:24px 20px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
     <input type="hidden" id="approve-tid">
     <div style="text-align:center;margin-bottom:16px;">
       <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--green),var(--green-dark));display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:24px;">✅</div>
-      <div style="font-size:18px;font-weight:800;color:var(--text);">อนุมัติและกำหนด Plan</div>
-      <div style="font-size:13px;color:var(--text2);margin-top:4px;">เลือก Plan ที่ครูชำระมา</div>
+      <div style="font-size:18px;font-weight:800;color:var(--text);">อนุมัติบัญชีครู</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:4px;">บัญชีจะเปิดใช้งานได้ทันทีในแผน Free</div>
     </div>
-    <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;">🗓 เลือกระยะเวลา</div>
-    <div id="approve-plans"></div>
-    <div style="font-size:13px;font-weight:700;color:var(--text2);margin:12px 0 6px;">📝 หมายเหตุ (ไม่บังคับ)</div>
-    <input type="text" id="approve-note" placeholder="เช่น โอนวันที่ 8 พ.ค. 68" style="font-size:14px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;width:100%;outline:none;font-family:Sarabun,sans-serif;">
+    <div style="background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:700;color:#15803D;margin-bottom:4px;">🆓 แผน Free (หลังอนุมัติ)</div>
+      <div style="font-size:12px;color:#166534;line-height:1.5;">สูงสุด 5 ห้อง · 9 ชิ้นงาน · PDF เท่านั้น<br>ครูสามารถอัพเกรด Premium ได้เองจากโปรไฟล์</div>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:6px;">📝 หมายเหตุ (ไม่บังคับ)</div>
+    <input type="text" id="approve-note" placeholder="หมายเหตุถึงครู" style="font-size:14px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;width:100%;outline:none;font-family:Sarabun,sans-serif;">
     <div style="display:flex;gap:8px;margin-top:16px;">
       <button onclick="closeApproveModal()" style="flex:1;padding:12px;font-size:14px;font-weight:600;border-radius:12px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:Sarabun,sans-serif;color:var(--text2);">ยกเลิก</button>
-      <button onclick="confirmApproveTeacher()" style="flex:2;padding:12px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">✅ อนุมัติและเปิดใช้งาน</button>
+      <button onclick="confirmApproveTeacher()" style="flex:2;padding:12px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">✅ อนุมัติ</button>
     </div>
   </div>
 </div>
