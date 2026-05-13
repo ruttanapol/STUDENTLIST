@@ -996,30 +996,9 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       <!-- เพิ่มวิชาใหม่ -->
       <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;border:1.5px solid var(--border);">
         <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">➕ เพิ่มวิชาใหม่</div>
-        <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <div style="flex:1;">
-            <label class="lbl" style="margin-top:0;">ชื่อวิชา</label>
-            <input type="text" id="ns-subj-name" placeholder="เช่น คณิตศาสตร์" style="font-size:14px;">
-          </div>
-          <div style="flex:0 0 90px;">
-            <label class="lbl" style="margin-top:0;">คะแนนเก็บ</label>
-            <input type="number" id="ns-subj-total" placeholder="100" inputmode="numeric" min="1"
-              style="text-align:center;font-weight:700;color:var(--green-dark);font-size:14px;">
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-          <div style="flex:0 0 90px;">
-            <label class="lbl" style="margin-top:0;">จำนวนชิ้นงาน</label>
-            <input type="number" id="ns-subj-hwcount" placeholder="10" inputmode="numeric" min="1"
-              style="text-align:center;font-weight:700;color:var(--purple);font-size:14px;"
-              oninput="calcSubjScorePerHW()">
-          </div>
-          <div style="flex:1;padding-top:20px;">
-            <div style="background:var(--purple-light);border-radius:10px;padding:10px 14px;text-align:center;">
-              <div style="font-size:11px;color:var(--purple);font-weight:600;">คะแนนต่อชิ้น (อัตโนมัติ)</div>
-              <div style="font-size:22px;font-weight:800;color:var(--purple);" id="ns-subj-per-hw">—</div>
-            </div>
-          </div>
+        <div style="margin-bottom:8px;">
+          <label class="lbl" style="margin-top:0;">ชื่อวิชา</label>
+          <input type="text" id="ns-subj-name" placeholder="เช่น คณิตศาสตร์" style="font-size:14px;">
         </div>
         <button onclick="addSubjectFull()" style="width:100%;padding:12px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
           + เพิ่มวิชา

@@ -3544,18 +3544,7 @@ function getSubjectNames() {
   return DB.subjects.map(s => s.name);
 }
 
-function calcSubjScorePerHW() {
-  const total = parseFloat(document.getElementById('ns-subj-total')?.value) || 0;
-  const count = parseInt(document.getElementById('ns-subj-hwcount')?.value) || 0;
-  const perEl = document.getElementById('ns-subj-per-hw');
-  if(!perEl) return;
-  if(total > 0 && count > 0) {
-    const per = Math.round((total / count) * 100) / 100;
-    perEl.textContent = per;
-  } else {
-    perEl.textContent = '—';
-  }
-}
+// calcSubjScorePerHW removed — ไม่ใช้แล้ว
 
 // อัพเดต total เมื่อเปลี่ยนวิชาใน form เพิ่มงาน
 function onSubjChangeInHW() {
@@ -3572,30 +3561,25 @@ function onSubjChangeInHW() {
 
 async function addSubjectFull() {
   const name = document.getElementById('ns-subj-name')?.value.trim();
-  const total = parseFloat(document.getElementById('ns-subj-total')?.value) || 100;
-  const hwCount = parseInt(document.getElementById('ns-subj-hwcount')?.value) || 10;
   if(!name) { toast('กรอกชื่อวิชาด้วย','warn'); return; }
 
   // ตรวจซ้ำ
   const names = getSubjectNames();
   if(names.includes(name)) { toast('วิชานี้มีอยู่แล้ว','warn'); return; }
 
-  const subjObj = { name, total, hwCount };
-  
+  const subjObj = { name };
+
   // migrate: ถ้า subjects ยังเป็น string array ให้แปลงเป็น objects
   if(DB.subjects.length > 0 && typeof DB.subjects[0] === 'string') {
-    DB.subjects = DB.subjects.map(s => ({name:s, total:100, hwCount:10}));
+    DB.subjects = DB.subjects.map(s => ({name:s}));
   }
-  
+
   showActionPopup('กำลังเพิ่มวิชา',name,'add');
   DB.subjects.push(subjObj);
   await sbSaveSettings('subjects', DB.subjects);
 
   document.getElementById('ns-subj-name').value = '';
-  document.getElementById('ns-subj-total').value = '';
-  document.getElementById('ns-subj-hwcount').value = '';
-  document.getElementById('ns-subj-per-hw').textContent = '—';
-  
+
   renderSubjectsFull();
   renderManage();
   populateHWDropdown();
@@ -3641,32 +3625,15 @@ function renderSubjectsFull() {
 
   el.innerHTML = DB.subjects.map(s => {
     const name = typeof s === 'string' ? s : s.name;
-    const collectScore = typeof s === 'object' ? (s.total||100) : 100;
     const hwsInSubj = DB.homeworks.filter(h=>h.subject===name);
     const actualMaxSum = hwsInSubj.reduce((sum,h)=>sum+(h.maxScore||100),0);
-    const ratio = actualMaxSum > 0 ? Math.round(collectScore/actualMaxSum*100)/100 : 0;
     return `<div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <div style="font-size:15px;font-weight:700;color:var(--text);">${name}</div>
         <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;background:var(--blue-light);color:var(--blue-dark);padding:2px 8px;border-radius:20px;font-weight:700;">รวม ${actualMaxSum} คะแนน</span>
           <span style="font-size:11px;background:var(--green-light);color:var(--green-dark);padding:2px 8px;border-radius:20px;font-weight:700;">${hwsInSubj.length} ชิ้นงาน</span>
           <button onclick="deleteSubjectFull('${name}')" style="padding:4px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;">ลบ</button>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end;">
-        <div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">คะแนนเต็มรวม (จากชิ้นงาน)</div>
-          <div style="background:var(--blue-light);border-radius:8px;padding:10px;text-align:center;font-size:18px;font-weight:800;color:var(--blue-dark);">${actualMaxSum}</div>
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">คะแนนเก็บ (กำหนดเอง)</div>
-          <input type="number" value="${collectScore}" min="1"
-            style="text-align:center;font-weight:700;color:var(--green-dark);font-size:16px;padding:10px;width:100%;border-radius:8px;border:1.5px solid var(--green);box-sizing:border-box;"
-            onchange="updateSubjectScore('${name}',this.value)">
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">อัตราส่วน (×)</div>
-          <div style="background:var(--purple-light);border-radius:8px;padding:10px;text-align:center;font-size:16px;font-weight:800;color:var(--purple);">${ratio}</div>
         </div>
       </div>
       ${hwsInSubj.length > 0 ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px;">${hwsInSubj.sort((a,b)=>a.num-b.num).map(h=>`<span style="font-size:11px;padding:2px 8px;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;color:var(--text2);">ชิ้นที่${h.num} <b style="color:var(--text);">${h.title.substring(0,10)}</b> <span style="color:var(--green-dark);font-weight:700;">/${h.maxScore||100}</span></span>`).join('')}</div>` : ''}
