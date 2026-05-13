@@ -5488,6 +5488,7 @@ function toggleAnnouncementEnabled(checked) {
 }
 
 async function saveAnnouncement(overrideEnabled) {
+  console.log('[saveAnnouncement] called, USE_SUPABASE=', USE_SUPABASE, 'SB=', !!SB);
   const btn = document.getElementById('announce-save-btn');
   const statusEl = document.getElementById('announce-status');
   const showStatus = (msg, ok) => {
