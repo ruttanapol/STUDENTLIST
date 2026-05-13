@@ -2477,18 +2477,71 @@ function openExportModal(type){
   exportRoomSel=new Set(rooms);
   const rg=document.getElementById('export-room-grid');
   rg.innerHTML=rooms.map(r=>`<button class="room-cb checked" data-room="${r}" onclick="toggleExportRoom(this,'${r}')"><span>✓</span> ${r}</button>`).join('');
+
+  // Subject filter dropdown
+  const subjSel = document.getElementById('export-subj-filter');
+  if(subjSel) {
+    subjSel.innerHTML = '<option value="">— ทุกวิชา —</option>' + getSubjectNames().map(n=>`<option value="${n}">${n}</option>`).join('');
+    subjSel.value = '';
+  }
+
   exportHWSel=new Set(DB.homeworks.map(h=>h.num));
-  const hf=document.getElementById('export-hw-filter');
-  hf.innerHTML=`<button class="hw-cb checked" data-hw="all" onclick="toggleAllHW(this)">ทุกชิ้น</button>`+DB.homeworks.map(h=>`<button class="hw-cb checked" data-hw="${h.num}" onclick="toggleExportHW(this,${h.num})">ชิ้นที่ ${h.num}</button>`).join('');
+  _renderExportHWList('');
   document.getElementById('export-progress-bar').classList.remove('on');
   document.getElementById('export-progress-fill').style.width='0%';
   document.getElementById('export-go-btn').disabled=false;
   document.getElementById('export-modal').classList.add('on');
+  updateExportScorePreview();
+}
+
+function _renderExportHWList(subjFilter) {
+  const hws = subjFilter
+    ? DB.homeworks.filter(h=>h.subject===subjFilter)
+    : DB.homeworks;
+  exportHWSel = new Set(hws.map(h=>h.num));
+  const hf=document.getElementById('export-hw-filter');
+  hf.innerHTML=`<button class="hw-cb checked" data-hw="all" onclick="toggleAllHW(this)">ทุกชิ้น</button>`
+    +hws.map(h=>`<button class="hw-cb checked" data-hw="${h.num}" onclick="toggleExportHW(this,${h.num})">ชิ้นที่ ${h.num} <span style="font-size:10px;opacity:.7;">/${h.maxScore||100}</span></button>`).join('');
+  updateExportScorePreview();
+}
+
+function filterExportBySubject(val) {
+  _renderExportHWList(val);
+  // auto-fill คะแนนเก็บ from subject settings
+  if(val) {
+    const subj = DB.subjects.find(s=>(typeof s==='string'?s:s.name)===val);
+    const collect = subj && typeof subj==='object' ? (subj.total||0) : 0;
+    const inp = document.getElementById('export-collect-score');
+    if(inp && collect) inp.value = collect;
+    updateExportScorePreview();
+  }
+}
+
+function updateExportScorePreview() {
+  const selectedHWs = DB.homeworks.filter(h=>exportHWSel.has(h.num));
+  const totalMax = selectedHWs.reduce((s,h)=>s+(h.maxScore||100),0);
+  const maxEl = document.getElementById('export-total-max');
+  if(maxEl) maxEl.textContent = totalMax;
+  const maxEl2 = document.getElementById('export-total-max-2');
+  if(maxEl2) maxEl2.textContent = totalMax;
+  const collectInp = document.getElementById('export-collect-score');
+  const collectScore = collectInp ? (parseFloat(collectInp.value)||0) : 0;
+  const ratioEl = document.getElementById('export-score-ratio');
+  if(ratioEl) {
+    if(totalMax>0 && collectScore>0) {
+      const ratio = Math.round(collectScore/totalMax*1000)/1000;
+      ratioEl.textContent = `(raw × ${ratio})`;
+      ratioEl.style.color = 'var(--green-dark)';
+    } else {
+      ratioEl.textContent = 'กรอกคะแนนเก็บ';
+      ratioEl.style.color = 'var(--text3)';
+    }
+  }
 }
 function closeExportModal(){document.getElementById('export-modal').classList.remove('on');}
 function toggleExportRoom(btn,room){if(exportRoomSel.has(room)){exportRoomSel.delete(room);btn.classList.remove('checked');btn.querySelector('span').textContent='';}else{exportRoomSel.add(room);btn.classList.add('checked');btn.querySelector('span').textContent='✓';}}
-function toggleExportHW(btn,num){if(exportHWSel.has(num)){exportHWSel.delete(num);btn.classList.remove('checked');}else{exportHWSel.add(num);btn.classList.add('checked');}const allBtn=document.querySelector('#export-hw-filter [data-hw="all"]');if(allBtn)allBtn.classList.toggle('checked',exportHWSel.size===DB.homeworks.length);}
-function toggleAllHW(btn){const allSelected=exportHWSel.size===DB.homeworks.length;document.querySelectorAll('#export-hw-filter [data-hw]:not([data-hw="all"])').forEach(b=>{const n=parseInt(b.dataset.hw);if(allSelected){exportHWSel.delete(n);b.classList.remove('checked');}else{exportHWSel.add(n);b.classList.add('checked');}});btn.classList.toggle('checked',!allSelected);}
+function toggleExportHW(btn,num){if(exportHWSel.has(num)){exportHWSel.delete(num);btn.classList.remove('checked');}else{exportHWSel.add(num);btn.classList.add('checked');}const allBtn=document.querySelector('#export-hw-filter [data-hw="all"]');if(allBtn)allBtn.classList.toggle('checked',exportHWSel.size===DB.homeworks.length);updateExportScorePreview();}
+function toggleAllHW(btn){const allSelected=exportHWSel.size===DB.homeworks.length;document.querySelectorAll('#export-hw-filter [data-hw]:not([data-hw="all"])').forEach(b=>{const n=parseInt(b.dataset.hw);if(allSelected){exportHWSel.delete(n);b.classList.remove('checked');}else{exportHWSel.add(n);b.classList.add('checked');}});btn.classList.toggle('checked',!allSelected);updateExportScorePreview();}
 function exportSelectAll(sel){document.querySelectorAll('#export-room-grid .room-cb').forEach(btn=>{const room=btn.dataset.room;if(sel){exportRoomSel.add(room);btn.classList.add('checked');btn.querySelector('span').textContent='✓';}else{exportRoomSel.delete(room);btn.classList.remove('checked');btn.querySelector('span').textContent='';}}); }
 function getStudentNum(student, room) {
   const roomStudents = DB.students.filter(s => s.room === room).sort((a,b) => a.id.localeCompare(b.id));
@@ -2497,16 +2550,26 @@ function getStudentNum(student, room) {
 function buildExportData(){
   const selectedRooms=[...exportRoomSel].sort();
   const selectedHWs=DB.homeworks.filter(h=>exportHWSel.has(h.num)).sort((a,b)=>a.num-b.num);
+  const collectInp = document.getElementById('export-collect-score');
+  const collectScore = collectInp ? (parseFloat(collectInp.value)||0) : 0;
+  const hwTotalMax = selectedHWs.reduce((s,h)=>s+(h.maxScore||100),0);
   return selectedRooms.map(room=>{
     const students=DB.students.filter(s=>s.room===room).sort((a,b)=>a.id.localeCompare(b.id));
     const rows=students.map((s,idx)=>{
       const row={เลขที่:idx+1,เลขประจำตัว:s.id,'ชื่อ-นามสกุล':s.name,ห้อง:s.room};
       let totalScore=0,totalMax=0,doneCount=0;
       selectedHWs.forEach(h=>{const sub=DB.submissions[s.id+'_'+h.num];const maxScore=sub?.maxScore||h.maxScore||100;if(sub){doneCount++;const sc=(sub.score!==null&&sub.score!==undefined)?sub.score:maxScore;totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:'✓';}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
-      row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;row['คะแนนรวม']=totalScore;row['คะแนนเต็ม']=totalMax;row['%คะแนน']=totalMax>0?Math.round(totalScore/totalMax*100)+'%':'0%';
+      row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
+      row['คะแนนรวม']=totalScore;
+      row['คะแนนเต็มรวม']=hwTotalMax;
+      row['%คะแนน']=totalMax>0?Math.round(totalScore/totalMax*100)+'%':'0%';
+      if(collectScore>0 && hwTotalMax>0) {
+        row['คะแนนเก็บ']=collectScore;
+        row['คะแนนที่ได้']=Math.round(totalScore/hwTotalMax*collectScore*100)/100;
+      }
       return row;
     });
-    return{room,students,rows,homeworks:selectedHWs};
+    return{room,students,rows,homeworks:selectedHWs,collectScore,hwTotalMax};
   });
 }
 async function doExport(){
@@ -2531,8 +2594,11 @@ async function doExport(){
   }catch(e){console.error(e);toast('เกิดข้อผิดพลาด: '+e.message,'err');}
   btn.disabled=false;
 }
-function exportExcel(data,pf){return new Promise(resolve=>{const wb=XLSX.utils.book_new();data.forEach((roomData,i)=>{const{room,rows,homeworks}=roomData;const sheetName=room.replace(/[\\\/\?\*\[\]]/g,'').substring(0,31);const wsData=[];wsData.push([`รายงานการส่งงาน - ${room}`]);wsData.push([`งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' '+h.title).join(', ')}`]);wsData.push([`วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}`]);wsData.push([]);const header=['เลขที่','เลขประจำตัว','ชื่อ-นามสกุล'];homeworks.forEach(h=>header.push('งานครั้งที่ '+h.num+'\n'+h.title.substring(0,15)+'\n(เต็ม '+(h.maxScore||100)+')'));header.push('ส่งแล้ว','คะแนนรวม','คะแนนเต็ม','%คะแนน');wsData.push(header);rows.forEach(r=>{const row=[r['เลขที่'],r['เลขประจำตัว'],r['ชื่อ-นามสกุล']];homeworks.forEach(h=>row.push(r['งานครั้งที่ '+h.num]));row.push(r['ส่งแล้ว'],r['คะแนนรวม'],r['คะแนนเต็ม'],r['%คะแนน']);wsData.push(row);});const ws=XLSX.utils.aoa_to_sheet(wsData);ws['!cols']=[{wch:6},{wch:14},{wch:26},...homeworks.map(()=>({wch:14})),{wch:10},{wch:10},{wch:10},{wch:8}];const totalCols=3+homeworks.length+4-1;ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:totalCols}},{s:{r:1,c:0},e:{r:1,c:totalCols}},{s:{r:2,c:0},e:{r:2,c:totalCols}}];XLSX.utils.book_append_sheet(wb,ws,sheetName);pf.style.width=(40+(i+1)/data.length*50)+'%';});const date=new Date().toISOString().slice(0,10);XLSX.writeFile(wb,`รายงานส่งงาน_${date}.xlsx`);resolve();});}
-async function exportPDF(data,pf){const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});let html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"><style>*{font-family:Sarabun,sans-serif;box-sizing:border-box;margin:0;padding:0;}body{font-size:11pt;color:#1E293B;}.page{padding:12mm 15mm;page-break-after:always;}.page:last-child{page-break-after:avoid;}.page-title{font-size:16pt;font-weight:700;color:#2563EB;margin-bottom:4px;}.page-meta{font-size:9pt;color:#64748B;margin-bottom:12px;border-bottom:2px solid #E2E8F0;padding-bottom:8px;}table{width:100%;border-collapse:collapse;font-size:10pt;}th{background:linear-gradient(135deg,#EBF2FF,#DBEAFE);color:#1E40AF;font-weight:700;padding:7px 6px;border:1px solid #BFDBFE;font-size:9pt;text-align:center;}td{padding:6px;border:1px solid #E2E8F0;vertical-align:middle;}tr:nth-child(even) td{background:#F8FAFF;}.num{text-align:center;color:#64748B;}.ok{text-align:center;color:#16A34A;font-weight:700;background:#DCFCE7!important;font-size:9pt;}.no{text-align:center;color:#94A3B8;font-size:9pt;}.pct-col{text-align:center;font-weight:700;}.footer{margin-top:8px;font-size:8pt;color:#94A3B8;text-align:right;}</style></head><body>`;data.forEach((roomData,i)=>{const{room,rows,homeworks}=roomData;const dateStr=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});html+=`<div class="page"><div class="page-title">📋 รายงานการส่งงาน — ${room}</div><div class="page-meta">งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' ('+h.title+')').join(' · ')} &nbsp;|&nbsp; วันที่พิมพ์: ${dateStr} &nbsp;|&nbsp; นักเรียน ${rows.length} คน</div><table><thead><tr><th style="width:40px;">เลขที่</th><th style="width:90px;">เลขประจำตัว</th><th>ชื่อ-นามสกุล</th>${homeworks.map(h=>`<th style="width:65px;">งานครั้งที่ ${h.num}<br><span style="font-size:8pt;font-weight:400;">(/${h.maxScore||100})</span></th>`).join('')}<th style="width:55px;">ส่งแล้ว</th><th style="width:60px;">คะแนนรวม</th><th style="width:45px;">%</th></tr></thead><tbody>${rows.map(r=>{const hwCells=homeworks.map(h=>{const v=r['งานครั้งที่ '+h.num];const isOk=v!==undefined&&v!=='—';const display=isOk?(typeof v==='number'?v:'✓'):'—';return `<td class="${isOk?'ok':'no'}">${display}</td>`;}).join('');const pct=parseInt(r['%คะแนน']);const pctColor=pct===100?'#16A34A':pct>=60?'#2563EB':'#EF4444';const totalScore=r['คะแนนรวม'];const totalMax=r['คะแนนเต็ม'];return `<tr><td class="num">${r['เลขที่']}</td><td class="num">${r['เลขประจำตัว']}</td><td>${r['ชื่อ-นามสกุล']}</td>${hwCells}<td class="pct-col">${r['ส่งแล้ว']}</td><td class="pct-col" style="color:#6D28D9;font-weight:700;">${totalScore}<span style="font-size:8pt;color:#94A3B8;">/${totalMax}</span></td><td class="pct-col" style="color:${pctColor};">${r['%คะแนน']}</td></tr>`;}).join('')}</tbody></table><div class="footer">TaskGenius · พิมพ์วันที่ ${dateStr}</div></div>`;pf.style.width=(40+(i+1)/data.length*50)+'%';});html+='</body></html>';const win=window.open('','_blank','width=900,height=700');if(!win){toast('กรุณาอนุญาต Popup เพื่อ Export PDF','warn');return;}win.document.write(html);win.document.close();win.onload=()=>{setTimeout(()=>{win.focus();win.print();},800);};}
+function exportExcel(data,pf){return new Promise(resolve=>{const wb=XLSX.utils.book_new();data.forEach((roomData,i)=>{const{room,rows,homeworks,collectScore,hwTotalMax}=roomData;const sheetName=room.replace(/[\\\/\?\*\[\]]/g,'').substring(0,31);const wsData=[];wsData.push([`รายงานการส่งงาน - ${room}`]);wsData.push([`งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' '+h.title).join(', ')}`]);wsData.push([`วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}`]);wsData.push([]);const header=['เลขที่','เลขประจำตัว','ชื่อ-นามสกุล'];homeworks.forEach(h=>header.push('งานครั้งที่ '+h.num+'\n'+h.title.substring(0,15)+'\n(เต็ม '+(h.maxScore||100)+')'));const hasCollect = collectScore>0;
+      header.push('ส่งแล้ว','คะแนนรวม',`คะแนนเต็ม(/${hwTotalMax})`,'%คะแนน');
+      if(hasCollect) header.push(`คะแนนที่ได้(/${collectScore})`);
+      wsData.push(header);rows.forEach(r=>{const row=[r['เลขที่'],r['เลขประจำตัว'],r['ชื่อ-นามสกุล']];homeworks.forEach(h=>row.push(r['งานครั้งที่ '+h.num]));row.push(r['ส่งแล้ว'],r['คะแนนรวม'],r['คะแนนเต็มรวม'],r['%คะแนน']);if(hasCollect)row.push(r['คะแนนที่ได้']??'');wsData.push(row);});const ws=XLSX.utils.aoa_to_sheet(wsData);ws['!cols']=[{wch:6},{wch:14},{wch:26},...homeworks.map(()=>({wch:14})),{wch:10},{wch:10},{wch:10},{wch:8},...(hasCollect?[{wch:14}]:[])];const totalCols=3+homeworks.length+(hasCollect?5:4)-1;ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:totalCols}},{s:{r:1,c:0},e:{r:1,c:totalCols}},{s:{r:2,c:0},e:{r:2,c:totalCols}}];XLSX.utils.book_append_sheet(wb,ws,sheetName);pf.style.width=(40+(i+1)/data.length*50)+'%';});const date=new Date().toISOString().slice(0,10);XLSX.writeFile(wb,`รายงานส่งงาน_${date}.xlsx`);resolve();});}
+async function exportPDF(data,pf){const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});let html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"><style>*{font-family:Sarabun,sans-serif;box-sizing:border-box;margin:0;padding:0;}body{font-size:11pt;color:#1E293B;}.page{padding:12mm 15mm;page-break-after:always;}.page:last-child{page-break-after:avoid;}.page-title{font-size:16pt;font-weight:700;color:#2563EB;margin-bottom:4px;}.page-meta{font-size:9pt;color:#64748B;margin-bottom:12px;border-bottom:2px solid #E2E8F0;padding-bottom:8px;}table{width:100%;border-collapse:collapse;font-size:10pt;}th{background:linear-gradient(135deg,#EBF2FF,#DBEAFE);color:#1E40AF;font-weight:700;padding:7px 6px;border:1px solid #BFDBFE;font-size:9pt;text-align:center;}td{padding:6px;border:1px solid #E2E8F0;vertical-align:middle;}tr:nth-child(even) td{background:#F8FAFF;}.num{text-align:center;color:#64748B;}.ok{text-align:center;color:#16A34A;font-weight:700;background:#DCFCE7!important;font-size:9pt;}.no{text-align:center;color:#94A3B8;font-size:9pt;}.pct-col{text-align:center;font-weight:700;}.footer{margin-top:8px;font-size:8pt;color:#94A3B8;text-align:right;}</style></head><body>`;data.forEach((roomData,i)=>{const{room,rows,homeworks,collectScore,hwTotalMax}=roomData;const dateStr=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});html+=`<div class="page"><div class="page-title">📋 รายงานการส่งงาน — ${room}</div><div class="page-meta">งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' ('+h.title+')').join(' · ')} &nbsp;|&nbsp; วันที่พิมพ์: ${dateStr} &nbsp;|&nbsp; นักเรียน ${rows.length} คน</div><table><thead><tr><th style="width:40px;">เลขที่</th><th style="width:90px;">เลขประจำตัว</th><th>ชื่อ-นามสกุล</th>${homeworks.map(h=>`<th style="width:65px;">งานครั้งที่ ${h.num}<br><span style="font-size:8pt;font-weight:400;">(/${h.maxScore||100})</span></th>`).join('')}<th style="width:50px;">ส่งแล้ว</th><th style="width:55px;">คะแนนรวม</th><th style="width:40px;">%</th>${collectScore>0?`<th style="width:60px;background:linear-gradient(135deg,#DCFCE7,#BBF7D0);color:#15803D;">คะแนนที่ได้<br><span style="font-size:7pt;font-weight:400;">(/${collectScore})</span></th>`:''}</tr></thead><tbody>${rows.map(r=>{const hwCells=homeworks.map(h=>{const v=r['งานครั้งที่ '+h.num];const isOk=v!==undefined&&v!=='—';const display=isOk?(typeof v==='number'?v:'✓'):'—';return `<td class="${isOk?'ok':'no'}">${display}</td>`;}).join('');const pct=parseInt(r['%คะแนน']);const pctColor=pct===100?'#16A34A':pct>=60?'#2563EB':'#EF4444';const totalScore=r['คะแนนรวม'];const totalMax=r['คะแนนเต็ม'];return `<tr><td class="num">${r['เลขที่']}</td><td class="num">${r['เลขประจำตัว']}</td><td>${r['ชื่อ-นามสกุล']}</td>${hwCells}<td class="pct-col">${r['ส่งแล้ว']}</td><td class="pct-col" style="color:#6D28D9;font-weight:700;">${totalScore}<span style="font-size:8pt;color:#94A3B8;">/${totalMax}</span></td><td class="pct-col" style="color:${pctColor};">${r['%คะแนน']}</td>${collectScore>0?`<td class="pct-col" style="color:#15803D;font-weight:800;background:#F0FDF4;">${r['คะแนนที่ได้']??'—'}</td>`:''}</tr>`;}).join('')}</tbody></table><div class="footer">TaskGenius · พิมพ์วันที่ ${dateStr}</div></div>`;pf.style.width=(40+(i+1)/data.length*50)+'%';});html+='</body></html>';const win=window.open('','_blank','width=900,height=700');if(!win){toast('กรุณาอนุญาต Popup เพื่อ Export PDF','warn');return;}win.document.write(html);win.document.close();win.onload=()=>{setTimeout(()=>{win.focus();win.print();},800);};}
 
 // ---- INIT ----
 // ╔══════════════════════════════════════════════════════╗
@@ -3541,6 +3607,7 @@ async function deleteSubjectFull(name) {
 }
 
 async function updateSubjectScore(name, total, hwCount) {
+  // hwCount param kept for backward compat but ignored
   const subj = DB.subjects.find(s => (typeof s === 'string' ? s : s.name) === name);
   if(!subj) return;
   if(typeof subj === 'object') {
@@ -3568,36 +3635,35 @@ function renderSubjectsFull() {
 
   el.innerHTML = DB.subjects.map(s => {
     const name = typeof s === 'string' ? s : s.name;
-    const total = typeof s === 'object' ? (s.total||100) : 100;
-    const hwCount = typeof s === 'object' ? (s.hwCount||10) : 10;
-    const perHW = hwCount > 0 ? Math.round((total/hwCount)*100)/100 : total;
-    const hwInSubj = DB.homeworks.filter(h=>h.subject===name).length;
+    const collectScore = typeof s === 'object' ? (s.total||100) : 100;
+    const hwsInSubj = DB.homeworks.filter(h=>h.subject===name);
+    const actualMaxSum = hwsInSubj.reduce((sum,h)=>sum+(h.maxScore||100),0);
+    const ratio = actualMaxSum > 0 ? Math.round(collectScore/actualMaxSum*100)/100 : 0;
     return `<div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;">
         <div style="font-size:15px;font-weight:700;color:var(--text);">${name}</div>
         <div style="display:flex;align-items:center;gap:6px;">
-          <span style="font-size:11px;background:var(--green-light);color:var(--green-dark);padding:2px 8px;border-radius:20px;font-weight:700;">${hwInSubj} ชิ้นงาน</span>
+          <span style="font-size:11px;background:var(--green-light);color:var(--green-dark);padding:2px 8px;border-radius:20px;font-weight:700;">${hwsInSubj.length} ชิ้นงาน</span>
           <button onclick="deleteSubjectFull('${name}')" style="padding:4px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;">ลบ</button>
         </div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <div style="flex:1;">
-          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">คะแนนเก็บทั้งหมด</div>
-          <input type="number" value="${total}" min="1" 
-            style="text-align:center;font-weight:700;color:var(--green-dark);font-size:15px;padding:8px;"
-            onchange="updateSubjectScore('${name}',this.value,${hwCount})">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end;">
+        <div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">คะแนนเต็มรวม (จากชิ้นงาน)</div>
+          <div style="background:var(--blue-light);border-radius:8px;padding:10px;text-align:center;font-size:18px;font-weight:800;color:var(--blue-dark);">${actualMaxSum}</div>
         </div>
-        <div style="flex:1;">
-          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">จำนวนชิ้นงาน</div>
-          <input type="number" value="${hwCount}" min="1"
-            style="text-align:center;font-weight:700;color:var(--purple);font-size:15px;padding:8px;"
-            onchange="updateSubjectScore('${name}',${total},this.value)">
+        <div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">คะแนนเก็บ (กำหนดเอง)</div>
+          <input type="number" value="${collectScore}" min="1"
+            style="text-align:center;font-weight:700;color:var(--green-dark);font-size:16px;padding:10px;width:100%;border-radius:8px;border:1.5px solid var(--green);box-sizing:border-box;"
+            onchange="updateSubjectScore('${name}',this.value)">
         </div>
-        <div style="flex:0 0 80px;">
-          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">คะแนน/ชิ้น</div>
-          <div style="background:var(--purple-light);border-radius:8px;padding:8px;text-align:center;font-size:18px;font-weight:800;color:var(--purple);">${perHW}</div>
+        <div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">อัตราส่วน (×)</div>
+          <div style="background:var(--purple-light);border-radius:8px;padding:10px;text-align:center;font-size:16px;font-weight:800;color:var(--purple);">${ratio}</div>
         </div>
       </div>
+      ${hwsInSubj.length > 0 ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px;">${hwsInSubj.sort((a,b)=>a.num-b.num).map(h=>`<span style="font-size:11px;padding:2px 8px;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;color:var(--text2);">ชิ้นที่${h.num} <b style="color:var(--text);">${h.title.substring(0,10)}</b> <span style="color:var(--green-dark);font-weight:700;">/${h.maxScore||100}</span></span>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -4115,6 +4181,9 @@ function openSetPlan(tid, currentPlan) {
   document.getElementById('set-plan-expiry-date').value = expDate;
   // show/hide expiry row
   document.getElementById('set-plan-expiry-row').style.display = (currentPlan === 'premium') ? '' : 'none';
+  // clear error
+  const errEl = document.getElementById('set-plan-error');
+  if(errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
   document.getElementById('set-plan-modal').style.display = 'flex';
 }
 
@@ -4189,10 +4258,20 @@ async function confirmSetPlan() {
     closeSetPlanModal();
     const reactivated = isExpiredAcc ? ' · เปิดใช้งานอีกครั้งแล้ว ✨' : '';
     toast2(`✅ เปลี่ยน Plan เป็น ${plan === 'premium' ? '💎 Premium' : '🎁 Free'} แล้ว${reactivated}`);
-    loadSuperAdminPanel();
+    // ถ้า reactivate → สลับ tab ไปหา "ผู้ใช้งาน" เพื่อให้เห็นการเปลี่ยนแปลง
+    if(isExpiredAcc) {
+      _saStatusFilter = 'active';
+      const activeBtn = document.getElementById('sa-tab-active');
+      if(activeBtn) setSAFilter('active', activeBtn);
+    }
+    await loadSuperAdminPanel();
   } catch(e) {
     console.error('[confirmSetPlan] error:', e);
-    toast2('บันทึกไม่สำเร็จ: ' + (e.message||JSON.stringify(e)), 'err');
+    const errMsg = e.message || JSON.stringify(e);
+    toast2('บันทึกไม่สำเร็จ: ' + errMsg, 'err');
+    // แสดง error ในตัว modal ด้วย เผื่อ toast ไม่เห็น
+    const errEl = document.getElementById('set-plan-error');
+    if(errEl) { errEl.textContent = '❌ ' + errMsg; errEl.style.display = ''; }
   } finally {
     if(btn){ btn.textContent = '💾 บันทึก'; btn.disabled = false; }
   }

@@ -1330,8 +1330,36 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     </div>
     <div class="room-grid" id="export-room-grid"></div>
 
-    <div class="export-scope-label">📝 เลือกงาน</div>
+    <div class="export-scope-label">📝 เลือกชิ้นงาน</div>
+    <div style="margin-bottom:8px;">
+      <select id="export-subj-filter" onchange="filterExportBySubject(this.value)"
+        style="width:100%;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;font-family:Sarabun,sans-serif;">
+      </select>
+    </div>
     <div class="hw-filter-row" id="export-hw-filter"></div>
+
+    <!-- คะแนน config -->
+    <div style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border:1.5px solid #86EFAC;border-radius:12px;padding:14px;margin-top:8px;margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:800;color:var(--green-dark);margin-bottom:10px;">📊 ตั้งค่าคะแนน</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
+        <div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">คะแนนเต็มรวม (จากงานที่เลือก)</div>
+          <div style="background:#fff;border-radius:8px;padding:10px;text-align:center;font-size:20px;font-weight:800;color:var(--blue-dark);border:1.5px solid #BFDBFE;">
+            <span id="export-total-max">0</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">คะแนนเก็บ (กำหนดเอง)</div>
+          <input type="number" id="export-collect-score" min="1" placeholder="เช่น 10"
+            oninput="updateExportScorePreview()"
+            style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1.5px solid var(--green);font-size:18px;font-weight:800;color:var(--green-dark);text-align:center;font-family:Sarabun,sans-serif;">
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;font-size:13px;">
+        <span style="color:var(--text2);">สูตรคำนวณ</span>
+        <span style="font-weight:700;color:var(--purple);">(คะแนนรวม ÷ <span id="export-total-max-2">0</span>) × คะแนนเก็บ = <span id="export-score-ratio" style="color:var(--green-dark);">—</span></span>
+      </div>
+    </div>
 
     <div class="progress-bar-export" id="export-progress-bar">
       <div class="progress-fill-export" id="export-progress-fill"></div>
@@ -1662,6 +1690,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       <input type="date" id="set-plan-expiry-date" style="font-size:14px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;width:100%;outline:none;font-family:Sarabun,sans-serif;">
       <div style="font-size:12px;color:var(--text3);margin-top:4px;">ปล่อยว่างไว้ = ไม่มีวันหมดอายุ</div>
     </div>
+    <div id="set-plan-error" style="display:none;background:#FEE2E2;color:#B91C1C;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:10px;"></div>
     <div style="display:flex;gap:8px;">
       <button onclick="closeSetPlanModal()" style="flex:1;padding:12px;font-size:14px;font-weight:600;border-radius:12px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:Sarabun,sans-serif;color:var(--text2);">ยกเลิก</button>
       <button onclick="confirmSetPlan()" style="flex:2;padding:12px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">💾 บันทึก Plan</button>
