@@ -2642,6 +2642,7 @@ function switchManageTab(tab, btn){
   if(tab==='subjects') renderSubjectsFull();
   if(tab==='homework') renderManage();
   if(tab==='grade') openGradeTab();
+  if(tab==='attend') initAttendanceTab();
 }
 
 // ╔══════════════════════════════════════════════════════╗
@@ -5593,4 +5594,225 @@ function closeAnnouncement() {
   const overlay = document.getElementById('announcement-overlay');
   if(overlay) overlay.style.display = 'none';
   sessionStorage.setItem('ann_dismissed', '1');
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  ATTENDANCE SYSTEM (เช็คชื่อ)                       ║
+// ╚══════════════════════════════════════════════════════╝
+
+let _attRecords = {};   // {studentId: status}
+let _attLoaded = false;
+
+const ATT_STATUS = {
+  present: { label:'มา',   icon:'✅', bg:'#DCFCE7', color:'#15803D', border:'#86EFAC' },
+  absent:  { label:'ขาด',  icon:'❌', bg:'#FEE2E2', color:'#B91C1C', border:'#FCA5A5' },
+  late:    { label:'สาย',  icon:'⏰', bg:'#FEF3C7', color:'#B45309', border:'#FCD34D' },
+  leave:   { label:'ลา',   icon:'🏥', bg:'#DBEAFE', color:'#1D4ED8', border:'#93C5FD' },
+};
+
+function initAttendanceTab() {
+  // Populate room selector
+  const sel = document.getElementById('att-room-sel');
+  if(!sel) return;
+  const rooms = DB.rooms || [...new Set(DB.students.map(s=>s.room))].sort();
+  sel.innerHTML = rooms.map(r=>`<option value="${r}">${r}</option>`).join('');
+
+  // Set today's date
+  const dateEl = document.getElementById('att-date');
+  if(dateEl && !dateEl.value) {
+    dateEl.value = new Date().toISOString().slice(0,10);
+  }
+
+  renderAttendanceList();
+}
+
+function renderAttendanceList() {
+  const room = document.getElementById('att-room-sel')?.value || '';
+  const date = document.getElementById('att-date')?.value || '';
+  if(!room) return;
+
+  const students = DB.students.filter(s=>s.room===room)
+    .sort((a,b)=>a.name.localeCompare(b.name,'th'));
+
+  // Load saved records if date+room changed
+  _attLoaded = false;
+  loadAttendanceForDate(date, room).then(() => {
+    _buildStudentList(students);
+    updateAttSummary();
+  });
+}
+
+async function loadAttendanceForDate(date, room) {
+  if(!SB || !date || !room) {
+    // default all present
+    const students = DB.students.filter(s=>s.room===room);
+    _attRecords = {};
+    students.forEach(s => _attRecords[s.id] = 'present');
+    return;
+  }
+  const dateKey = date.replace(/-/g,'');
+  const roomKey = room.replace(/[^a-zA-Z0-9ก-ฮ]/g,'_');
+  const key = `att_${dateKey}_${roomKey}`;
+  const { data } = await SB.from('settings').select('value')
+    .eq('key', key + '_' + CURRENT_TEACHER.id).maybeSingle();
+
+  _attRecords = {};
+  if(data?.value?.records) {
+    data.value.records.forEach(r => { _attRecords[r.id] = r.status; });
+  } else {
+    // default all present
+    DB.students.filter(s=>s.room===room).forEach(s => _attRecords[s.id] = 'present');
+  }
+  _attLoaded = true;
+}
+
+function _buildStudentList(students) {
+  const el = document.getElementById('att-student-list');
+  if(!el) return;
+  if(!students.length) {
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:13px;">ไม่มีนักเรียนในห้องนี้</div>';
+    return;
+  }
+  el.innerHTML = students.map((s, idx) => {
+    const cur = _attRecords[s.id] || 'present';
+    const btns = Object.entries(ATT_STATUS).map(([key, cfg]) => {
+      const isActive = cur === key;
+      return `<button onclick="setAttStatus('${s.id}',this,'${key}')"
+        style="flex:1;padding:5px 2px;font-size:11px;font-weight:700;border-radius:7px;border:1.5px solid ${isActive?cfg.border:'#E2E8F0'};background:${isActive?cfg.bg:'#F8FAFC'};color:${isActive?cfg.color:'#94A3B8'};cursor:pointer;font-family:Sarabun,sans-serif;transition:all .1s;">
+        ${cfg.icon}<br>${cfg.label}
+      </button>`;
+    }).join('');
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fff;border-radius:10px;margin-bottom:5px;border:1.5px solid #F1F5F9;">
+      <div style="width:24px;text-align:center;font-size:12px;color:var(--text3);flex-shrink:0;">${idx+1}</div>
+      <div style="flex:1;font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div>
+      <div style="display:flex;gap:4px;flex-shrink:0;">${btns}</div>
+    </div>`;
+  }).join('');
+}
+
+function setAttStatus(studentId, btn, status) {
+  _attRecords[studentId] = status;
+  // Update buttons in this row
+  const row = btn.closest('div[style*="display:flex"]');
+  if(row) {
+    const allBtns = row.querySelectorAll('button');
+    const keys = Object.keys(ATT_STATUS);
+    allBtns.forEach((b, i) => {
+      const k = keys[i];
+      const cfg = ATT_STATUS[k];
+      const isActive = k === status;
+      b.style.borderColor = isActive ? cfg.border : '#E2E8F0';
+      b.style.background = isActive ? cfg.bg : '#F8FAFC';
+      b.style.color = isActive ? cfg.color : '#94A3B8';
+    });
+  }
+  updateAttSummary();
+}
+
+function setAllAttStatus(status) {
+  const room = document.getElementById('att-room-sel')?.value || '';
+  DB.students.filter(s=>s.room===room).forEach(s => _attRecords[s.id] = status);
+  const students = DB.students.filter(s=>s.room===room).sort((a,b)=>a.name.localeCompare(b.name,'th'));
+  _buildStudentList(students);
+  updateAttSummary();
+}
+
+function updateAttSummary() {
+  const el = document.getElementById('att-summary');
+  if(!el) return;
+  const counts = { present:0, absent:0, late:0, leave:0 };
+  Object.values(_attRecords).forEach(s => { if(counts[s]!==undefined) counts[s]++; });
+  el.innerHTML = Object.entries(ATT_STATUS).map(([k,cfg]) =>
+    `<div style="flex:1;text-align:center;padding:7px 4px;border-radius:8px;background:${cfg.bg};border:1.5px solid ${cfg.border};">
+      <div style="font-size:16px;">${cfg.icon}</div>
+      <div style="font-size:18px;font-weight:800;color:${cfg.color};">${counts[k]}</div>
+      <div style="font-size:10px;color:${cfg.color};font-weight:600;">${cfg.label}</div>
+    </div>`
+  ).join('');
+}
+
+function onAttDateChange() {
+  renderAttendanceList();
+}
+
+async function saveAttendance() {
+  if(!SB || !CURRENT_TEACHER) { toast('ต้องเชื่อมต่อก่อน','err'); return; }
+  const room = document.getElementById('att-room-sel')?.value || '';
+  const date = document.getElementById('att-date')?.value || '';
+  if(!room || !date) { toast('กรุณาเลือกห้องและวันที่','err'); return; }
+
+  const btn = document.getElementById('att-save-btn');
+  const statusEl = document.getElementById('att-save-status');
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...'; }
+
+  const students = DB.students.filter(s=>s.room===room);
+  const records = students.map(s => ({ id:s.id, name:s.name, status:_attRecords[s.id]||'present' }));
+  const counts = { present:0, absent:0, late:0, leave:0 };
+  records.forEach(r => { if(counts[r.status]!==undefined) counts[r.status]++; });
+
+  const dateKey = date.replace(/-/g,'');
+  const roomKey = room.replace(/[^a-zA-Z0-9ก-ฮ]/g,'_');
+  const key = `att_${dateKey}_${roomKey}`;
+  const value = { date, room, records, counts, savedAt: new Date().toISOString() };
+
+  const { data: existing } = await SB.from('settings').select('key')
+    .eq('key', key + '_' + CURRENT_TEACHER.id).maybeSingle();
+  const { error } = existing
+    ? await SB.from('settings').update({ value }).eq('key', key + '_' + CURRENT_TEACHER.id)
+    : await SB.from('settings').insert({ key: key + '_' + CURRENT_TEACHER.id, value });
+
+  if(btn) { btn.disabled = false; btn.textContent = '💾 บันทึกเช็คชื่อ'; }
+  if(error) {
+    if(statusEl) { statusEl.textContent = '❌ บันทึกไม่สำเร็จ: '+error.message; statusEl.style.display='block'; statusEl.style.background='#FEE2E2'; statusEl.style.color='#B91C1C'; }
+    return;
+  }
+  const dateDisplay = new Date(date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'});
+  if(statusEl) {
+    statusEl.textContent = `✅ บันทึกเช็คชื่อวันที่ ${dateDisplay} · มา ${counts.present} / ขาด ${counts.absent} / สาย ${counts.late} / ลา ${counts.leave}`;
+    statusEl.style.display='block'; statusEl.style.background='#DCFCE7'; statusEl.style.color='#15803D';
+    setTimeout(() => { statusEl.style.display='none'; }, 5000);
+  }
+  toast('✅ บันทึกเช็คชื่อแล้ว');
+}
+
+async function loadAttendanceHistory() {
+  if(!SB || !CURRENT_TEACHER) return;
+  const histEl = document.getElementById('att-history-list');
+  if(histEl) histEl.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:13px;">⏳ กำลังโหลด...</div>';
+
+  const { data, error } = await SB.from('settings')
+    .select('key,value')
+    .like('key', `att_%_${CURRENT_TEACHER.id}`)
+    .order('key', { ascending: false })
+    .limit(30);
+
+  if(error || !data) { if(histEl) histEl.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px;">โหลดประวัติไม่สำเร็จ</div>'; return; }
+
+  if(!data.length) { if(histEl) histEl.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:13px;">ยังไม่มีประวัติเช็คชื่อ</div>'; return; }
+
+  if(histEl) histEl.innerHTML = data.map(row => {
+    const v = row.value;
+    const d = v.date ? new Date(v.date).toLocaleDateString('th-TH',{weekday:'short',day:'numeric',month:'short',year:'2-digit'}) : '-';
+    const c = v.counts || {};
+    return `<div onclick="loadHistoryRecord('${v.date}','${v.room}')"
+      style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:10px;margin-bottom:5px;border:1.5px solid #F1F5F9;cursor:pointer;"
+      onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='#F1F5F9'">
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);">${d} · ${v.room||'-'}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px;">
+          ✅ ${c.present||0} · ❌ ${c.absent||0} · ⏰ ${c.late||0} · 🏥 ${c.leave||0}
+        </div>
+      </div>
+      <span style="font-size:16px;color:#CBD5E1;">›</span>
+    </div>`;
+  }).join('');
+}
+
+function loadHistoryRecord(date, room) {
+  const dateEl = document.getElementById('att-date');
+  const roomSel = document.getElementById('att-room-sel');
+  if(dateEl) dateEl.value = date;
+  if(roomSel) roomSel.value = room;
+  renderAttendanceList();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }

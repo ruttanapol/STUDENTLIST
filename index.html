@@ -904,6 +904,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     <button class="mtab" onclick="switchManageTab('students',this)">👤 นักเรียน</button>
     <button class="mtab" onclick="switchManageTab('subjects',this)">📚 วิชา</button>
     <button class="mtab" onclick="switchManageTab('homework',this)">📝 งาน</button>
+    <button class="mtab" onclick="switchManageTab('attend',this)">📋 เช็คชื่อ</button>
     <button class="mtab" onclick="switchManageTab('grade',this)">📊 เกรด</button>
     <button class="mtab" onclick="switchManageTab('reset',this)">🗑️</button>
   </div>
@@ -1043,7 +1044,46 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     </div>
   </div>
 
-  <div <div id="mtab-grade" class="mtab-page" style="display:none;">
+
+  <!-- ══════════ ATTENDANCE TAB ══════════ -->
+  <div id="mtab-attend" class="mtab-page" style="display:none;">
+    <!-- Controls row -->
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
+      <select id="att-room-sel" onchange="renderAttendanceList()"
+        style="flex:1;min-width:120px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;font-family:Sarabun,sans-serif;">
+      </select>
+      <input type="date" id="att-date" onchange="onAttDateChange()"
+        style="flex:1;min-width:130px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;font-family:Sarabun,sans-serif;">
+    </div>
+
+    <!-- Quick action + summary -->
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+      <button onclick="setAllAttStatus('present')" style="flex:1;padding:8px;font-size:13px;font-weight:700;border-radius:8px;border:none;background:#DCFCE7;color:#15803D;cursor:pointer;font-family:Sarabun,sans-serif;">✅ มาทุกคน</button>
+      <button onclick="setAllAttStatus('absent')" style="flex:1;padding:8px;font-size:13px;font-weight:700;border-radius:8px;border:none;background:#FEE2E2;color:#B91C1C;cursor:pointer;font-family:Sarabun,sans-serif;">❌ ขาดทุกคน</button>
+    </div>
+    <div id="att-summary" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;"></div>
+
+    <!-- Student list -->
+    <div id="att-student-list" style="margin-bottom:12px;"></div>
+
+    <!-- Save button -->
+    <button onclick="saveAttendance()" id="att-save-btn"
+      style="width:100%;padding:13px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">
+      💾 บันทึกเช็คชื่อ
+    </button>
+    <div id="att-save-status" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:700;text-align:center;"></div>
+
+    <!-- History -->
+    <div style="margin-top:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text2);">📅 ประวัติเช็คชื่อ</div>
+        <button onclick="loadAttendanceHistory()" style="padding:4px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;color:var(--text2);">🔄 โหลด</button>
+      </div>
+      <div id="att-history-list"></div>
+    </div>
+  </div>
+
+  <div id="mtab-grade" class="mtab-page" style="display:none;">
 
     <!-- Premium Gate -->
     <div id="grade-premium-gate" style="display:none;text-align:center;padding:32px 16px;">
