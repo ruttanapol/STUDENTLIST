@@ -574,11 +574,12 @@ async function sbAddHomework(hw) {
     await reloadHomeworks();
   } else {
     const existing = DB.homeworks.find(h => h.num === hw.num);
-    if(existing) { existing.title=hw.title; existing.subject=hw.subject; existing.maxScore=hw.maxScore; existing.deadline=hw.deadline||''; existing.fileUrl=hw.fileUrl||''; existing.fileName=hw.fileName||''; }
+    if(existing) { existing.title=hw.title; existing.subject=hw.subject; existing.maxScore=hw.maxScore; existing.deadline=hw.deadline||null; existing.fileUrl=hw.fileUrl||''; existing.fileName=hw.fileName||''; }
     else { DB.homeworks.push(hw); DB.homeworks.sort((a,b)=>a.num-b.num); }
     saveDB();
     renderManage();
     populateHWDropdown();
+    renderSubjectsFull();
   }
 }
 
@@ -638,6 +639,8 @@ async function sbSaveSettings(key, value) {
     if(error) throw error;
   } else {
     saveDB();
+    // re-render subjects ถ้า tab subjects เปิดอยู่
+    if(document.getElementById('subj-full-list')) renderSubjectsFull();
   }
 }
 
@@ -2629,7 +2632,8 @@ async function saveHW(){
   const title=document.getElementById('n-hwtitle').value.trim();
   const subject=document.getElementById('n-hwsubj').value;
   const maxScore=parseInt(document.getElementById('n-hwmaxscore').value)||100;
-  const deadline=document.getElementById('n-hwdeadline')?document.getElementById('n-hwdeadline').value:'';
+  const deadlineRaw=document.getElementById('n-hwdeadline')?document.getElementById('n-hwdeadline').value:'';
+  const deadline = deadlineRaw && deadlineRaw.trim() !== '' ? deadlineRaw : null;
   if(!num||!title){toast('กรอกให้ครบ','warn');return;}
   // เช็ค limit เฉพาะเพิ่มใหม่ (ไม่ใช่แก้ไขของเดิม)
   const isNew = !DB.homeworks.find(h => h.num === num);
@@ -2645,7 +2649,7 @@ async function saveHW(){
     document.getElementById('n-hwnum').value='';
     document.getElementById('n-hwtitle').value='';
     if(document.getElementById('n-hwdeadline'))document.getElementById('n-hwdeadline').value='';
-  }catch(e){toast('ไม่สำเร็จ: '+e.message,'err');}
+  }catch(e){actionPopupError('บันทึกไม่สำเร็จ: '+e.message);}
 }
 
 function openEditHW(num){
@@ -3897,7 +3901,8 @@ async function saveHWWithFile() {
   const title = document.getElementById('n-hwtitle').value.trim();
   const subject = document.getElementById('n-hwsubj').value;
   const maxScore = parseInt(document.getElementById('n-hwmaxscore')?.value) || 100;
-  const deadline = document.getElementById('n-hwdeadline')?.value || '';
+  const deadlineRaw = document.getElementById('n-hwdeadline')?.value || '';
+  const deadline = deadlineRaw.trim() !== '' ? deadlineRaw : null;
   const fileInput = document.getElementById('hw-file-input');
   const file = fileInput?.files[0];
 
