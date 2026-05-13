@@ -55,15 +55,16 @@ body { background:var(--bg); overscroll-behavior:none; }
   /* admin content area */
   #s-admin-body {
     flex: 1;
-    overflow: hidden;  /* ให้ s-admin-main จัดการ scroll แทน */
+    min-height: 0;      /* key: allow flex child to shrink */
+    overflow: hidden;
     display: flex;
-    height: 100%;
   }
   
   /* desktop sidebar nav */
   #s-admin-sidebar {
     width: var(--sidebar-w);
     flex-shrink: 0;
+    min-height: 0;
     background: var(--card);
     border-right: 1.5px solid var(--border);
     padding: 20px 12px;
@@ -73,10 +74,10 @@ body { background:var(--bg); overscroll-behavior:none; }
   
   #s-admin-main {
     flex: 1;
+    min-height: 0;      /* key: enables overflow-y scroll in flexbox */
     overflow-y: auto;
     overflow-x: hidden;
     padding: 0;
-    height: 100%;
   }
   
   /* superadmin scroll area */
