@@ -5498,10 +5498,11 @@ async function saveAnnouncement(overrideEnabled) {
     return;
   }
   const data = { text, enabled, type: _announceType, updatedAt: new Date().toISOString() };
-  const { error } = await SB.from('settings').upsert(
-    { key: 'announcement', value: data },
-    { onConflict: 'key' }
-  );
+  // ใช้ SELECT → INSERT/UPDATE แทน upsert เพื่อหลีกเลี่ยงปัญหา onConflict
+  const { data: existing } = await SB.from('settings').select('key').eq('key','announcement').maybeSingle();
+  const { error } = existing
+    ? await SB.from('settings').update({ value: data }).eq('key','announcement')
+    : await SB.from('settings').insert({ key: 'announcement', value: data });
   if(error) { toast2('บันทึกไม่สำเร็จ: ' + error.message, 'err'); return; }
   _announceData = data;
   toast2(enabled ? '📢 บันทึกและเปิดประกาศแล้ว' : '💾 บันทึกประกาศแล้ว (ปิดอยู่)');
