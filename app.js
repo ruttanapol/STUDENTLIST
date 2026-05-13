@@ -6,8 +6,7 @@
 // ╔══════════════════════════════════════════════════════╗
 // ║  SECTION A: CONSTANTS & CONFIGURATION               ║
 // ╚══════════════════════════════════════════════════════╝
-const SUPER_ADMIN_PW = null; // ย้ายไป Supabase แล้ว  //
-const ADMIN_PW = 'teacher123';  // เหลือไว้ compatibility (ไม่ใช้แล้ว)
+// Credentials moved to Supabase settings
 
 // ╔══════════════════════════════════════════════════════╗
 // ║  SECTION B: SUPABASE + LOCAL STORAGE LAYER          ║
@@ -186,11 +185,10 @@ async function tryRestoreSession(){
     document.getElementById('teacher-topbar-name').textContent=teacher.display_name;if(teacher.avatar_url) updateTopbarAvatar(teacher.avatar_url);
     document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
     // เช็คและแจ้งเตือนอายุการใช้งาน
-await checkAndNotifyExpiry(teacher);
+    await checkAndNotifyExpiry(teacher);
     showScreen('s-admin');
     populateScanSelects();
     renderDashboard();
-    await checkAndNotifyExpiry(teacher);
     await checkAndDowngradePremium();
     checkLockedDataOnLoad();
     return true;
@@ -1206,15 +1204,16 @@ async function loadSuperAdminPanel(){
       +'<div style="font-size:13px;color:#B45309;">กรุณากลับไปตั้งค่าก่อน หรือรีโหลดหน้าเว็บ</div>'
       +'<button onclick="logout()" style="margin-top:12px;padding:8px 20px;border-radius:20px;border:1.5px solid #B45309;background:#FEF3C7;color:#92400E;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">← กลับหน้าหลัก</button>'
       +'</div>';
-    document.getElementById('sa-pending-list').innerHTML = notConn;
-    document.getElementById('sa-approved-list').innerHTML = '';
-    document.getElementById('sa-rejected-list').innerHTML = '';
-    document.getElementById('sa-pending-badge').style.display = 'none';
+    const allEl3 = document.getElementById('sa-all-list');
+    if(allEl3) allEl3.innerHTML = notConn;
+    const pb3 = document.getElementById('sa-pending-badge');
+    if(pb3) pb3.style.display = 'none';
     return;
   }
   try{
     // แสดง loading
-    document.getElementById('sa-pending-list').innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);">⏳ กำลังโหลด...</div>';
+    const allEl3b = document.getElementById('sa-all-list');
+    if(allEl3b) allEl3b.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);">⏳ กำลังโหลด...</div>';
     const {data,error}=await SB.from('teachers').select('id,email,username,first_name,last_name,display_name,status,created_at,expires_at,slip_url,slip_uploaded_at,plan,plan_expires_at').order('created_at');
     if(error)throw error;
     renderTeacherList(data||[]);
@@ -1229,9 +1228,8 @@ async function loadSuperAdminPanel(){
         +'<div style="font-size:15px;font-weight:700;color:#B91C1C;margin-bottom:4px;">ยังไม่ได้สร้าง Tables</div>'
         +'<div style="font-size:13px;color:#991B1B;">กรุณาไปรัน SQL ใน Supabase SQL Editor ก่อน</div></div>'
       : '<div style="background:#FEE2E2;border-radius:12px;padding:16px;text-align:center;font-size:13px;color:#B91C1C;">❌ '+msg+'</div>';
-    document.getElementById('sa-pending-list').innerHTML = errHtml;
-    document.getElementById('sa-approved-list').innerHTML = '';
-    document.getElementById('sa-rejected-list').innerHTML = '';
+    const allEl3c = document.getElementById('sa-all-list');
+    if(allEl3c) allEl3c.innerHTML = errHtml;
   }
 }
 
@@ -3561,10 +3559,9 @@ function onSubjChangeInHW() {
   const subj = getSubjectObj(subjName);
   if(!subj) return;
   const maxEl = document.getElementById('n-hwmaxscore');
-  if(!maxEl || maxEl.value == subj.scorePerHW) return;
-  // คำนวณ scorePerHW
-  const per = subj.hwCount > 0 ? Math.round((subj.total / subj.hwCount) * 100) / 100 : subj.total;
-  if(maxEl) maxEl.value = per;
+  // auto-fill max score จาก subject total (ค่าเก็บ)
+  const per = subj.total || 100;
+  if(maxEl && !maxEl.value) maxEl.value = per;
 }
 
 async function addSubjectFull() {
@@ -3615,7 +3612,7 @@ async function updateSubjectScore(name, total, hwCount) {
   if(!subj) return;
   if(typeof subj === 'object') {
     subj.total = parseFloat(total) || 100;
-    subj.hwCount = parseInt(hwCount) || 10;
+    // hwCount is now auto-derived from actual homeworks, no longer stored
   }
   await sbSaveSettings('subjects', DB.subjects);
   renderSubjectsFull();
@@ -4989,6 +4986,19 @@ async function loadAnthropicKey() {
   try {
     const { data } = await SB.from('settings').select('value').eq('key','anthropic_key').single();
     ANTHROPIC_KEY = data?.value || '';
+    // Update SA panel status if visible
+    const statusEl = document.getElementById('sa-api-key-status');
+    const inp = document.getElementById('sa-anthropic-key');
+    if(statusEl) {
+      if(ANTHROPIC_KEY) {
+        statusEl.textContent = '✅ ตั้งค่าแล้ว · ' + ANTHROPIC_KEY.slice(0,12) + '...';
+        statusEl.style.color = 'var(--green-dark)';
+        if(inp) inp.value = ANTHROPIC_KEY;
+      } else {
+        statusEl.textContent = 'ยังไม่ได้ตั้งค่า';
+        statusEl.style.color = 'var(--text3)';
+      }
+    }
   } catch(e) {
     ANTHROPIC_KEY = '';
   }
@@ -5429,4 +5439,51 @@ function renderSAStats(teachers) {
       </div>
     </div>
     ${expired > 0 ? `<div style="background:#FEE2E2;border:1.5px solid #FCA5A5;border-radius:10px;padding:8px 12px;font-size:13px;color:var(--red);font-weight:700;margin-bottom:12px;">⚠️ มี ${expired} บัญชีที่ Premium หมดอายุแล้ว</div>` : ''}`;
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  SECTION SA: MISSING SUPER ADMIN FUNCTIONS          ║
+// ╚══════════════════════════════════════════════════════╝
+
+function toggleApiKeyVisibility() {
+  const inp = document.getElementById('sa-anthropic-key');
+  const btn = document.getElementById('api-key-toggle');
+  if(!inp) return;
+  const isHidden = inp.type === 'password';
+  inp.type = isHidden ? 'text' : 'password';
+  if(btn) btn.textContent = isHidden ? 'ซ่อน' : 'แสดง';
+}
+
+async function saveAnthropicKey() {
+  const inp = document.getElementById('sa-anthropic-key');
+  const statusEl = document.getElementById('sa-api-key-status');
+  const key = inp?.value?.trim() || '';
+  if(!key) { toast2('กรุณากรอก API Key ก่อน', 'err'); return; }
+  if(!key.startsWith('sk-ant-')) { toast2('API Key ต้องขึ้นต้นด้วย sk-ant-', 'err'); return; }
+  try {
+    await SB.from('settings').upsert({ key: 'anthropic_key', value: key }, { onConflict: 'key' });
+    ANTHROPIC_KEY = key;
+    if(statusEl) { statusEl.textContent = '✅ บันทึกแล้ว · ' + key.slice(0,12) + '...'; statusEl.style.color = 'var(--green-dark)'; }
+    toast2('✅ บันทึก API Key แล้ว');
+  } catch(e) {
+    toast2('บันทึกไม่สำเร็จ: ' + e.message, 'err');
+  }
+}
+
+async function changeSuperAdminPw() {
+  const pw1 = document.getElementById('new-sa-pw')?.value?.trim() || '';
+  const pw2 = document.getElementById('new-sa-pw2')?.value?.trim() || '';
+  const errEl = document.getElementById('sa-pw-err');
+  if(errEl) errEl.textContent = '';
+  if(!pw1) { if(errEl) errEl.textContent = 'กรุณากรอกรหัสผ่านใหม่'; return; }
+  if(pw1.length < 6) { if(errEl) errEl.textContent = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'; return; }
+  if(pw1 !== pw2) { if(errEl) errEl.textContent = 'รหัสผ่านไม่ตรงกัน'; return; }
+  try {
+    await SB.from('settings').upsert({ key: 'superadmin_pw', value: pw1 }, { onConflict: 'key' });
+    document.getElementById('new-sa-pw').value = '';
+    document.getElementById('new-sa-pw2').value = '';
+    toast2('✅ เปลี่ยนรหัสผ่าน Super Admin แล้ว');
+  } catch(e) {
+    if(errEl) errEl.textContent = 'บันทึกไม่สำเร็จ: ' + e.message;
+  }
 }
