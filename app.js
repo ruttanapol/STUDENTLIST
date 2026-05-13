@@ -3002,7 +3002,8 @@ function startExpiryCountdown(expiresAt) {
     }" style="font-size:11px;padding:2px 8px;">⏱ ${info.label}</span>`;
     if(info.status === 'expired') {
       clearInterval(_expiryTimer);
-      toast('บัญชีของคุณหมดอายุแล้ว กรุณาติดต่อแอดมิน', 'err');
+      toast('บัญชีของคุณหมดอายุแล้ว — กด ต่ออายุ ด้านบน', 'err');
+      showLockedDataBanner(0);
       setTimeout(()=>logout(), 3000);
     }
   }
@@ -3145,7 +3146,8 @@ function showExpiryModal(type, daysLeft, expiresAt) {
   if(type === 'expired') {
     icon.textContent = '🔒';
     title.textContent = 'บัญชีหมดอายุแล้ว';
-    body.innerHTML = 'บัญชีของคุณหมดอายุแล้ว<br>กรุณาติดต่อแอดมินเพื่อต่ออายุการใช้งาน';
+    body.innerHTML = 'บัญชีของคุณหมดอายุแล้ว';
+    body.innerHTML += '<br><button onclick="openRenewalFlow()" style="margin-top:10px;padding:8px 18px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">💳 ต่ออายุ Premium</button>';
     daysEl.textContent = '';
     dateEl.textContent = 'หมดอายุเมื่อ: ' + expDate;
     // ล็อกบัญชีหลัง 5 วินาที
@@ -3154,7 +3156,7 @@ function showExpiryModal(type, daysLeft, expiresAt) {
     const urgency = daysLeft <= 3 ? '🚨' : '⚠️';
     icon.textContent = urgency;
     title.textContent = daysLeft <= 3 ? 'บัญชีใกล้หมดอายุมาก!' : 'บัญชีใกล้หมดอายุ';
-    body.innerHTML = `บัญชีของคุณจะหมดอายุในอีก <b style="color:var(--red);font-size:18px;">${daysLeft}</b> วัน<br>กรุณาติดต่อแอดมินเพื่อต่ออายุการใช้งาน`;
+    body.innerHTML = `บัญชีของคุณจะหมดอายุในอีก <b style="color:var(--red);font-size:18px;">${daysLeft}</b> วัน<br><button onclick="openRenewalFlow()" style="margin-top:10px;padding:8px 18px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,#F59E0B,#D97706);color:#fff;cursor:pointer;font-family:Sarabun,sans-serif;">💳 ต่ออายุ Premium</button>`;
     daysEl.textContent = '';
     dateEl.textContent = 'วันหมดอายุ: ' + expDate;
   }
@@ -4092,8 +4094,8 @@ function showUpgradeModal(reason) {
         ${features.map(([icon,text])=>'<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);"><span style="font-size:16px;width:24px;text-align:center;">'+icon+'</span><span style="font-size:14px;color:var(--text);">'+text+'</span></div>').join('')}
       </div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:16px;">ราคาเริ่มต้น <b style="color:var(--purple);font-size:16px;">฿99</b> / เดือน</div>
-      <button onclick="document.getElementById('upgrade-modal').remove()" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;border:none;cursor:pointer;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;box-shadow:0 4px 16px rgba(124,58,237,0.35);font-family:Sarabun,sans-serif;">ติดต่อแอดมินเพื่ออัปเกรด</button>
-      <button onclick="document.getElementById('upgrade-modal').remove()" style="width:100%;padding:10px;font-size:14px;font-weight:600;border-radius:10px;border:none;cursor:pointer;background:none;color:var(--text3);margin-top:8px;font-family:Sarabun,sans-serif;">ปิด</button>
+      <button onclick="document.getElementById('upgrade-modal').remove();openRenewalFlow()" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;border:none;cursor:pointer;background:linear-gradient(135deg,#7C3AED,#4F8EF7);color:#fff;box-shadow:0 4px 16px rgba(124,58,237,0.35);font-family:Sarabun,sans-serif;">💳 อัพเกรดพรีเมี่ยม</button>
+      <button onclick="document.getElementById('upgrade-modal').remove()" style="width:100%;padding:10px;font-size:14px;font-weight:600;border-radius:10px;border:none;cursor:pointer;background:none;color:var(--text3);margin-top:8px;font-family:Sarabun,sans-serif;">ยังไม่สนใจ</button>
     </div>`;
   modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
@@ -5204,7 +5206,7 @@ function showLockedDataBanner(count) {
         <div style="font-size:11px;opacity:0.85;">แผน Premium หมดอายุ — ชิ้นงานที่เกิน ${FREE_LIMITS.homeworks} ชิ้นถูกล็อคชั่วคราว</div>
       </div>
     </div>
-    <button onclick="openRenewalFlow()" style="padding:7px 14px;font-size:12px;font-weight:700;border-radius:10px;border:none;background:#fff;color:#B91C1C;cursor:pointer;white-space:nowrap;font-family:Sarabun,sans-serif;">💳 ต่ออายุ</button>`;
+    <button onclick="openRenewalFlow()" style="padding:7px 14px;font-size:12px;font-weight:700;border-radius:10px;border:none;background:#fff;color:#B91C1C;cursor:pointer;white-space:nowrap;font-family:Sarabun,sans-serif;">💳 อัพเกรดพรีเมี่ยม</button>`;
   document.body.appendChild(banner);
 }
 
@@ -5217,6 +5219,10 @@ let _renewalPayInfo = null;
 async function openRenewalFlow() {
   const modal = document.getElementById('renewal-modal');
   if(!modal) return;
+  // Adjust title based on context
+  const titleEl = document.getElementById('renewal-modal-title');
+  const _lockedHWs = getLockedHomeworks();
+  if(titleEl) titleEl.textContent = _lockedHWs.length > 0 ? 'ต่ออายุ Premium' : 'อัพเกรดพรีเมี่ยม';
 
   // Load payment info
   try {
