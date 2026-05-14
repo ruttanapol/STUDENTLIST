@@ -1372,9 +1372,10 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
             </div>
             <!-- Stats panel -->
             <div id="att-panel-stats" style="display:none;padding:10px;">
-              <div style="display:flex;gap:6px;margin-bottom:8px;">
-                <button onclick="loadAttendanceStats()" style="flex:1;padding:7px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;font-family:Sarabun,sans-serif;">📊 โหลดสถิติ</button>
+              <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+                <button onclick="loadAttendanceStats()" style="flex:1;min-width:80px;padding:7px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;font-family:Sarabun,sans-serif;">📊 โหลดสถิติ</button>
                 <button onclick="exportAttendanceStatsPDF()" style="padding:7px 10px;font-size:11px;font-weight:700;border-radius:8px;border:1.5px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-family:Sarabun,sans-serif;">📄 PDF</button>
+                <button id="att-clear-btn" onclick="clearAttendanceData()" style="padding:7px 10px;font-size:11px;font-weight:700;border-radius:8px;border:1.5px solid #FCA5A5;background:#FFF5F5;color:#B91C1C;cursor:pointer;font-family:Sarabun,sans-serif;">🗑️ ล้างข้อมูล</button>
               </div>
               <div id="att-stats-content" style="max-height:320px;overflow-y:auto;">
                 <div style="text-align:center;padding:20px;color:var(--text3);font-size:13px;">กด "โหลดสถิติ" เพื่อดูข้อมูลสะสม</div>

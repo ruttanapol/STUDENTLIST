@@ -6295,3 +6295,42 @@ function switchAttTab(tab) {
     if(histBtn) { histBtn.style.background = '#fff'; histBtn.style.color = 'var(--text2)'; histBtn.style.borderBottom = '2px solid transparent'; }
   }
 }
+
+async function clearAttendanceData() {
+  const room = document.getElementById('att-room-sel')?.value || '';
+  if(!room) { toast('กรุณาเลือกห้องก่อน', 'warn'); return; }
+  if(!SB || !CURRENT_TEACHER) return;
+
+  // Confirm dialog
+  const confirmed = confirm(`⚠️ ล้างข้อมูลเช็คชื่อทั้งหมดของห้อง "${room}"?\n\nข้อมูลทุกวันจะถูกลบถาวร กรุณา Export ก่อนถ้าต้องการเก็บ`);
+  if(!confirmed) return;
+
+  const btn = document.getElementById('att-clear-btn');
+  if(btn) { btn.disabled = true; btn.textContent = '⏳ กำลังล้าง...'; }
+
+  try {
+    const roomKey = room.replace(/[^a-zA-Z0-9ก-ฮ]/g,'_');
+    const pattern = `att_%_${roomKey}%_${CURRENT_TEACHER.id}`;
+    // Fetch all matching keys first
+    const { data, error } = await SB.from('settings').select('key').like('key', pattern);
+    if(error) throw error;
+    if(!data?.length) { toast('ไม่พบข้อมูลเช็คชื่อ', 'warn'); return; }
+
+    // Delete all
+    for(const row of data) {
+      await SB.from('settings').delete().eq('key', row.key);
+    }
+
+    _attStatsData = null;
+    _attRecords = {};
+    document.getElementById('att-history-list').innerHTML = '';
+    const statsEl = document.getElementById('att-stats-content');
+    if(statsEl) statsEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px;">ล้างข้อมูลแล้ว</div>';
+    updateAttSummary();
+    toast(`🗑️ ล้างข้อมูลเช็คชื่อห้อง ${room} แล้ว (${data.length} วัน)`);
+  } catch(e) {
+    toast('ล้างไม่สำเร็จ: ' + e.message, 'err');
+  } finally {
+    if(btn) { btn.disabled = false; btn.textContent = '🗑️ ล้างข้อมูลเช็คชื่อ'; }
+  }
+}
