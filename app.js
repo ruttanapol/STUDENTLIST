@@ -5435,26 +5435,27 @@ function renderSAStats(teachers) {
     if(t.plan!=='premium') return false;
     return t.plan_expires_at && new Date(t.plan_expires_at) < new Date();
   }).length;
+  // Compact sidebar stats
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">
-      <div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:10px;text-align:center;">
-        <div style="font-size:22px;font-weight:800;color:var(--blue);">${total}</div>
-        <div style="font-size:11px;color:var(--text2);">ทั้งหมด</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+      <div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:8px;text-align:center;">
+        <div style="font-size:20px;font-weight:800;color:#fff;">${total}</div>
+        <div style="font-size:10px;color:#64748B;">ทั้งหมด</div>
       </div>
-      <div style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border:1.5px solid #86EFAC;border-radius:12px;padding:10px;text-align:center;">
-        <div style="font-size:22px;font-weight:800;color:var(--green-dark);">${approved}</div>
-        <div style="font-size:11px;color:var(--green-dark);">อนุมัติแล้ว</div>
+      <div style="background:rgba(34,197,94,0.15);border-radius:10px;padding:8px;text-align:center;">
+        <div style="font-size:20px;font-weight:800;color:#4ADE80;">${approved}</div>
+        <div style="font-size:10px;color:#4ADE80;">อนุมัติ</div>
       </div>
-      <div style="background:linear-gradient(135deg,#FAF5FF,#EDE9FE);border:1.5px solid #C4B5FD;border-radius:12px;padding:10px;text-align:center;">
-        <div style="font-size:22px;font-weight:800;color:var(--purple);">${premium}</div>
-        <div style="font-size:11px;color:var(--purple);">💎 Premium</div>
+      <div style="background:rgba(139,92,246,0.15);border-radius:10px;padding:8px;text-align:center;">
+        <div style="font-size:20px;font-weight:800;color:#A78BFA;">${premium}</div>
+        <div style="font-size:10px;color:#A78BFA;">Premium</div>
       </div>
-      <div style="background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border:1.5px solid #FCD34D;border-radius:12px;padding:10px;text-align:center;">
-        <div style="font-size:22px;font-weight:800;color:#B45309;">${pending}</div>
-        <div style="font-size:11px;color:#B45309;">รออนุมัติ</div>
+      <div style="background:rgba(245,158,11,0.15);border-radius:10px;padding:8px;text-align:center;">
+        <div style="font-size:20px;font-weight:800;color:#FCD34D;">${pending}</div>
+        <div style="font-size:10px;color:#FCD34D;">รอ</div>
       </div>
     </div>
-    ${expired > 0 ? `<div style="background:#FEE2E2;border:1.5px solid #FCA5A5;border-radius:10px;padding:8px 12px;font-size:13px;color:var(--red);font-weight:700;margin-bottom:12px;">⚠️ มี ${expired} บัญชีที่ Premium หมดอายุแล้ว</div>` : ''}`;
+    ${expired > 0 ? `<div style="margin-top:6px;background:rgba(239,68,68,0.2);border-radius:8px;padding:6px 8px;font-size:11px;color:#FCA5A5;font-weight:700;">⚠️ ${expired} Premium หมดอายุ</div>` : ''}`;
 }
 
 // ╔══════════════════════════════════════════════════════╗
@@ -6024,4 +6025,34 @@ function checkFeatureGate(key, label) {
     return false;
   }
   return true;
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  SA SIDEBAR NAVIGATION                              ║
+// ╚══════════════════════════════════════════════════════╝
+
+function showSASection(id, btn) {
+  // Hide all sections
+  document.querySelectorAll('.sa-section').forEach(s => s.style.display = 'none');
+  // Show target
+  const sec = document.getElementById('sa-sec-' + id);
+  if(sec) sec.style.display = 'block';
+  // Update nav highlight
+  document.querySelectorAll('.sa-nav-item').forEach(b => {
+    b.style.background = 'transparent';
+    b.style.color = '#94A3B8';
+  });
+  const activeBtn = btn || document.getElementById('sanav-' + id);
+  if(activeBtn) {
+    activeBtn.style.background = 'rgba(99,102,241,0.25)';
+    activeBtn.style.color = '#C7D2FE';
+  }
+  // Lazy-load section data
+  if(id === 'features') loadFeatureFlags(true);
+  if(id === 'announce') loadAnnouncementSettings();
+  if(id === 'plans')    { loadPlansSettings(); loadPaymentSettings(); }
+  if(id === 'contact')  loadContactSettings();
+  if(id === 'system')   { loadMaintenanceStatus(); checkOrphanData(); }
+  if(id === 'api')      loadAnthropicKey();
+  if(id === 'security') loadBypassIds?.();
 }
