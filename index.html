@@ -1350,13 +1350,36 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
             <div id="att-save-status" style="display:none;margin-top:8px;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:700;text-align:center;"></div>
           </div>
 
-          <!-- ประวัติ -->
-          <div style="background:#fff;border-radius:14px;border:1.5px solid var(--border);padding:12px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-              <div style="font-size:13px;font-weight:700;color:var(--text);">📅 ประวัติ</div>
-              <button onclick="loadAttendanceHistory()" style="padding:3px 8px;font-size:11px;border-radius:6px;border:1.5px solid var(--border);background:#fff;cursor:pointer;color:var(--text2);">🔄</button>
+          <!-- ประวัติ + สถิติ -->
+          <div style="background:#fff;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;">
+            <!-- Tab header -->
+            <div style="display:flex;border-bottom:2px solid #F1F5F9;">
+              <button id="att-tab-history" onclick="switchAttTab('history')"
+                style="flex:1;padding:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;font-family:Sarabun,sans-serif;background:var(--blue-light);color:var(--blue-dark);border-bottom:2px solid var(--blue);">
+                📅 ประวัติ
+              </button>
+              <button id="att-tab-stats" onclick="switchAttTab('stats')"
+                style="flex:1;padding:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;font-family:Sarabun,sans-serif;background:#fff;color:var(--text2);border-bottom:2px solid transparent;">
+                📊 สถิติสะสม
+              </button>
             </div>
-            <div id="att-history-list" style="max-height:320px;overflow-y:auto;"></div>
+            <!-- History panel -->
+            <div id="att-panel-history" style="padding:10px;">
+              <div style="display:flex;justify-content:flex-end;margin-bottom:6px;">
+                <button onclick="loadAttendanceHistory()" style="padding:3px 8px;font-size:11px;border-radius:6px;border:1.5px solid var(--border);background:#fff;cursor:pointer;color:var(--text2);">🔄</button>
+              </div>
+              <div id="att-history-list" style="max-height:280px;overflow-y:auto;"></div>
+            </div>
+            <!-- Stats panel -->
+            <div id="att-panel-stats" style="display:none;padding:10px;">
+              <div style="display:flex;gap:6px;margin-bottom:8px;">
+                <button onclick="loadAttendanceStats()" style="flex:1;padding:7px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;font-family:Sarabun,sans-serif;">📊 โหลดสถิติ</button>
+                <button onclick="exportAttendanceStatsPDF()" style="padding:7px 10px;font-size:11px;font-weight:700;border-radius:8px;border:1.5px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;font-family:Sarabun,sans-serif;">📄 PDF</button>
+              </div>
+              <div id="att-stats-content" style="max-height:320px;overflow-y:auto;">
+                <div style="text-align:center;padding:20px;color:var(--text3);font-size:13px;">กด "โหลดสถิติ" เพื่อดูข้อมูลสะสม</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

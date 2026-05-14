@@ -251,6 +251,7 @@ async function connectSupabase(silent = false) {
     setTimeout(()=>loadContactLinksForLogin(), 400);setTimeout(()=>checkMaintenanceMode(), 600);
     setTimeout(()=>checkAnnouncement(), 800);
     setTimeout(()=>loadFeatureFlags(), 900);
+    setTimeout(()=>loadGlobalBypassIds(), 1000);
     setTimeout(() => {
       document.getElementById('setup-overlay').style.display = 'none';
     }, silent ? 0 : 600);
@@ -3357,6 +3358,14 @@ async function cleanOrphanData() {
 
 // ===== MAINTENANCE MODE =====
 // ===== BYPASS IDs (TEST ACCOUNTS FOR MAINTENANCE) =====
+async function loadGlobalBypassIds() {
+  if(!SB) return;
+  try {
+    const {data} = await SB.from('settings').select('value').eq('key','bypass_ids').maybeSingle();
+    _globalBypassIds = Array.isArray(data?.value) ? data.value : [];
+  } catch(e) { _globalBypassIds = []; }
+}
+
 async function loadBypassIds() {
   if(!USE_SUPABASE||!SB) return;
   try {
@@ -4049,6 +4058,7 @@ function getTeacherPlan() {
 }
 
 function isPremium() {
+  if(isBypassAccount()) return true; // bypass accounts = premium
   return getTeacherPlan() === 'premium';
 }
 
@@ -5879,69 +5889,54 @@ function exportAttendanceExcel() {
 function exportAttendancePDF() {
   if(!checkFeatureGate('export_pdf','Export PDF')) return;
   if(!isPremium()) { showUpgradeModal('Export PDF เฉพาะ Premium 🔒'); return; }
-  if(typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') { toast('กำลังโหลด PDF library...','warn'); return; }
   const { room, dateDisplay, rows, counts } = _buildAttExportRows();
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation:'portrait', unit:'pt', format:'a4' });
+  const dateFile = (document.getElementById('att-date')?.value||'').replace(/-/g,'');
+  const statusColors = {
+    present:'#15803D', absent:'#B91C1C', late:'#B45309', sick:'#BE123C', personal:'#6D28D9'
+  };
 
-  // Header
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(14);
-  doc.text(`Attendance Report`, 40, 40);
-  doc.setFontSize(11);
-  doc.setFont('helvetica','normal');
-  doc.text(`Room: ${room}  |  Date: ${dateDisplay}`, 40, 58);
+  const html = `<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <title>เช็คชื่อ ${room} ${dateDisplay}</title>
+    <style>
+      *{font-family:Sarabun,sans-serif;box-sizing:border-box;margin:0;padding:0;}
+      body{font-size:11pt;color:#1E293B;padding:12mm 15mm;}
+      h1{font-size:16pt;font-weight:700;color:#2563EB;margin-bottom:4px;}
+      .meta{font-size:9pt;color:#64748B;border-bottom:2px solid #E2E8F0;padding-bottom:8px;margin-bottom:10px;}
+      .summary{display:flex;gap:10px;margin-bottom:12px;}
+      .sum-box{flex:1;text-align:center;padding:8px;border-radius:8px;}
+      table{width:100%;border-collapse:collapse;font-size:10pt;}
+      th{background:#DBEAFE;color:#1E40AF;font-weight:700;padding:7px 6px;border:1px solid #BFDBFE;text-align:center;}
+      td{padding:6px 8px;border:1px solid #E2E8F0;}
+      tr:nth-child(even) td{background:#F8FAFF;}
+      .num{text-align:center;color:#64748B;}
+      .status{text-align:center;font-weight:700;}
+      @media print{body{padding:8mm 10mm;}}
+    </style>
+  </head><body>
+    <h1>📋 รายงานเช็คชื่อ — ${room}</h1>
+    <div class="meta">วันที่: ${dateDisplay} &nbsp;|&nbsp; นักเรียน ${rows.length} คน &nbsp;|&nbsp; พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}</div>
+    <div class="summary">
+      <div class="sum-box" style="background:#DCFCE7;color:#15803D;"><b style="font-size:18pt;">${counts.present||0}</b><br>✅ มา</div>
+      <div class="sum-box" style="background:#FEE2E2;color:#B91C1C;"><b style="font-size:18pt;">${counts.absent||0}</b><br>❌ ขาด</div>
+      <div class="sum-box" style="background:#FEF3C7;color:#B45309;"><b style="font-size:18pt;">${counts.late||0}</b><br>⏰ สาย</div>
+      <div class="sum-box" style="background:#FFF1F2;color:#BE123C;"><b style="font-size:18pt;">${counts.sick||0}</b><br>🤒 ลาป่วย</div>
+      <div class="sum-box" style="background:#F5F3FF;color:#6D28D9;"><b style="font-size:18pt;">${counts.personal||0}</b><br>📋 ลากิจ</div>
+    </div>
+    <table><thead><tr><th style="width:40px;">ที่</th><th style="width:90px;">รหัส</th><th>ชื่อ-นามสกุล</th><th style="width:100px;">สถานะ</th></tr></thead>
+    <tbody>${rows.map(r=>{
+      const st = Object.entries(_attRecords).find(([id])=>id===r.รหัส)?.[1]||'present';
+      const cfg = ATT_STATUS[st]||ATT_STATUS.present;
+      return `<tr><td class="num">${r.เลขที่}</td><td class="num">${r.รหัส||''}</td><td>${r.ชื่อ}</td><td class="status" style="color:${statusColors[st]||'#000'};">${cfg.icon} ${cfg.label}</td></tr>`;
+    }).join('')}</tbody></table>
+  </body></html>`;
 
-  // Summary
-  doc.setFillColor(240,253,244);
-  doc.roundedRect(40, 68, 515, 28, 4, 4, 'F');
-  doc.setFontSize(10);
-  const sumText = `✅ มา: ${counts.present||0}  ❌ ขาด: ${counts.absent||0}  ⏰ สาย: ${counts.late||0}  🤒 ลาป่วย: ${counts.sick||0}  📋 ลากิจ: ${counts.personal||0}`;
-  doc.text(sumText, 48, 86);
-
-  // Status color mapping for text
-  const statusColor = { present:[21,128,61], absent:[185,28,28], late:[180,83,9], sick:[190,18,60], personal:[109,40,217] };
-
-  // Table
-  const tableY = 108;
-  const rowH = 22;
-  const cols = [40, 90, 110, 390, 455];
-  const headers = ['#', 'รหัส', 'ชื่อ-นามสกุล', 'ห้อง', 'สถานะ'];
-
-  // Header row
-  doc.setFillColor(30, 58, 138);
-  doc.rect(40, tableY, 515, rowH, 'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(9);
-  doc.setFont('helvetica','bold');
-  headers.forEach((h,i) => doc.text(h, cols[i]+4, tableY+15));
-
-  // Data rows
-  doc.setFont('helvetica','normal');
-  rows.forEach((r,i) => {
-    const y = tableY + rowH*(i+1);
-    if(y > 780) return; // page overflow guard
-    doc.setFillColor(i%2===0?248:255, i%2===0?250:255, i%2===0?252:255);
-    doc.rect(40, y, 515, rowH, 'F');
-    doc.setTextColor(0,0,0);
-    doc.text(String(r.เลขที่), cols[0]+4, y+15);
-    doc.text(String(r.รหัส||''), cols[1]+4, y+15);
-    doc.text((r.ชื่อ||'').substring(0,28), cols[2]+4, y+15);
-    doc.text(String(r.ห้อง||''), cols[3]+4, y+15);
-    const st = Object.keys(_attRecords).length ? (Object.entries(_attRecords).find(([id])=>id===r.รหัส)?.[1]||'present') : 'present';
-    const [rr,gg,bb] = statusColor[st] || [0,0,0];
-    doc.setTextColor(rr,gg,bb);
-    doc.setFont('helvetica','bold');
-    doc.text(r.ประเภท||'', cols[4]+4, y+15);
-    doc.setFont('helvetica','normal');
-    doc.setTextColor(0,0,0);
-  });
-
-  // Border
-  doc.setDrawColor(200,200,200);
-  doc.rect(40, tableY, 515, rowH*(rows.length+1));
-
-  doc.save(`เช็คชื่อ_${room}_${(document.getElementById('att-date')?.value||'').replace(/-/g,'')}.pdf`);
+  const win = window.open('','_blank','width=800,height=700');
+  if(!win) { toast('กรุณาอนุญาต Popup เพื่อ Export PDF','warn'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => setTimeout(() => { win.focus(); win.print(); }, 800);
   toast('✅ Export PDF เช็คชื่อสำเร็จ');
 }
 
@@ -5950,6 +5945,14 @@ function exportAttendancePDF() {
 // ╚══════════════════════════════════════════════════════╝
 
 let _featureFlags = {};
+let _globalBypassIds = []; // email/id ที่ bypass ทุก lock
+
+function isBypassAccount() {
+  if(!CURRENT_TEACHER || !_globalBypassIds.length) return false;
+  return _globalBypassIds.some(id =>
+    id && (id === CURRENT_TEACHER.email || id === CURRENT_TEACHER.id || id === CURRENT_TEACHER.username)
+  );
+}
 
 const FEATURE_DEFS = [
   { key:'attendance',   icon:'📋', label:'เช็คชื่อ',          plan:'Premium', desc:'หน้าเช็คชื่อนักเรียน + Export' },
@@ -6034,6 +6037,7 @@ function closeFeatureLockedPopup() {
 
 // requiresPremium: true = Premium-only feature, false = available to all
 function checkFeatureGate(key, label, requiresPremium = true) {
+  if(isBypassAccount()) return true; // bypass accounts ใช้ทุกฟีเจอร์ได้
   if(!isFeatureEnabled(key)) {
     if(requiresPremium && !isPremium()) {
       // Free user + admin locked → ให้ plan check จัดการ (แสดง upgrade modal ตามปกติ)
@@ -6075,4 +6079,140 @@ function showSASection(id, btn) {
   if(id === 'system')   { loadMaintenanceStatus(); checkOrphanData(); }
   if(id === 'api')      loadAnthropicKey();
   if(id === 'security') loadBypassIds?.();
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  ATTENDANCE STATISTICS (สถิติสะสม)                  ║
+// ╚══════════════════════════════════════════════════════╝
+
+async function loadAttendanceStats() {
+  const room = document.getElementById('att-room-sel')?.value || '';
+  if(!room || !SB || !CURRENT_TEACHER) return;
+
+  const statsEl = document.getElementById('att-stats-content');
+  if(statsEl) statsEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);">⏳ กำลังโหลดสถิติ...</div>';
+
+  // Load all attendance records for this room
+  const { data, error } = await SB.from('settings')
+    .select('key,value')
+    .like('key', `att_%_${room.replace(/[^a-zA-Z0-9ก-ฮ]/g,'_')}%_${CURRENT_TEACHER.id}`)
+    .order('key');
+
+  if(error || !data) {
+    if(statsEl) statsEl.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px;">โหลดไม่สำเร็จ</div>';
+    return;
+  }
+
+  if(!data.length) {
+    if(statsEl) statsEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px;">ยังไม่มีข้อมูลเช็คชื่อ</div>';
+    return;
+  }
+
+  // Aggregate per student
+  const students = DB.students.filter(s=>s.room===room).sort((a,b)=>a.name.localeCompare(b.name,'th'));
+  const agg = {}; // {sid: {present,absent,late,sick,personal,total,dates:[]}}
+  students.forEach(s => { agg[s.id] = {name:s.name, present:0,absent:0,late:0,sick:0,personal:0,total:0,dates:[]}; });
+
+  data.forEach(row => {
+    const recs = row.value?.records || [];
+    const date = row.value?.date || '';
+    recs.forEach(r => {
+      if(!agg[r.id]) agg[r.id] = {name:r.name||r.id, present:0,absent:0,late:0,sick:0,personal:0,total:0,dates:[]};
+      const a = agg[r.id];
+      const st = r.status || 'present';
+      if(a[st] !== undefined) a[st]++;
+      a.total++;
+      if(date && !a.dates.includes(date)) a.dates.push(date);
+    });
+  });
+
+  const totalDays = data.length;
+  const dateList = data.map(r=>r.value?.date).filter(Boolean).sort();
+  const firstDate = dateList[0] ? new Date(dateList[0]).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
+  const lastDate  = dateList[dateList.length-1] ? new Date(dateList[dateList.length-1]).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
+
+  if(!statsEl) return;
+  statsEl.innerHTML = `
+    <div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--blue-dark);">
+      📅 บันทึก <b>${totalDays} วัน</b> (${firstDate} – ${lastDate})
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:#1E3A5F;color:#fff;">
+            <th style="padding:7px 8px;text-align:left;border-radius:8px 0 0 0;">ชื่อ-นามสกุล</th>
+            <th style="padding:7px 6px;text-align:center;">✅มา</th>
+            <th style="padding:7px 6px;text-align:center;">❌ขาด</th>
+            <th style="padding:7px 6px;text-align:center;">⏰สาย</th>
+            <th style="padding:7px 6px;text-align:center;">🤒ลาป่วย</th>
+            <th style="padding:7px 6px;text-align:center;">📋ลากิจ</th>
+            <th style="padding:7px 6px;text-align:center;border-radius:0 8px 0 0;">% มา</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${students.map((s,i)=>{
+            const a = agg[s.id] || {};
+            const tot = a.total || 0;
+            const pct = tot > 0 ? Math.round((a.present||0)/tot*100) : 0;
+            const pctColor = pct>=80?'#15803D':pct>=60?'#B45309':'#B91C1C';
+            return `<tr style="background:${i%2===0?'#fff':'#F8FAFC'};">
+              <td style="padding:6px 8px;font-weight:600;color:var(--text);border-bottom:1px solid #F1F5F9;">${s.name}</td>
+              <td style="text-align:center;color:#15803D;font-weight:700;border-bottom:1px solid #F1F5F9;">${a.present||0}</td>
+              <td style="text-align:center;color:#B91C1C;font-weight:700;border-bottom:1px solid #F1F5F9;">${a.absent||0}</td>
+              <td style="text-align:center;color:#B45309;border-bottom:1px solid #F1F5F9;">${a.late||0}</td>
+              <td style="text-align:center;color:#BE123C;border-bottom:1px solid #F1F5F9;">${a.sick||0}</td>
+              <td style="text-align:center;color:#6D28D9;border-bottom:1px solid #F1F5F9;">${a.personal||0}</td>
+              <td style="text-align:center;font-weight:700;color:${pctColor};border-bottom:1px solid #F1F5F9;">${pct}%</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+async function exportAttendanceStatsPDF() {
+  if(!isPremium()) { showUpgradeModal('Export PDF เฉพาะ Premium 🔒'); return; }
+  const room = document.getElementById('att-room-sel')?.value || '';
+  const statsEl = document.getElementById('att-stats-content');
+  if(!statsEl || !room) { toast('กรุณาโหลดสถิติก่อน', 'warn'); return; }
+
+  const html = `<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <title>สถิติเช็คชื่อ ${room}</title>
+    <style>
+      *{font-family:Sarabun,sans-serif;box-sizing:border-box;margin:0;padding:0;}
+      body{font-size:11pt;color:#1E293B;padding:12mm 15mm;}
+      h1{font-size:16pt;font-weight:700;color:#2563EB;margin-bottom:8px;}
+      ${statsEl.querySelector('table')?.outerHTML ? '' : ''}
+    </style>
+  </head><body>
+    <h1>📊 สถิติเช็คชื่อ — ${room}</h1>
+    <div style="font-size:9pt;color:#64748B;margin-bottom:12px;">พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}</div>
+    ${statsEl.innerHTML}
+  </body></html>`;
+
+  const win = window.open('','_blank','width=800,height=700');
+  if(!win) { toast('กรุณาอนุญาต Popup','warn'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => setTimeout(() => { win.focus(); win.print(); }, 800);
+}
+
+function switchAttTab(tab) {
+  const histPanel = document.getElementById('att-panel-history');
+  const statsPanel = document.getElementById('att-panel-stats');
+  const histBtn = document.getElementById('att-tab-history');
+  const statsBtn = document.getElementById('att-tab-stats');
+  if(tab === 'history') {
+    if(histPanel) histPanel.style.display = 'block';
+    if(statsPanel) statsPanel.style.display = 'none';
+    if(histBtn) { histBtn.style.background = 'var(--blue-light)'; histBtn.style.color = 'var(--blue-dark)'; histBtn.style.borderBottom = '2px solid var(--blue)'; }
+    if(statsBtn) { statsBtn.style.background = '#fff'; statsBtn.style.color = 'var(--text2)'; statsBtn.style.borderBottom = '2px solid transparent'; }
+  } else {
+    if(histPanel) histPanel.style.display = 'none';
+    if(statsPanel) statsPanel.style.display = 'block';
+    if(statsBtn) { statsBtn.style.background = 'var(--blue-light)'; statsBtn.style.color = 'var(--blue-dark)'; statsBtn.style.borderBottom = '2px solid var(--blue)'; }
+    if(histBtn) { histBtn.style.background = '#fff'; histBtn.style.color = 'var(--text2)'; histBtn.style.borderBottom = '2px solid transparent'; }
+  }
 }
