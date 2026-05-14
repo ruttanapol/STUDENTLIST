@@ -1944,7 +1944,7 @@ function updateConflictWarn(){
 }
 
 async function recordScan(sid, scoreOverride){
-  if(!checkFeatureGate('barcode_scan','สแกนบาร์โค้ด')) return;
+  if(!checkFeatureGate('barcode_scan','สแกนบาร์โค้ด', false)) return;
   sid=sid.trim();
   const hwNum=parseInt(document.getElementById('hw-num-input').value)||1;
   const hwTitle=document.getElementById('hw-title-input').value.trim()||'ชิ้นที่ '+hwNum;
@@ -5230,7 +5230,7 @@ let _renewalSlipFile = null;
 let _renewalPayInfo = null;
 
 async function openRenewalFlow() {
-  if(!checkFeatureGate('renewal','ระบบชำระเงิน')) return;
+  if(!checkFeatureGate('renewal','ระบบชำระเงิน', false)) return;
   const modal = document.getElementById('renewal-modal');
   if(!modal) return;
   // Adjust title based on context
@@ -6019,9 +6019,29 @@ function isFeatureEnabled(key) {
   return _featureFlags[key] !== false;
 }
 
-function checkFeatureGate(key, label) {
+function showFeatureLockedPopup(label) {
+  const overlay = document.getElementById('feature-locked-overlay');
+  const nameEl = document.getElementById('feature-locked-name');
+  if(!overlay) return;
+  if(nameEl) nameEl.textContent = '"' + label + '"';
+  overlay.style.display = 'flex';
+}
+
+function closeFeatureLockedPopup() {
+  const overlay = document.getElementById('feature-locked-overlay');
+  if(overlay) overlay.style.display = 'none';
+}
+
+// requiresPremium: true = Premium-only feature, false = available to all
+function checkFeatureGate(key, label, requiresPremium = true) {
   if(!isFeatureEnabled(key)) {
-    toast(`ฟังก์ชัน "${label}" ถูกปิดโดยแอดมินระบบ`, 'err');
+    if(requiresPremium && !isPremium()) {
+      // Free user + admin locked → ให้ plan check จัดการ (แสดง upgrade modal ตามปกติ)
+      return true;
+    }
+    // Premium user + admin locked → ปิดปรับปรุงชั่วคราว
+    // หรือ feature ทุกคน + admin locked → ปิดปรับปรุงชั่วคราว
+    showFeatureLockedPopup(label);
     return false;
   }
   return true;
