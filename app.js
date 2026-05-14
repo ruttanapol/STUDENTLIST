@@ -6085,6 +6085,31 @@ function showSASection(id, btn) {
 // ║  ATTENDANCE STATISTICS (สถิติสะสม)                  ║
 // ╚══════════════════════════════════════════════════════╝
 
+// สัญลักษณ์สถานะในตาราง
+const ATT_SYMBOL = {
+  present: '',          // มา = ช่องว่าง
+  absent:  'ข',         // ขาด
+  late:    'ส',         // สาย
+  sick:    'ป',         // ลาป่วย
+  personal:'ก',         // ลากิจ
+};
+const ATT_CELL_COLOR = {
+  present: 'transparent',
+  absent:  '#FEE2E2',
+  late:    '#FEF3C7',
+  sick:    '#FFF1F2',
+  personal:'#F5F3FF',
+};
+const ATT_TEXT_COLOR = {
+  present: '#000',
+  absent:  '#B91C1C',
+  late:    '#B45309',
+  sick:    '#BE123C',
+  personal:'#6D28D9',
+};
+
+let _attStatsData = null; // cache for export
+
 async function loadAttendanceStats() {
   const room = document.getElementById('att-room-sel')?.value || '';
   if(!room || !SB || !CURRENT_TEACHER) return;
@@ -6092,111 +6117,165 @@ async function loadAttendanceStats() {
   const statsEl = document.getElementById('att-stats-content');
   if(statsEl) statsEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);">⏳ กำลังโหลดสถิติ...</div>';
 
-  // Load all attendance records for this room
+  const roomKey = room.replace(/[^a-zA-Z0-9ก-ฮ]/g,'_');
   const { data, error } = await SB.from('settings')
     .select('key,value')
-    .like('key', `att_%_${room.replace(/[^a-zA-Z0-9ก-ฮ]/g,'_')}%_${CURRENT_TEACHER.id}`)
+    .like('key', `att_%_${roomKey}%_${CURRENT_TEACHER.id}`)
     .order('key');
 
-  if(error || !data) {
-    if(statsEl) statsEl.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px;">โหลดไม่สำเร็จ</div>';
+  if(error || !data?.length) {
+    if(statsEl) statsEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px;">${error?'โหลดไม่สำเร็จ':'ยังไม่มีข้อมูลเช็คชื่อ'}</div>`;
     return;
   }
 
-  if(!data.length) {
-    if(statsEl) statsEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px;">ยังไม่มีข้อมูลเช็คชื่อ</div>';
-    return;
-  }
-
-  // Aggregate per student
   const students = DB.students.filter(s=>s.room===room).sort((a,b)=>a.name.localeCompare(b.name,'th'));
-  const agg = {}; // {sid: {present,absent,late,sick,personal,total,dates:[]}}
-  students.forEach(s => { agg[s.id] = {name:s.name, present:0,absent:0,late:0,sick:0,personal:0,total:0,dates:[]}; });
-
+  // Build date list (sorted)
+  const dates = data.map(r=>r.value?.date).filter(Boolean).sort();
+  // Build lookup: date → {sid: status}
+  const dayMap = {};
   data.forEach(row => {
-    const recs = row.value?.records || [];
-    const date = row.value?.date || '';
-    recs.forEach(r => {
-      if(!agg[r.id]) agg[r.id] = {name:r.name||r.id, present:0,absent:0,late:0,sick:0,personal:0,total:0,dates:[]};
-      const a = agg[r.id];
-      const st = r.status || 'present';
-      if(a[st] !== undefined) a[st]++;
-      a.total++;
-      if(date && !a.dates.includes(date)) a.dates.push(date);
+    const d = row.value?.date;
+    if(!d) return;
+    dayMap[d] = {};
+    (row.value?.records||[]).forEach(r => { dayMap[d][r.id] = r.status || 'present'; });
+  });
+
+  // Cache for export
+  _attStatsData = { room, students, dates, dayMap };
+
+  if(!statsEl) return;
+  statsEl.innerHTML = _buildAttStatsTableHTML(room, students, dates, dayMap, false);
+}
+
+function _buildAttStatsTableHTML(room, students, dates, dayMap, forPrint = false) {
+  // Group dates by month
+  const monthGroups = {};
+  dates.forEach(d => {
+    const dt = new Date(d);
+    const mKey = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0');
+    const mLabel = dt.toLocaleDateString('th-TH',{month:'short', year:'2-digit'});
+    if(!monthGroups[mKey]) monthGroups[mKey] = {label:mLabel, dates:[]};
+    monthGroups[mKey].dates.push(d);
+  });
+
+  const cs = 'border:1px solid #999;'; // cell style base
+  const thS = `${cs}padding:3px 4px;text-align:center;background:#f0f0f0;font-size:11px;font-weight:700;`;
+  const tdS = `${cs}padding:2px 3px;text-align:center;font-size:11px;`;
+
+  // Count totals per student
+  const totals = {};
+  students.forEach(s => { totals[s.id] = {present:0,absent:0,late:0,sick:0,personal:0}; });
+  dates.forEach(d => {
+    students.forEach(s => {
+      const st = dayMap[d]?.[s.id] ?? 'present';
+      if(totals[s.id][st] !== undefined) totals[s.id][st]++;
     });
   });
 
-  const totalDays = data.length;
-  const dateList = data.map(r=>r.value?.date).filter(Boolean).sort();
-  const firstDate = dateList[0] ? new Date(dateList[0]).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
-  const lastDate  = dateList[dateList.length-1] ? new Date(dateList[dateList.length-1]).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
+  // Build header rows
+  let monthHeader = `<th rowspan="4" style="${thS}min-width:30px;">เลขที่</th>
+    <th rowspan="4" style="${thS}min-width:60px;">เลข<br>ประจำตัว</th>
+    <th rowspan="4" style="${thS}min-width:120px;">ชื่อ - สกุล</th>`;
+  let weekHeader = ``;
+  let dayHeader = ``;
+  let symbolHeader = ``;
 
-  if(!statsEl) return;
-  statsEl.innerHTML = `
-    <div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--blue-dark);">
-      📅 บันทึก <b>${totalDays} วัน</b> (${firstDate} – ${lastDate})
+  Object.values(monthGroups).forEach(mg => {
+    monthHeader += `<th colspan="${mg.dates.length}" style="${thS}background:#dbeafe;">${mg.label}</th>`;
+    // Week numbers
+    mg.dates.forEach(d => {
+      const dt = new Date(d);
+      const weekOfMonth = Math.ceil(dt.getDate()/7);
+      weekHeader += `<th style="${thS}min-width:22px;">${weekOfMonth}</th>`;
+      dayHeader  += `<th style="${thS}">${dt.getDate()}</th>`;
+      symbolHeader += `<th style="${thS}font-size:9px;">${['อา','จ','อ','พ','พฤ','ศ','ส'][dt.getDay()]}</th>`;
+    });
+  });
+
+  // Summary header
+  const sumH = `<th rowspan="4" style="${thS}min-width:30px;background:#d1fae5;">ม</th>
+    <th rowspan="4" style="${thS}min-width:30px;background:#fef3c7;">ส</th>
+    <th rowspan="4" style="${thS}min-width:30px;background:#fff1f2;">ป</th>
+    <th rowspan="4" style="${thS}min-width:30px;background:#f5f3ff;">ก</th>
+    <th rowspan="4" style="${thS}min-width:30px;background:#fee2e2;">ข</th>`;
+
+  // Build data rows
+  const dataRows = students.map((s, idx) => {
+    const tot = totals[s.id];
+    let cells = '';
+    dates.forEach(d => {
+      const st = dayMap[d]?.[s.id] ?? 'present';
+      const sym = ATT_SYMBOL[st] || '';
+      const bg = ATT_CELL_COLOR[st] || 'transparent';
+      const tc = ATT_TEXT_COLOR[st] || '#000';
+      cells += `<td style="${tdS}background:${bg};color:${tc};font-weight:700;">${sym}</td>`;
+    });
+    return `<tr>
+      <td style="${tdS}">${idx+1}</td>
+      <td style="${tdS}">${s.id}</td>
+      <td style="${cs}padding:2px 6px;font-size:11px;text-align:left;">${s.name}</td>
+      ${cells}
+      <td style="${tdS}background:#d1fae5;font-weight:700;color:#15803D;">${tot.present}</td>
+      <td style="${tdS}background:#fef3c7;color:#B45309;">${tot.late}</td>
+      <td style="${tdS}background:#fff1f2;color:#BE123C;">${tot.sick}</td>
+      <td style="${tdS}background:#f5f3ff;color:#6D28D9;">${tot.personal}</td>
+      <td style="${tdS}background:#fee2e2;font-weight:700;color:#B91C1C;">${tot.absent}</td>
+    </tr>`;
+  }).join('');
+
+  const tableHTML = `<table style="border-collapse:collapse;font-family:Sarabun,sans-serif;${forPrint?'width:100%;':''}">
+    <thead>
+      <tr>${monthHeader}${sumH}</tr>
+      <tr>${weekHeader}</tr>
+      <tr>${dayHeader}</tr>
+      <tr>${symbolHeader}</tr>
+    </thead>
+    <tbody>${dataRows}</tbody>
+  </table>`;
+
+  return forPrint ? tableHTML : `
+    <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">
+      📅 <b>${dates.length} วัน</b> · ห้อง ${room}
+      &nbsp;|&nbsp; ม=มา ส=สาย ป=ลาป่วย ก=ลากิจ ข=ขาด
     </div>
-    <div style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead>
-          <tr style="background:#1E3A5F;color:#fff;">
-            <th style="padding:7px 8px;text-align:left;border-radius:8px 0 0 0;">ชื่อ-นามสกุล</th>
-            <th style="padding:7px 6px;text-align:center;">✅มา</th>
-            <th style="padding:7px 6px;text-align:center;">❌ขาด</th>
-            <th style="padding:7px 6px;text-align:center;">⏰สาย</th>
-            <th style="padding:7px 6px;text-align:center;">🤒ลาป่วย</th>
-            <th style="padding:7px 6px;text-align:center;">📋ลากิจ</th>
-            <th style="padding:7px 6px;text-align:center;border-radius:0 8px 0 0;">% มา</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${students.map((s,i)=>{
-            const a = agg[s.id] || {};
-            const tot = a.total || 0;
-            const pct = tot > 0 ? Math.round((a.present||0)/tot*100) : 0;
-            const pctColor = pct>=80?'#15803D':pct>=60?'#B45309':'#B91C1C';
-            return `<tr style="background:${i%2===0?'#fff':'#F8FAFC'};">
-              <td style="padding:6px 8px;font-weight:600;color:var(--text);border-bottom:1px solid #F1F5F9;">${s.name}</td>
-              <td style="text-align:center;color:#15803D;font-weight:700;border-bottom:1px solid #F1F5F9;">${a.present||0}</td>
-              <td style="text-align:center;color:#B91C1C;font-weight:700;border-bottom:1px solid #F1F5F9;">${a.absent||0}</td>
-              <td style="text-align:center;color:#B45309;border-bottom:1px solid #F1F5F9;">${a.late||0}</td>
-              <td style="text-align:center;color:#BE123C;border-bottom:1px solid #F1F5F9;">${a.sick||0}</td>
-              <td style="text-align:center;color:#6D28D9;border-bottom:1px solid #F1F5F9;">${a.personal||0}</td>
-              <td style="text-align:center;font-weight:700;color:${pctColor};border-bottom:1px solid #F1F5F9;">${pct}%</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
+    <div style="overflow-x:auto;">${tableHTML}</div>`;
 }
 
 async function exportAttendanceStatsPDF() {
   if(!isPremium()) { showUpgradeModal('Export PDF เฉพาะ Premium 🔒'); return; }
-  const room = document.getElementById('att-room-sel')?.value || '';
-  const statsEl = document.getElementById('att-stats-content');
-  if(!statsEl || !room) { toast('กรุณาโหลดสถิติก่อน', 'warn'); return; }
+  if(!_attStatsData) { toast('กรุณากด "โหลดสถิติ" ก่อน', 'warn'); return; }
+  const { room, students, dates, dayMap } = _attStatsData;
+  const tableHTML = _buildAttStatsTableHTML(room, students, dates, dayMap, true);
+  const dateStr = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
 
   const html = `<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
-    <title>สถิติเช็คชื่อ ${room}</title>
+    <title>สมุดเช็คชื่อ ${room}</title>
     <style>
       *{font-family:Sarabun,sans-serif;box-sizing:border-box;margin:0;padding:0;}
-      body{font-size:11pt;color:#1E293B;padding:12mm 15mm;}
-      h1{font-size:16pt;font-weight:700;color:#2563EB;margin-bottom:8px;}
-      ${statsEl.querySelector('table')?.outerHTML ? '' : ''}
+      body{font-size:10pt;color:#1E293B;padding:8mm 10mm;}
+      h1{font-size:14pt;font-weight:700;margin-bottom:4px;}
+      .meta{font-size:9pt;color:#64748B;margin-bottom:10px;}
+      table{border-collapse:collapse;width:100%;}
+      th,td{border:1px solid #999;padding:2px 3px;text-align:center;}
+      @media print{
+        @page{size:A3 landscape;margin:8mm;}
+        body{padding:0;}
+      }
     </style>
   </head><body>
-    <h1>📊 สถิติเช็คชื่อ — ${room}</h1>
-    <div style="font-size:9pt;color:#64748B;margin-bottom:12px;">พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}</div>
-    ${statsEl.innerHTML}
+    <h1>สมุดเช็คชื่อ — ห้อง ${room}</h1>
+    <div class="meta">พิมพ์วันที่ ${dateStr} &nbsp;|&nbsp; ม=มา &nbsp;ส=สาย &nbsp;ป=ลาป่วย &nbsp;ก=ลากิจ &nbsp;ข=ขาด</div>
+    ${tableHTML}
+    <script>window.onload=()=>setTimeout(()=>{window.print();},600);</script>
   </body></html>`;
 
-  const win = window.open('','_blank','width=800,height=700');
+  const win = window.open('','_blank');
   if(!win) { toast('กรุณาอนุญาต Popup','warn'); return; }
   win.document.write(html);
   win.document.close();
-  win.onload = () => setTimeout(() => { win.focus(); win.print(); }, 800);
+  toast('✅ เปิดหน้า Export PDF สมุดเช็คชื่อ');
 }
 
 function switchAttTab(tab) {
