@@ -250,6 +250,7 @@ async function connectSupabase(silent = false) {
     setTimeout(()=>loadTeacherListForStudent(), 200);
     setTimeout(()=>loadContactLinksForLogin(), 400);setTimeout(()=>checkMaintenanceMode(), 600);
     setTimeout(()=>checkAnnouncement(), 800);
+    setTimeout(()=>loadFeatureFlags(), 900);
     setTimeout(() => {
       document.getElementById('setup-overlay').style.display = 'none';
     }, silent ? 0 : 600);
@@ -1248,6 +1249,7 @@ async function loadSuperAdminPanel(){
     loadContactSettings();
     loadMaintenanceStatus();
     loadAnnouncementSettings();
+    loadFeatureFlags(true);
   }catch(e){
     const msg = e.message||String(e);
     const isNoTable = msg.includes('does not exist')||msg.includes('relation');
@@ -1869,10 +1871,10 @@ async function refreshStudentView(){
   renderStudentView(_currentStuDB.student, _currentStuDB);
 }
 function showAP(id,btn){
-  // Premium gate for attendance
-  if(id==='attend' && !isPremium()) {
-    showUpgradeModal('🔒 ฟีเจอร์เช็คชื่อสำหรับ Premium เท่านั้น');
-    return;
+  // Feature flag gate
+  if(id==='attend') {
+    if(!checkFeatureGate('attendance','เช็คชื่อ')) return;
+    if(!isPremium()) { showUpgradeModal('🔒 ฟีเจอร์เช็คชื่อสำหรับ Premium เท่านั้น'); return; }
   }
   // sync sidebar nav items
   ['scan','dash','manage','attend'].forEach(function(p){
@@ -1942,6 +1944,7 @@ function updateConflictWarn(){
 }
 
 async function recordScan(sid, scoreOverride){
+  if(!checkFeatureGate('barcode_scan','สแกนบาร์โค้ด')) return;
   sid=sid.trim();
   const hwNum=parseInt(document.getElementById('hw-num-input').value)||1;
   const hwTitle=document.getElementById('hw-title-input').value.trim()||'ชิ้นที่ '+hwNum;
@@ -2503,6 +2506,8 @@ async function clearAllStudents(){
 // ===== EXPORT =====
 let exportType='pdf',exportRoomSel=new Set(),exportHWSel=new Set();
 function openExportModal(type){
+  if(type==='excel' && !checkFeatureGate('export_excel','Export Excel')) return;
+  if(type==='pdf'   && !checkFeatureGate('export_pdf','Export PDF'))   return;
   exportType=type;
   document.getElementById('export-modal-title').textContent=type==='pdf'?'📄 Export PDF':'📊 Export Excel';
   document.getElementById('export-go-label').textContent=type==='pdf'?'ดาวน์โหลด PDF':'ดาวน์โหลด Excel';
@@ -4466,6 +4471,7 @@ function isGradeAllowed() {
 }
 
 function openGradeTab() {
+  if(!checkFeatureGate('grade','จัดการเกรด')) return;
   const gate = document.getElementById('grade-premium-gate');
   const content = document.getElementById('grade-content');
 
@@ -5009,6 +5015,7 @@ async function loadAnthropicKey() {
 }
 
 function openAIReport() {
+  if(!checkFeatureGate('ai_report','AI สรุปรายงาน')) return;
   if(!isPremium()) {
     showUpgradeModal('ฟีเจอร์ AI สรุปรายงาน สำหรับ Premium เท่านั้น');
     return;
@@ -5223,6 +5230,7 @@ let _renewalSlipFile = null;
 let _renewalPayInfo = null;
 
 async function openRenewalFlow() {
+  if(!checkFeatureGate('renewal','ระบบชำระเงิน')) return;
   const modal = document.getElementById('renewal-modal');
   if(!modal) return;
   // Adjust title based on context
@@ -5845,6 +5853,7 @@ function _buildAttExportRows() {
 }
 
 function exportAttendanceExcel() {
+  if(!checkFeatureGate('export_excel','Export Excel')) return;
   if(!isPremium()) { showUpgradeModal('Export Excel เฉพาะ Premium 🔒'); return; }
   if(typeof XLSX === 'undefined') { toast('กำลังโหลด Excel library...','warn'); return; }
   const { room, dateDisplay, rows, counts } = _buildAttExportRows();
@@ -5867,6 +5876,7 @@ function exportAttendanceExcel() {
 }
 
 function exportAttendancePDF() {
+  if(!checkFeatureGate('export_pdf','Export PDF')) return;
   if(!isPremium()) { showUpgradeModal('Export PDF เฉพาะ Premium 🔒'); return; }
   if(typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') { toast('กำลังโหลด PDF library...','warn'); return; }
   const { room, dateDisplay, rows, counts } = _buildAttExportRows();
@@ -5932,4 +5942,86 @@ function exportAttendancePDF() {
 
   doc.save(`เช็คชื่อ_${room}_${(document.getElementById('att-date')?.value||'').replace(/-/g,'')}.pdf`);
   toast('✅ Export PDF เช็คชื่อสำเร็จ');
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  FEATURE FLAG SYSTEM                                ║
+// ╚══════════════════════════════════════════════════════╝
+
+let _featureFlags = {};
+
+const FEATURE_DEFS = [
+  { key:'attendance',   icon:'📋', label:'เช็คชื่อ',          plan:'Premium', desc:'หน้าเช็คชื่อนักเรียน + Export' },
+  { key:'ai_report',    icon:'🤖', label:'AI สรุปรายงาน',     plan:'Premium', desc:'วิเคราะห์ข้อมูลด้วย AI' },
+  { key:'export_excel', icon:'📊', label:'Export Excel',       plan:'Premium', desc:'ดาวน์โหลดรายงาน Excel' },
+  { key:'export_pdf',   icon:'📄', label:'Export PDF',         plan:'Premium', desc:'ดาวน์โหลดรายงาน PDF' },
+  { key:'grade',        icon:'🎓', label:'จัดการเกรด',         plan:'Premium', desc:'คำนวณและ Export เกรด' },
+  { key:'renewal',      icon:'💳', label:'ระบบชำระเงิน',      plan:'ทุกคน',   desc:'ต่ออายุ Premium ด้วยสลิป' },
+  { key:'ai_slip',      icon:'🔍', label:'AI อ่านสลิป',        plan:'ทุกคน',   desc:'ตรวจสอบสลิปอัตโนมัติ' },
+  { key:'barcode_scan', icon:'📷', label:'สแกนบาร์โค้ด',      plan:'ทุกคน',   desc:'สแกนบาร์โค้ดบันทึกงาน' },
+];
+
+async function loadFeatureFlags(renderList = false) {
+  if(!SB) return;
+  try {
+    const { data } = await SB.from('settings').select('value').eq('key','feature_flags').maybeSingle();
+    _featureFlags = data?.value || {};
+  } catch(e) { _featureFlags = {}; }
+
+  if(renderList) renderFeatureFlagsList();
+}
+
+function renderFeatureFlagsList() {
+  const el = document.getElementById('feature-flags-list');
+  if(!el) return;
+
+  el.innerHTML = FEATURE_DEFS.map(f => {
+    const enabled = _featureFlags[f.key] !== false; // default ON
+    const planBadge = f.plan === 'Premium'
+      ? `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;background:linear-gradient(135deg,#EDE9FE,#DDD6FE);color:#6D28D9;border:1px solid #C4B5FD;">💎 ${f.plan}</span>`
+      : `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;background:#F1F5F9;color:#64748B;border:1px solid #E2E8F0;">🆓 ${f.plan}</span>`;
+
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 10px;background:#fff;border-radius:10px;margin-bottom:6px;border:1.5px solid ${enabled?'#C7D2FE':'#FCA5A5'};">
+      <span style="font-size:18px;flex-shrink:0;">${f.icon}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:${enabled?'var(--text)':'#94A3B8'};">${f.label}</div>
+        <div style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          ${planBadge} <span>${f.desc}</span>
+        </div>
+      </div>
+      <button onclick="toggleFeatureFlag('${f.key}',${!enabled})"
+        style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;white-space:nowrap;font-family:Sarabun,sans-serif;
+        background:${enabled?'#DCFCE7':'#FEE2E2'};color:${enabled?'#15803D':'#B91C1C'};">
+        ${enabled ? '🔓 เปิด' : '🔒 ปิด'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+async function toggleFeatureFlag(featureKey, enabledState) {
+  if(!SB) return;
+  _featureFlags[featureKey] = enabledState;
+
+  const { data: existing } = await SB.from('settings').select('key').eq('key','feature_flags').maybeSingle();
+  const { error } = existing
+    ? await SB.from('settings').update({ value: _featureFlags }).eq('key','feature_flags')
+    : await SB.from('settings').insert({ key: 'feature_flags', value: _featureFlags });
+
+  if(error) { toast2('บันทึกไม่สำเร็จ: ' + error.message, 'err'); return; }
+
+  renderFeatureFlagsList();
+  const def = FEATURE_DEFS.find(f=>f.key===featureKey);
+  toast2(`${enabledState ? '🔓 เปิด' : '🔒 ปิด'} ${def?.label || featureKey} แล้ว`);
+}
+
+function isFeatureEnabled(key) {
+  return _featureFlags[key] !== false;
+}
+
+function checkFeatureGate(key, label) {
+  if(!isFeatureEnabled(key)) {
+    toast(`ฟังก์ชัน "${label}" ถูกปิดโดยแอดมินระบบ`, 'err');
+    return false;
+  }
+  return true;
 }
