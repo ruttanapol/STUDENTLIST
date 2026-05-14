@@ -861,6 +861,12 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
         <div class="card-title" style="margin:0;">📋 บันทึกวันนี้</div>
         <div id="scan-count" style="font-size:13px;color:var(--text2);font-weight:600;">0 รายการ</div>
       </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text2);">ประวัติการสแกน</div>
+        <button onclick="openScanHistory()" style="padding:5px 12px;font-size:12px;font-weight:700;border-radius:20px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;">
+          📋 แก้ไขย้อนหลัง
+        </button>
+      </div>
       <div class="log-wrap" id="scan-log">
         <div class="empty">ยังไม่มีการสแกน</div>
       </div>
@@ -1945,6 +1951,55 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   </div>
 </div>
 
+
+<!-- ===== SCAN HISTORY MODAL ===== -->
+<div id="scan-history-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);align-items:flex-end;justify-content:center;">
+  <div style="background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 -8px 32px rgba(0,0,0,0.2);">
+    <!-- Header -->
+    <div style="padding:20px 20px 12px;border-bottom:1.5px solid var(--border);flex-shrink:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div>
+          <div style="font-size:18px;font-weight:800;color:var(--text);">📋 ประวัติการสแกน</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px;" id="sh-subtitle">โหลดข้อมูล...</div>
+        </div>
+        <button onclick="closeScanHistory()" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:18px;color:var(--text2);">✕</button>
+      </div>
+      <!-- Filters -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <select id="sh-hw-filter" onchange="renderScanHistory()" style="flex:1;min-width:120px;font-size:13px;padding:8px 10px;">
+          <option value="">ทุกชิ้นงาน</option>
+        </select>
+        <select id="sh-room-filter" onchange="renderScanHistory()" style="flex:1;min-width:100px;font-size:13px;padding:8px 10px;">
+          <option value="">ทุกห้อง</option>
+        </select>
+        <input type="text" id="sh-search" placeholder="🔍 ค้นชื่อ/รหัส..." oninput="renderScanHistory()"
+          style="flex:1;min-width:120px;font-size:13px;padding:8px 10px;">
+      </div>
+    </div>
+    <!-- List -->
+    <div id="sh-list" style="flex:1;overflow-y:auto;padding:12px 16px;-webkit-overflow-scrolling:touch;"></div>
+  </div>
+</div>
+
+<!-- Edit Score Modal -->
+<div id="edit-score-modal" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:20px;padding:24px;max-width:320px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+    <div style="font-size:17px;font-weight:800;color:var(--text);margin-bottom:4px;">✏️ แก้ไขคะแนน</div>
+    <div id="esm-info" style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6;"></div>
+    <label class="lbl">คะแนนใหม่</label>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <button onclick="adjustEditScore(-1)" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border);background:#fff;font-size:20px;font-weight:700;cursor:pointer;color:var(--red);">−</button>
+      <input type="number" id="esm-score" min="0" style="flex:1;text-align:center;font-size:24px;font-weight:800;color:var(--purple);padding:8px;border-radius:10px;">
+      <button onclick="adjustEditScore(1)" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border);background:#fff;font-size:20px;font-weight:700;cursor:pointer;color:var(--green-dark);">+</button>
+    </div>
+    <div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:16px;" id="esm-max-info"></div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="closeEditScoreModal()" style="flex:1;padding:12px;font-size:14px;font-weight:700;border-radius:10px;border:1.5px solid var(--border);background:#fff;cursor:pointer;color:var(--text2);">ยกเลิก</button>
+      <button onclick="saveEditScore()" style="flex:1;padding:12px;font-size:14px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;cursor:pointer;">💾 บันทึก</button>
+    </div>
+    <button onclick="deleteSubmission()" style="width:100%;padding:10px;font-size:13px;font-weight:700;border-radius:10px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;margin-top:8px;">🗑️ ลบการสแกนนี้</button>
+  </div>
+</div>
 <!-- ===== ACTION POPUP ===== -->
 <div id="action-popup" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.5);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
   <div style="background:#fff;border-radius:20px;padding:28px 24px;max-width:300px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">

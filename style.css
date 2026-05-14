@@ -579,3 +579,9 @@ a[download]:active { transform:scale(0.96); }
   cursor:pointer;transition:opacity .15s;
 }
 .plan-upgrade-banner:active{opacity:.85;}
+/* ===== SCAN HISTORY MODAL ===== */
+#scan-history-modal, #edit-score-modal {
+  animation: fadeIn .2s ease;
+}
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+#sh-list .log-item { border-bottom: 1px solid var(--border); }

@@ -4927,6 +4927,214 @@ async function exportSecGradeExcel() {
 // ╔══════════════════════════════════════════════════════╗
 // ║  SECTION L: APP INITIALIZATION                     ║
 // ╚══════════════════════════════════════════════════════╝
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  SCAN HISTORY & EDIT SCORE                         ║
+// ╚══════════════════════════════════════════════════════╝
+
+let _editingSubmission = null; // { sid, hwNum, currentScore, maxScore, stuName }
+
+// ===== OPEN / CLOSE =====
+async function openScanHistory() {
+  const modal = document.getElementById('scan-history-modal');
+  if(!modal) return;
+  modal.style.display = 'flex';
+
+  // Populate HW filter
+  const hwFilter = document.getElementById('sh-hw-filter');
+  if(hwFilter) {
+    hwFilter.innerHTML = '<option value="">ทุกชิ้นงาน</option>' +
+      DB.homeworks.map(h => `<option value="${h.num}">ชิ้นที่ ${h.num}: ${h.title}</option>`).join('');
+  }
+
+  // Populate room filter
+  const roomFilter = document.getElementById('sh-room-filter');
+  if(roomFilter) {
+    roomFilter.innerHTML = '<option value="">ทุกห้อง</option>' +
+      DB.rooms.map(r => `<option>${r}</option>`).join('');
+  }
+
+  // โหลดข้อมูลล่าสุดจาก Supabase
+  if(USE_SUPABASE && SB && CURRENT_TEACHER) {
+    const subtitle = document.getElementById('sh-subtitle');
+    if(subtitle) subtitle.textContent = 'กำลังโหลด...';
+    try {
+      await reloadSubmissions();
+    } catch(e) {}
+  }
+
+  renderScanHistory();
+}
+
+function closeScanHistory() {
+  const modal = document.getElementById('scan-history-modal');
+  if(modal) modal.style.display = 'none';
+}
+
+// ===== RENDER LIST =====
+function renderScanHistory() {
+  const el = document.getElementById('sh-list');
+  if(!el) return;
+
+  const hwFilter = document.getElementById('sh-hw-filter')?.value || '';
+  const roomFilter = document.getElementById('sh-room-filter')?.value || '';
+  const q = (document.getElementById('sh-search')?.value || '').toLowerCase();
+
+  // รวบรวม submissions ทั้งหมด
+  const subs = Object.entries(DB.submissions).map(([key, sub]) => {
+    const [sid, hwNum] = key.split('_');
+    const stu = DB.students.find(s => s.id === sid);
+    const hw = DB.homeworks.find(h => h.num === parseInt(hwNum));
+    return { key, sid, hwNum: parseInt(hwNum), stu, hw, sub };
+  }).filter(item => {
+    if(!item.stu) return false;
+    if(hwFilter && item.hwNum !== parseInt(hwFilter)) return false;
+    if(roomFilter && item.stu.room !== roomFilter) return false;
+    if(q && !item.stu.name.toLowerCase().includes(q) && !item.sid.includes(q)) return false;
+    return true;
+  }).sort((a, b) => {
+    // เรียงตาม submitted_at ล่าสุดก่อน
+    const ta = a.sub.submitted_at || a.sub.ts || '';
+    const tb = b.sub.submitted_at || b.sub.ts || '';
+    return tb.localeCompare(ta);
+  });
+
+  // อัพเดต subtitle
+  const subtitle = document.getElementById('sh-subtitle');
+  if(subtitle) subtitle.textContent = subs.length + ' รายการ';
+
+  if(!subs.length) {
+    el.innerHTML = '<div class="empty" style="padding:32px 0;">ไม่พบรายการ</div>';
+    return;
+  }
+
+  el.innerHTML = subs.map(({sid, hwNum, stu, hw, sub, key}) => {
+    const score = sub.score !== null && sub.score !== undefined ? sub.score : null;
+    const maxScore = sub.maxScore || hw?.maxScore || 100;
+    const pct = score !== null ? Math.round(score/maxScore*100) : null;
+    const timeStr = sub.submitted_at
+      ? new Date(sub.submitted_at).toLocaleString('th-TH', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
+      : (sub.ts || '—');
+    const scoreColor = pct >= 80 ? 'var(--green-dark)' : pct >= 60 ? 'var(--blue)' : 'var(--red)';
+
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;color:var(--text);">${stu.name} <span class="room-pill">${stu.room}</span></div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px;">ชิ้นที่ ${hwNum}: ${hw?.title || sub.hwTitle || '—'}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px;">🕐 ${timeStr}</div>
+      </div>
+      <div style="text-align:center;flex-shrink:0;">
+        <div style="font-size:18px;font-weight:800;color:${score!==null?scoreColor:'var(--text3)'};">
+          ${score !== null ? score : '—'}
+        </div>
+        <div style="font-size:10px;color:var(--text3);">/ ${maxScore}</div>
+      </div>
+<button onclick="openEditScoreById('${sid}',${hwNum})"
+        style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;white-space:nowrap;flex-shrink:0;">
+        ✏️ แก้ไข
+      </button>
+    </div>`;
+  }).join('');
+}
+
+// ===== EDIT SCORE =====
+function openEditScoreById(sid, hwNum) {
+  const stu = DB.students.find(s => s.id === sid);
+  const hw = DB.homeworks.find(h => h.num === hwNum);
+  const sub = DB.submissions[sid + '_' + hwNum];
+  if(!stu || !sub) return;
+  openEditScore({
+    sid, hwNum,
+    currentScore: sub.score !== null && sub.score !== undefined ? sub.score : null,
+    maxScore: sub.maxScore || hw?.maxScore || 100,
+    stuName: stu.name,
+    hwTitle: hw?.title || sub.hwTitle || ''
+  });
+}
+
+function openEditScore(data) {
+  _editingSubmission = data;
+  const modal = document.getElementById('edit-score-modal');
+  const info = document.getElementById('esm-info');
+  const scoreInput = document.getElementById('esm-score');
+  const maxInfo = document.getElementById('esm-max-info');
+  if(!modal || !info || !scoreInput) return;
+
+  info.innerHTML = `<b>${data.stuName}</b><br>ชิ้นที่ ${data.hwNum}: ${data.hwTitle}`;
+  scoreInput.value = data.currentScore !== null ? data.currentScore : '';
+  scoreInput.max = data.maxScore;
+  if(maxInfo) maxInfo.textContent = 'คะแนนเต็ม: ' + data.maxScore;
+  modal.style.display = 'flex';
+}
+
+function closeEditScoreModal() {
+  const modal = document.getElementById('edit-score-modal');
+  if(modal) modal.style.display = 'none';
+  _editingSubmission = null;
+}
+
+function adjustEditScore(delta) {
+  const input = document.getElementById('esm-score');
+  if(!input || !_editingSubmission) return;
+  const cur = parseFloat(input.value) || 0;
+  const newVal = Math.min(_editingSubmission.maxScore, Math.max(0, cur + delta));
+  input.value = newVal;
+}
+
+async function saveEditScore() {
+  if(!_editingSubmission) return;
+  const scoreInput = document.getElementById('esm-score');
+  const newScore = scoreInput?.value !== '' ? parseFloat(scoreInput.value) : null;
+  const {sid, hwNum, maxScore, hwTitle} = _editingSubmission;
+  const stu = DB.students.find(s => s.id === sid);
+  if(!stu) return;
+
+  showActionPopup('กำลังบันทึกคะแนน', stu.name + ' · ชิ้นที่ ' + hwNum, 'edit');
+
+  try {
+    await sbRecordSubmission({
+      sid, hwNum, hwTitle, room: stu.room,
+      score: newScore, maxScore
+    });
+    closeEditScoreModal();
+    renderScanHistory();
+    setTimeout(() => actionPopupDone('บันทึกคะแนนแล้ว ✅', stu.name + ': ' + newScore + '/' + maxScore, 'edit'), 100);
+  } catch(e) {
+    actionPopupError('บันทึกไม่สำเร็จ: ' + e.message);
+  }
+}
+
+async function deleteSubmission() {
+  if(!_editingSubmission) return;
+  const {sid, hwNum, stuName} = _editingSubmission;
+  if(!confirm('ลบการสแกนของ ' + stuName + ' ชิ้นที่ ' + hwNum + '?')) return;
+
+  showActionPopup('กำลังลบ', stuName + ' · ชิ้นที่ ' + hwNum, 'delete');
+
+  try {
+    if(USE_SUPABASE && SB && CURRENT_TEACHER) {
+      const tid = CURRENT_TEACHER.id;
+      const {error} = await SB.from('submissions')
+        .delete()
+        .eq('student_id', sid)
+        .eq('hw_num', hwNum)
+        .eq('teacher_id', tid);
+      if(error) throw error;
+      await reloadSubmissions();
+    } else {
+      const key = sid + '_' + hwNum;
+      delete DB.submissions[key];
+      saveDB();
+    }
+    renderDashboard();
+    closeEditScoreModal();
+    renderScanHistory();
+    setTimeout(() => actionPopupDone('ลบการสแกนแล้ว', stuName, 'delete'), 100);
+  } catch(e) {
+    actionPopupError('ลบไม่สำเร็จ: ' + e.message);
+  }
+}
+
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
