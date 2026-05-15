@@ -4121,7 +4121,8 @@ function getTeacherPlan() {
 }
 
 function isPremium() {
-  if(isBypassAccount()) return true; // bypass accounts = premium
+  // bypass_ids = bypass maintenance mode เท่านั้น ไม่ใช่ premium plan
+  // plan ต้องตรวจจาก teachers.plan เสมอ เพื่อให้ตรงกับที่ SA เห็นในหน้า admin
   return getTeacherPlan() === 'premium';
 }
 
