@@ -395,7 +395,9 @@ async function loadFromSupabase() {
 function setupRealtime() {
   if(!SB) return;
   if(realtimeChannel) { try{SB.removeChannel(realtimeChannel);}catch(e){} realtimeChannel=null; }
-  const channelName = CURRENT_TEACHER ? 'db-changes-'+CURRENT_TEACHER.id : 'db-changes-global';
+  // ถ้ายังไม่มี CURRENT_TEACHER → รอจนกว่าจะล็อกอิน setupRealtime จะถูกเรียกใหม่
+  if(!CURRENT_TEACHER) return;
+  const channelName = 'db-changes-'+CURRENT_TEACHER.id;
   realtimeChannel = SB.channel(channelName)
    .on('postgres_changes', {event:'*', schema:'public', table:'submissions'}, async () => {
   await reloadSubmissions();
@@ -415,9 +417,12 @@ function setupRealtime() {
       await reloadHomeworks();
       if(document.getElementById('s-admin')?.classList.contains('on')) renderDashboard();
     })
-    .on('postgres_changes', {event:'UPDATE', schema:'public', table:'teachers', filter:`id=eq.${CURRENT_TEACHER?.id}`}, async (payload) => {
+    .on('postgres_changes', {event:'UPDATE', schema:'public', table:'teachers', filter:`id=eq.${CURRENT_TEACHER?.id || '00000000-0000-0000-0000-000000000000'}`}, async (payload) => {
       // super admin เปลี่ยน plan — อัปเดต CURRENT_TEACHER และ UI ทันที
       if(!CURRENT_TEACHER) return;
+      // 🔒 guard: ตรวจว่า event นี้เป็นของ CURRENT_TEACHER จริง ๆ
+      // ป้องกันกรณี filter ผิดพลาดส่ง event ของครูคนอื่นมา
+      if(payload.new?.id && payload.new.id !== CURRENT_TEACHER.id) return;
       const newRecord = payload.new;
       const oldPlan = CURRENT_TEACHER.plan;
       CURRENT_TEACHER.plan = newRecord.plan || 'free';
