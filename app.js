@@ -182,6 +182,7 @@ async function tryRestoreSession(){
       username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||'',
       plan:teacher.plan||'free',plan_expires_at:teacher.plan_expires_at||null};
     await loadFromSupabase();
+    await loadGlobalBypassIds(); // โหลด bypass IDs ก่อน render เพื่อให้ isPremium() ถูกต้องทันที
     setTimeout(()=>setupRealtime(),500);
     document.getElementById('teacher-topbar-name').textContent=teacher.display_name;if(teacher.avatar_url) updateTopbarAvatar(teacher.avatar_url);
     document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
@@ -189,10 +190,10 @@ async function tryRestoreSession(){
 await checkAndNotifyExpiry(teacher);
     showScreen('s-admin');
     populateScanSelects();
-    renderDashboard();
-    await checkAndNotifyExpiry(teacher);
     await checkAndDowngradePremium();
     checkLockedDataOnLoad();
+    renderDashboard();
+    await checkAndNotifyExpiry(teacher);
     return true;
   }catch(e){ 
     console.error('[tryRestoreSession]', e);
@@ -827,7 +828,7 @@ async function loginTeacher(){
     const {data:maintData} = await SB.from('settings').select('value').eq('key','maintenance_mode').maybeSingle();
     const maintOn = maintData && maintData.value && maintData.value.enabled === true;
     if(maintOn) {
-      const bypass = await isBypassAccount(email) || await isBypassAccount(uid);
+      const bypass = await checkIdInBypassList(email) || await checkIdInBypassList(uid);
       if(!bypass) {
         await SB.auth.signOut();
         errEl.textContent='ระบบอยู่ในโหมดปรับปรุง กรุณาลองใหม่ภายหลัง';
@@ -838,6 +839,7 @@ async function loginTeacher(){
       // bypass account — แสดง badge แจ้งเตือน
       toast('🔓 เข้าระบบสำเร็จ (โหมดทดสอบ)','warn');
     }
+    await loadGlobalBypassIds(); // โหลด bypass IDs ก่อน render เพื่อให้ isPremium() ถูกต้องทันที
     CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,username:teacher.username||'',first_name:teacher.first_name||'',last_name:teacher.last_name||'',plan:teacher.plan||'free',plan_expires_at:teacher.plan_expires_at||null};
     await loadFromSupabase();
     setTimeout(()=>setupRealtime(),500);
@@ -1927,6 +1929,12 @@ async function onHWFieldChange(){
     const subject=document.getElementById('hw-subj-input').value;
     const maxScore=parseInt(document.getElementById('hw-maxscore-input').value)||100;
     if(!num||!title)return;
+    // ตรวจ plan limit ถ้าเป็นงานใหม่
+    const isNewHWAutoSave = !DB.homeworks.find(h => h.num === num);
+    if(isNewHWAutoSave) {
+      const autoSaveLimit = checkPlanLimit('homework');
+      if(!autoSaveLimit.ok) { toast(autoSaveLimit.msg, 'warn'); return; }
+    }
     await sbAddHomework({num,title,subject,maxScore});
     lsSet('hw_current',{num,title,subject,maxScore});
     if(badge){badge.style.display='';setTimeout(()=>badge.style.display='none',2000);}
@@ -2508,6 +2516,7 @@ async function clearAllStudents(){
 let exportType='pdf',exportRoomSel=new Set(),exportHWSel=new Set();
 function openExportModal(type){
   if(type==='excel' && !checkFeatureGate('export_excel','Export Excel')) return;
+  if(type==='excel' && !isPremium()) { showUpgradeModal('Export Excel เฉพาะแพลน Premium 🔒'); return; }
   if(type==='pdf'   && !checkFeatureGate('export_pdf','Export PDF'))   return;
   exportType=type;
   document.getElementById('export-modal-title').textContent=type==='pdf'?'📄 Export PDF':'📊 Export Excel';
@@ -3414,7 +3423,7 @@ async function removeBypassId(idx) {
   toast2('ลบบัญชีทดสอบแล้ว','warn');
 }
 
-async function isBypassAccount(emailOrId) {
+async function checkIdInBypassList(emailOrId) {
   if(!USE_SUPABASE||!SB) return false;
   try {
     const {data} = await SB.from('settings').select('value').eq('key','bypass_ids').maybeSingle();
@@ -3435,7 +3444,7 @@ async function checkMaintenanceMode() {
         if(sess&&sess.session) {
           const email = sess.session.user.email;
           const uid = sess.session.user.id;
-          const bypass = await isBypassAccount(email) || await isBypassAccount(uid);
+          const bypass = await checkIdInBypassList(email) || await checkIdInBypassList(uid);
           if(bypass) return; // ข้ามผ่าน maintenance
         }
       } catch(e2) {}
@@ -4416,11 +4425,15 @@ function renderTeacherPlanBadge() {
 function renderPlanLimitBadges() {
   // แสดง badge ขีดจำกัดใน header ของแต่ละ section
   const plan = getTeacherPlan();
+
+  // ลบ badges เก่าก่อนเสมอ (เพื่อให้ตัวเลขอัพเดตถูกต้อง)
+  document.querySelectorAll('.limit-badge').forEach(b => b.remove());
+
   if(plan === 'premium') return; // premium ไม่แสดง limit
 
   // Room limit badge
   const roomCard = document.querySelector('#mtab-rooms .card-title');
-  if(roomCard && !roomCard.querySelector('.limit-badge')) {
+  if(roomCard) {
     const used = DB.rooms.length;
     const max = FREE_LIMITS.rooms;
     const pct = used/max;
@@ -4434,7 +4447,7 @@ function renderPlanLimitBadges() {
 
   // HW limit badge
   const hwCard = document.querySelector('#mtab-homework .card-title');
-  if(hwCard && !hwCard.querySelector('.limit-badge')) {
+  if(hwCard) {
     const used = DB.homeworks.length;
     const max = FREE_LIMITS.homeworks;
     const pct = used/max;
@@ -5392,8 +5405,9 @@ async function checkAndDowngradePremium() {
 
   // Downgrade to free
   try {
-    await SB.from('teachers').update({plan:'free'}).eq('id', CURRENT_TEACHER.id);
+    await SB.from('teachers').update({plan:'free', plan_expires_at: null}).eq('id', CURRENT_TEACHER.id);
     CURRENT_TEACHER.plan = 'free';
+    CURRENT_TEACHER.plan_expires_at = null;
     renderPlanBanner();
     // Check locked HWs
     const locked = getLockedHomeworks();
