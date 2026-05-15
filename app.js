@@ -656,13 +656,26 @@ async function sbImportStudents(students) {
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
     const rows = students.map(s => ({id:s.id, name:s.name, room:s.room, teacher_id:tid}));
-    // batch upsert ทั้งหมดในครั้งเดียว — เร็วกว่า loop มาก
-    const CHUNK = 50; // Supabase รองรับ ~500 rows/call แต่ 50 ปลอดภัยและแสดง progress ได้
+    const CHUNK = 50;
     for(let i = 0; i < rows.length; i += CHUNK) {
       const chunk = rows.slice(i, i + CHUNK);
-      const {error} = await SB.from('students').upsert(chunk, {onConflict:'id,teacher_id', ignoreDuplicates:true});
-      if(error) throw error;
-      // อัพเดต progress bar
+
+      // ลอง upsert ด้วย composite constraint ก่อน
+      let {error} = await SB.from('students').upsert(chunk, {onConflict:'id,teacher_id', ignoreDuplicates:true});
+
+      if(error) {
+        // Fallback: ถ้า constraint ไม่มีใน DB → insert ทีละแถว ข้าม duplicate
+        let anyFail = null;
+        for(const row of chunk) {
+          const {error: e2} = await SB.from('students').insert(row);
+          if(e2) {
+            if(e2.code === '23505' || (e2.message||'').includes('duplicate')) continue;
+            anyFail = e2;
+          }
+        }
+        if(anyFail) throw anyFail;
+      }
+
       const pct = Math.round(Math.min((i + CHUNK) / rows.length * 100, 100));
       const bar = document.getElementById('ap-bar');
       const sub = document.getElementById('ap-sub');
@@ -2968,6 +2981,21 @@ async function confirmXLImport(){
     }
   }
 
+  // ตรวจ student per-room limit (free plan)
+  if(!isPremium()) {
+    const roomGroups = {};
+    newStudents.forEach(s => { roomGroups[s.room] = (roomGroups[s.room]||0) + 1; });
+    for(const [room, count] of Object.entries(roomGroups)) {
+      const existing = DB.students.filter(s => s.room === room).length;
+      if(existing + count > FREE_LIMITS.studentsPerRoom) {
+        showUpgradeModal(`ห้อง ${room} จะมีนักเรียน ${existing+count} คน เกินขีดจำกัด Free Plan (${FREE_LIMITS.studentsPerRoom} คน/ห้อง) 🔒`);
+        return;
+      }
+    }
+  }
+
+  if(!newStudents.length) { toast('ไม่มีรายการใหม่ให้นำเข้า','warn'); return; }
+
   showActionPopup('กำลังอัพโหลด...','เตรียมบันทึกรายชื่อ '+newStudents.length+' คน...','upload');
   try {
     await sbImportStudents(newStudents);
@@ -2979,7 +3007,14 @@ async function confirmXLImport(){
     cancelXLImport();renderManage();
     if(_lastImportedStudents.length>0)document.getElementById('qr-gen-card').style.display='';
     toast('✅ นำเข้าแล้ว '+newStudents.length+' คน'+(skipped?' (ข้าม '+skipped+' ซ้ำ)':''));
-  } catch(e){toast('นำเข้าไม่สำเร็จ: '+e.message,'err');}
+  } catch(e){
+    const msg = e.message || String(e);
+    if(msg.includes('constraint') || msg.includes('unique') || msg.includes('duplicate')) {
+      toast('นำเข้าบางส่วนไม่สำเร็จ: รหัสนักเรียนซ้ำกับระบบ','warn');
+    } else {
+      toast('นำเข้าไม่สำเร็จ: '+msg,'err');
+    }
+  }
 }
 // ===== EXPIRY SYSTEM =====
 function getExpiryInfo(expiresAt) {
