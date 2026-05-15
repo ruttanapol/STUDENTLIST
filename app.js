@@ -389,7 +389,13 @@ async function loadFromSupabase() {
   if(DB.subjects.length > 0 && typeof DB.subjects[0] === 'string') {
     DB.subjects = DB.subjects.map(s => ({name:s,total:100,hwCount:10}));
   }
-  if(settingsMap[roomsKey]) DB.rooms = settingsMap[roomsKey];
+  // DB.rooms = union ของ settings rooms + rooms จาก students จริง
+  // ป้องกัน out-of-sync เช่น downgrade จาก premium → ห้องเรียนแสดงผิด
+  const settingsRooms = Array.isArray(settingsMap[roomsKey]) ? settingsMap[roomsKey] : [];
+  const studentRooms = [...new Set(DB.students.map(s => s.room).filter(Boolean))];
+  DB.rooms = [...new Set([...settingsRooms, ...studentRooms])].sort((a,b) =>
+    a.localeCompare(b, 'th', {numeric:true, sensitivity:'base'})
+  );
 }
 
 // ---- Realtime subscription ----
@@ -4109,20 +4115,13 @@ const FREE_LIMITS = {
 
 function getTeacherPlan() {
   if (!CURRENT_TEACHER) return 'free';
-  const plan = CURRENT_TEACHER.plan || 'free';
-  // ถ้าเป็น premium แต่ plan_expires_at หมดอายุแล้ว → ถือว่า free เสมอ
-  // (ป้องกันกรณี DB update ล้มเหลว แต่ realtime ยังส่ง plan='premium' มา)
-  if (plan === 'premium' && CURRENT_TEACHER.plan_expires_at) {
-    if (new Date(CURRENT_TEACHER.plan_expires_at) < new Date()) {
-      return 'free';
-    }
-  }
-  return plan;
+  return CURRENT_TEACHER.plan || 'free';
 }
 
 function isPremium() {
-  // bypass_ids = bypass maintenance mode เท่านั้น ไม่ใช่ premium plan
-  // plan ต้องตรวจจาก teachers.plan เสมอ เพื่อให้ตรงกับที่ SA เห็นในหน้า admin
+  // ตรวจจาก teachers.plan field เท่านั้น
+  // bypass_ids ใช้สำหรับ bypass maintenance mode เท่านั้น ไม่ใช่ premium
+  // การตรวจ plan_expires_at อยู่ใน loginTeacher + checkAndDowngradePremium แล้ว
   return getTeacherPlan() === 'premium';
 }
 
