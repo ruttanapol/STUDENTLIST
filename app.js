@@ -252,7 +252,8 @@ async function connectSupabase(silent = false) {
     setTimeout(()=>loadContactLinksForLogin(), 400);setTimeout(()=>checkMaintenanceMode(), 600);
     setTimeout(()=>checkAnnouncement(), 800);
     setTimeout(()=>loadFeatureFlags(), 900);
-    setTimeout(()=>loadGlobalBypassIds(), 1000);
+    // loadGlobalBypassIds จะถูกเรียกใน loginTeacher/tryRestoreSession/activateFreeTeacher แทน
+    // เพื่อป้องกัน race condition ที่ bypass IDs โหลดทีหลัง render → กลายเป็น premium เมื่อคลิ้ก
     setTimeout(() => {
       document.getElementById('setup-overlay').style.display = 'none';
     }, silent ? 0 : 600);
@@ -421,12 +422,13 @@ function setupRealtime() {
       // super admin เปลี่ยน plan — อัปเดต CURRENT_TEACHER และ UI ทันที
       if(!CURRENT_TEACHER) return;
       // 🔒 guard: ตรวจว่า event นี้เป็นของ CURRENT_TEACHER จริง ๆ
-      // ป้องกันกรณี filter ผิดพลาดส่ง event ของครูคนอื่นมา
-      if(payload.new?.id && payload.new.id !== CURRENT_TEACHER.id) return;
+      // ถ้า id ไม่มีหรือไม่ตรงกัน → return ทันที (ป้องกัน event ของครูคนอื่น)
+      if(!payload.new?.id || payload.new.id !== CURRENT_TEACHER.id) return;
       const newRecord = payload.new;
       const oldPlan = CURRENT_TEACHER.plan;
-      CURRENT_TEACHER.plan = newRecord.plan || 'free';
-      CURRENT_TEACHER.plan_expires_at = newRecord.plan_expires_at || null;
+      // อัพเดต plan — ถ้า field ไม่มีใน payload ให้ใช้ค่าเดิม
+      CURRENT_TEACHER.plan = ('plan' in newRecord) ? (newRecord.plan || 'free') : CURRENT_TEACHER.plan;
+      CURRENT_TEACHER.plan_expires_at = ('plan_expires_at' in newRecord) ? newRecord.plan_expires_at : CURRENT_TEACHER.plan_expires_at;
       renderPlanBanner();
       // แจ้งเตือนถ้า plan เปลี่ยน
       if(oldPlan !== CURRENT_TEACHER.plan) {
@@ -4440,8 +4442,11 @@ async function activateFreeTeacher() {
     toast('เริ่มใช้งาน Free Plan แล้ว ✅');
     // โหลดข้อมูลและเข้าระบบ
     await loadFromSupabase();
+    await loadGlobalBypassIds(); // โหลด bypass IDs ก่อน render เพื่อให้ isPremium() ถูกต้องทันที
     await loadAnthropicKey();
+    setTimeout(()=>setupRealtime(),500);
     showScreen('s-admin');
+    renderDashboard();
   } catch(e) {
     toast('เกิดข้อผิดพลาด: '+e.message, 'err');
   }
