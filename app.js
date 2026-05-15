@@ -819,14 +819,18 @@ async function loginTeacher(){
     }
     // plan_expires_at หมดอายุ → downgrade เป็น free แต่ยังเข้าได้ปกติ
     if(teacher.plan_expires_at && new Date(teacher.plan_expires_at) < new Date()){
-      await SB.from('teachers').update({plan:'free', plan_expires_at:null}).eq('id',uid);
-      teacher.plan = 'free'; teacher.plan_expires_at = null;
-      toast('แพลน Premium หมดอายุแล้ว — ดาวน์เกรดเป็น Free อัตโนมัติ','warn');
+      const {error: downErr} = await SB.from('teachers').update({plan:'free', plan_expires_at:null}).eq('id',uid);
+      if(!downErr) {
+        // DB update สำเร็จ → อัพเดต local ด้วย
+        teacher.plan = 'free'; teacher.plan_expires_at = null;
+        toast('แพลน Premium หมดอายุแล้ว — ดาวน์เกรดเป็น Free อัตโนมัติ','warn');
+      }
+      // ถ้า DB update ล้มเหลว → ไม่แก้ local, getTeacherPlan() จะ return 'free' เองเพราะ expires_at หมดแล้ว
     }
     // expires_at (legacy) หมดอายุ → downgrade แต่ไม่บล็อก
     if(teacher.expires_at && new Date(teacher.expires_at) < new Date()){
-      await SB.from('teachers').update({status:'approved', plan:'free', expires_at:null}).eq('id',uid);
-      teacher.plan = 'free'; teacher.expires_at = null;
+      const {error: legacyDownErr} = await SB.from('teachers').update({status:'approved', plan:'free', expires_at:null}).eq('id',uid);
+      if(!legacyDownErr) { teacher.plan = 'free'; teacher.expires_at = null; }
     }
     // เข้าสู่ระบบสำเร็จ
     // เช็ค maintenance mode — bypass accounts ผ่านได้
@@ -4068,7 +4072,15 @@ const FREE_LIMITS = {
 
 function getTeacherPlan() {
   if (!CURRENT_TEACHER) return 'free';
-  return CURRENT_TEACHER.plan || 'free';
+  const plan = CURRENT_TEACHER.plan || 'free';
+  // ถ้าเป็น premium แต่ plan_expires_at หมดอายุแล้ว → ถือว่า free เสมอ
+  // (ป้องกันกรณี DB update ล้มเหลว แต่ realtime ยังส่ง plan='premium' มา)
+  if (plan === 'premium' && CURRENT_TEACHER.plan_expires_at) {
+    if (new Date(CURRENT_TEACHER.plan_expires_at) < new Date()) {
+      return 'free';
+    }
+  }
+  return plan;
 }
 
 function isPremium() {
