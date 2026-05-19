@@ -2183,7 +2183,7 @@ function renderTable(){
     const dots = DB.homeworks.map(h => {
   const sub = DB.submissions[s.id+'_'+h.num];
   const scoreLabel = (sub && sub.score !== null && sub.score !== undefined) ? sub.score : '';
-  const onclick = sub ? `openEditScore('${s.id}',${h.num})` : '';
+  const onclick = sub ? `openEditScoreById('${s.id}',${h.num})` : '';
   return `<div class="hw-dot ${sub?'dot-ok':'dot-no'}"
     style="cursor:${sub?'pointer':'default'};"
     onclick="${onclick}">
@@ -2257,21 +2257,9 @@ async function saveEditStu(){
   } catch(e){toast('แก้ไขไม่สำเร็จ: '+e.message,'err');}
 }
 
-async function openEditScore(sid,hwNum){
-  const key=sid+'_'+hwNum;
-  const sub=DB.submissions[key];
-  const hw=DB.homeworks.find(h=>h.num===parseInt(hwNum));
-  if(!sub)return;
-  const cur=(sub.score!==null&&sub.score!==undefined)?sub.score:'';
-  const max=sub.maxScore||hw?.maxScore||100;
-  const newScore=prompt(`แก้ไขคะแนน ${DB.students.find(s=>s.id===sid)?.name||sid}\nงานครั้งที่ ${hwNum} (เต็ม ${max})\nคะแนนปัจจุบัน: ${cur!==''?cur:'ยังไม่ได้กรอก'}`,cur);
-  if(newScore===null)return;
-  const parsed=newScore.trim()===''?null:parseFloat(newScore);
-  if(newScore.trim()!==''&&isNaN(parsed)){toast('กรุณากรอกตัวเลข','warn');return;}
-  try {
-    await sbUpdateScore(sid,parseInt(hwNum),parsed);
-    renderDashboard();toast('บันทึกคะแนนแล้ว ✅');
-  } catch(e){toast('บันทึกคะแนนไม่สำเร็จ: '+e.message,'err');}
+// openEditScore(sid,hwNum) → redirect ไป openEditScoreById (ลบ prompt เก่า)
+function _legacyEditScore(sid, hwNum) {
+  openEditScoreById(sid, parseInt(hwNum));
 }
 
 let xlImportData=[];
@@ -2402,17 +2390,15 @@ async function addRoom(){
   if(!limit.ok){ showUpgradeModal(limit.msg); return; }
   showActionPopup('กำลังเพิ่มห้อง '+n,'','add');
   try {
-    DB.rooms = [...new Set([...DB.rooms, n])].sort((a,b) =>
-      a.localeCompare(b, 'th', {numeric:true, sensitivity:'base'})
-    );
+    DB.rooms = [...new Set([...DB.rooms, n])].sort((a,b)=>
+      a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
     await sbSaveSettings('rooms', DB.rooms);
-    actionPopupDone('เพิ่มห้อง '+n+' แล้ว', '', 'add');
-    setTimeout(() => renderManage(), 100);
-    document.getElementById('n-room').value = '';
+    actionPopupDone('เพิ่มห้อง '+n+' แล้ว','','add');
+    setTimeout(()=>renderManage(),100);
+    document.getElementById('n-room').value='';
   } catch(e) {
-    // Rollback memory
-    DB.rooms = DB.rooms.filter(r => r !== n);
-    actionPopupError?.('เพิ่มห้องไม่สำเร็จ: ' + e.message) || toast('เพิ่มห้องไม่สำเร็จ: ' + e.message, 'err');
+    DB.rooms = DB.rooms.filter(r=>r!==n);
+    actionPopupError?.('เพิ่มห้องไม่สำเร็จ: '+e.message)||toast('เพิ่มห้องไม่สำเร็จ: '+e.message,'err');
   }
 }
 
@@ -2447,11 +2433,15 @@ async function delRoom(n){
   }
 
   // ลบออกจาก DB.rooms settings
-  DB.rooms = DB.rooms.filter(r=>r!==n);
-  await sbSaveSettings('rooms', DB.rooms);
-  actionPopupDone('ลบห้อง '+n+' แล้ว','','delete');
-  renderManage();
-  renderDashboard();
+  try {
+    DB.rooms = DB.rooms.filter(r=>r!==n);
+    await sbSaveSettings('rooms', DB.rooms);
+    actionPopupDone('ลบห้อง '+n+' แล้ว','','delete');
+    setTimeout(()=>{renderManage();renderDashboard();},100);
+  } catch(e) {
+    DB.rooms = [...DB.rooms, n].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
+    actionPopupError?.('ลบห้องไม่สำเร็จ: '+e.message)||toast('ลบห้องไม่สำเร็จ: '+e.message,'err');
+  }
 }
 
 async function addStudent(){
@@ -2463,7 +2453,7 @@ async function addStudent(){
   const limit = checkPlanLimit('student', room);
   if(!limit.ok){ showUpgradeModal(limit.msg); return; }
   showActionPopup('กำลังเพิ่มนักเรียน','รหัส '+id+' · '+name,'add');
-  try{await sbAddStudent({id,name,room});renderManage();document.getElementById('ns-id').value='';document.getElementById('ns-name').value='';actionPopupDone('เพิ่มนักเรียนแล้ว ✅',name+' · '+room,'add');}
+  try{await sbAddStudent({id,name,room});document.getElementById('ns-id').value='';document.getElementById('ns-name').value='';actionPopupDone('เพิ่มนักเรียนแล้ว ✅',name+' · '+room,'add');setTimeout(()=>renderManage(),100);}
   catch(e){actionPopupError('เพิ่มไม่สำเร็จ: '+e.message);}
 }
 
@@ -2543,7 +2533,7 @@ async function clearAllStudents(){
   } else {
     DB.students=[];DB.submissions=[];saveDB();
   }
-  renderManage();actionPopupDone('ลบรายชื่อนักเรียนแล้ว','ลบ '+count+' คนสำเร็จ','delete');
+  actionPopupDone('ลบรายชื่อนักเรียนแล้ว','ลบ '+count+' คนสำเร็จ','delete');setTimeout(()=>renderManage(),100);
 }
 
 // ╔══════════════════════════════════════════════════════╗
@@ -3016,7 +3006,7 @@ async function confirmXLImport(){
     await sbImportStudents(newStudents);
     const newRooms=[...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
     if(newRooms.length){
-      DB.rooms=[...new Set([...DB.rooms,...newRooms])].sort();
+      DB.rooms=[...new Set([...DB.rooms,...newRooms])].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
       await sbSaveSettings('rooms', DB.rooms);
     }
     cancelXLImport();renderManage();
@@ -5161,10 +5151,17 @@ function adjustEditScore(delta) {
 async function saveEditScore() {
   if(!_editingSubmission) return;
   const scoreInput = document.getElementById('esm-score');
-  const newScore = scoreInput?.value !== '' ? parseFloat(scoreInput.value) : null;
+  const rawVal = scoreInput?.value ?? '';
+  const newScore = rawVal !== '' ? parseFloat(rawVal) : null;
   const {sid, hwNum, maxScore, hwTitle} = _editingSubmission;
   const stu = DB.students.find(s => s.id === sid);
   if(!stu) return;
+  // Validate score range
+  if(newScore !== null) {
+    if(isNaN(newScore)) { toast('กรุณากรอกตัวเลข','warn'); return; }
+    if(newScore < 0) { toast('คะแนนต้องไม่ติดลบ','warn'); return; }
+    if(newScore > maxScore) { toast(`คะแนนเกิน ${maxScore} (คะแนนเต็ม)`,'warn'); return; }
+  }
 
   showActionPopup('กำลังบันทึกคะแนน', stu.name + ' · ชิ้นที่ ' + hwNum, 'edit');
 
@@ -5808,7 +5805,7 @@ function toggleAnnouncementEnabled(checked) {
 }
 
 async function saveAnnouncement(overrideEnabled) {
-  console.log('[saveAnnouncement] called, USE_SUPABASE=', USE_SUPABASE, 'SB=', !!SB);
+  // debug log removed
   const btn = document.getElementById('announce-save-btn');
   const statusEl = document.getElementById('announce-status');
   const showStatus = (msg, ok) => {
@@ -6034,34 +6031,13 @@ function updateAttSummary() {
   if(!el) return;
   const counts = { present:0, absent:0, late:0, sick:0, personal:0 };
   Object.values(_attRecords).forEach(s => { if(counts[s]!==undefined) counts[s]++; });
-  // สาย นับรวมกับ มา
-  const presentTotal = counts.present + counts.late;
-  el.innerHTML = `
-    <div style="flex:1;text-align:center;padding:7px 4px;border-radius:8px;background:#DCFCE7;border:1.5px solid #86EFAC;">
-      <div style="font-size:16px;">✅</div>
-      <div style="font-size:18px;font-weight:800;color:#15803D;">${presentTotal}</div>
-      <div style="font-size:10px;color:#15803D;font-weight:600;">มา${counts.late>0?' (+สาย '+counts.late+')':''}</div>
-    </div>
-    <div style="flex:1;text-align:center;padding:7px 4px;border-radius:8px;background:#FEE2E2;border:1.5px solid #FCA5A5;">
-      <div style="font-size:16px;">❌</div>
-      <div style="font-size:18px;font-weight:800;color:#B91C1C;">${counts.absent}</div>
-      <div style="font-size:10px;color:#B91C1C;font-weight:600;">ขาด</div>
-    </div>
-    <div style="flex:1;text-align:center;padding:7px 4px;border-radius:8px;background:#FEF3C7;border:1.5px solid #FCD34D;">
-      <div style="font-size:16px;">⏰</div>
-      <div style="font-size:18px;font-weight:800;color:#B45309;">${counts.late}</div>
-      <div style="font-size:10px;color:#B45309;font-weight:600;">สาย (นับเป็นมา)</div>
-    </div>
-    <div style="flex:1;text-align:center;padding:7px 4px;border-radius:8px;background:#FFF1F2;border:1.5px solid #FDA4AF;">
-      <div style="font-size:16px;">🤒</div>
-      <div style="font-size:18px;font-weight:800;color:#BE123C;">${counts.sick}</div>
-      <div style="font-size:10px;color:#BE123C;font-weight:600;">ลาป่วย</div>
-    </div>
-    <div style="flex:1;text-align:center;padding:7px 4px;border-radius:8px;background:#F5F3FF;border:1.5px solid #C4B5FD;">
-      <div style="font-size:16px;">📋</div>
-      <div style="font-size:18px;font-weight:800;color:#6D28D9;">${counts.personal}</div>
-      <div style="font-size:10px;color:#6D28D9;font-weight:600;">ลากิจ</div>
-    </div>`;
+  el.innerHTML = Object.entries(ATT_STATUS).map(([k,cfg]) =>
+    `<div style="flex:1;text-align:center;padding:7px 4px;border-radius:8px;background:${cfg.bg};border:1.5px solid ${cfg.border};">
+      <div style="font-size:16px;">${cfg.icon}</div>
+      <div style="font-size:18px;font-weight:800;color:${cfg.color};">${counts[k]}</div>
+      <div style="font-size:10px;color:${cfg.color};font-weight:600;">${cfg.label}</div>
+    </div>`
+  ).join('');
 }
 
 function onAttDateChange() {
@@ -6082,8 +6058,6 @@ async function saveAttendance() {
   const records = students.map(s => ({ id:s.id, name:s.name, status:_attRecords[s.id]||'present' }));
   const counts = { present:0, absent:0, late:0, sick:0, personal:0 };
   records.forEach(r => { if(counts[r.status]!==undefined) counts[r.status]++; });
-  // สาย นับรวมกับ มา
-  counts.presentTotal = counts.present + counts.late;
 
   const dateKey = date.replace(/-/g,'');
   const roomKey = room.replace(/[^a-zA-Z0-9ก-ฮ]/g,'_');
@@ -6103,7 +6077,7 @@ async function saveAttendance() {
   }
   const dateDisplay = new Date(date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'});
   if(statusEl) {
-    statusEl.textContent = `✅ บันทึกเช็คชื่อวันที่ ${dateDisplay} · มาเรียน ${counts.presentTotal} (สาย ${counts.late}) / ขาด ${counts.absent} / ลาป่วย ${counts.sick} / ลากิจ ${counts.personal}`;
+    statusEl.textContent = `✅ บันทึกเช็คชื่อวันที่ ${dateDisplay} · มาเรียน ${(counts.present||0)+(counts.late||0)} (สาย ${counts.late||0}) / ขาด ${counts.absent||0} / ลาป่วย ${counts.sick||0} / ลากิจ ${counts.personal||0}`;
     statusEl.style.display='block'; statusEl.style.background='#DCFCE7'; statusEl.style.color='#15803D';
     setTimeout(() => { statusEl.style.display='none'; }, 5000);
   }
@@ -6135,7 +6109,7 @@ async function loadAttendanceHistory() {
       <div style="flex:1;">
         <div style="font-size:13px;font-weight:700;color:var(--text);">${d} · ${v.room||'-'}</div>
         <div style="font-size:11px;color:var(--text3);margin-top:2px;">
-          ✅ ${(c.presentTotal||c.present||0)} · ❌ ${c.absent||0} · ⏰ ${c.late||0}(สาย) · 🤒 ${c.sick||0}
+          ✅ มา ${(c.present||0)+(c.late||0)} · ❌ ขาด ${c.absent||0} · ⏰ สาย ${c.late||0} · 🤒 ลา ${(c.sick||c.leave||0)+(c.personal||0)}
         </div>
       </div>
       <span style="font-size:16px;color:#CBD5E1;">›</span>
@@ -6165,12 +6139,10 @@ function _buildAttExportRows() {
   const rows = students.map((s,i) => {
     const st = _attRecords[s.id] || 'present';
     const cfg = ATT_STATUS[st];
-    return { เลขที่:i+1, รหัส:s.id, ชื่อ:s.name, ห้อง:s.room, สถานะ:`${cfg.icon} ${cfg.label}`, ประเภท:cfg.label, _status:st };
+    return { เลขที่:i+1, รหัส:s.id, ชื่อ:s.name, ห้อง:s.room, สถานะ:`${cfg.icon} ${cfg.label}`, ประเภท:cfg.label };
   });
   const counts = {};
-  Object.keys(ATT_STATUS).forEach(k => counts[k] = rows.filter(r=>r._status===k).length);
-  // สาย นับรวมกับ มา
-  counts.presentTotal = counts.present + counts.late;
+  Object.keys(ATT_STATUS).forEach(k => counts[k] = rows.filter(r=>r.ประเภท===ATT_STATUS[k].label).length);
   return { room, date, dateDisplay, students, rows, counts };
 }
 
@@ -6185,8 +6157,8 @@ function exportAttendanceExcel() {
     ['เลขที่','รหัส','ชื่อ-นามสกุล','ห้อง','สถานะ'],
     ...rows.map(r=>[r.เลขที่, r.รหัส, r.ชื่อ, r.ห้อง, r.สถานะ]),
     [],
-    ['สรุป','','มาเรียน (รวมสาย)','ขาด','สาย (นับเป็นมา)','ลาป่วย','ลากิจ'],
-    ['','',counts.presentTotal||0, counts.absent||0, counts.late||0, counts.sick||0, counts.personal||0],
+    ['สรุป','','มา','ขาด','สาย','ลาป่วย','ลากิจ'],
+    ['','',counts.present||0, counts.absent||0, counts.late||0, counts.sick||0, counts.personal||0],
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(ws_data);
@@ -6229,9 +6201,9 @@ function exportAttendancePDF() {
     <h1>📋 รายงานเช็คชื่อ — ${room}</h1>
     <div class="meta">วันที่: ${dateDisplay} &nbsp;|&nbsp; นักเรียน ${rows.length} คน &nbsp;|&nbsp; พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}</div>
     <div class="summary">
-      <div class="sum-box" style="background:#DCFCE7;color:#15803D;"><b style="font-size:18pt;">${counts.presentTotal||0}</b><br>✅ มาเรียน<br><span style="font-size:8pt;">(รวมสาย ${counts.late||0} คน)</span></div>
+      <div class="sum-box" style="background:#DCFCE7;color:#15803D;"><b style="font-size:18pt;">${counts.present||0}</b><br>✅ มา</div>
       <div class="sum-box" style="background:#FEE2E2;color:#B91C1C;"><b style="font-size:18pt;">${counts.absent||0}</b><br>❌ ขาด</div>
-      <div class="sum-box" style="background:#FEF3C7;color:#B45309;"><b style="font-size:18pt;">${counts.late||0}</b><br>⏰ สาย<br><span style="font-size:8pt;">(นับเป็นมา)</span></div>
+      <div class="sum-box" style="background:#FEF3C7;color:#B45309;"><b style="font-size:18pt;">${counts.late||0}</b><br>⏰ สาย</div>
       <div class="sum-box" style="background:#FFF1F2;color:#BE123C;"><b style="font-size:18pt;">${counts.sick||0}</b><br>🤒 ลาป่วย</div>
       <div class="sum-box" style="background:#F5F3FF;color:#6D28D9;"><b style="font-size:18pt;">${counts.personal||0}</b><br>📋 ลากิจ</div>
     </div>
