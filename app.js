@@ -2257,10 +2257,7 @@ async function saveEditStu(){
   } catch(e){toast('แก้ไขไม่สำเร็จ: '+e.message,'err');}
 }
 
-// openEditScore(sid,hwNum) → redirect ไป openEditScoreById (ลบ prompt เก่า)
-function _legacyEditScore(sid, hwNum) {
-  openEditScoreById(sid, parseInt(hwNum));
-}
+// openEditScore(sid,hwNum) → รวมเข้า openEditScoreById แล้ว
 
 let xlImportData=[];
 function downloadTemplate(){
@@ -2390,14 +2387,13 @@ async function addRoom(){
   if(!limit.ok){ showUpgradeModal(limit.msg); return; }
   showActionPopup('กำลังเพิ่มห้อง '+n,'','add');
   try {
-    DB.rooms = [...new Set([...DB.rooms, n])].sort((a,b)=>
-      a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
-    await sbSaveSettings('rooms', DB.rooms);
+    DB.rooms=[...new Set([...DB.rooms,n])].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
+    await sbSaveSettings('rooms',DB.rooms);
     actionPopupDone('เพิ่มห้อง '+n+' แล้ว','','add');
     setTimeout(()=>renderManage(),100);
     document.getElementById('n-room').value='';
   } catch(e) {
-    DB.rooms = DB.rooms.filter(r=>r!==n);
+    DB.rooms=DB.rooms.filter(r=>r!==n);
     actionPopupError?.('เพิ่มห้องไม่สำเร็จ: '+e.message)||toast('เพิ่มห้องไม่สำเร็จ: '+e.message,'err');
   }
 }
@@ -2439,7 +2435,7 @@ async function delRoom(n){
     actionPopupDone('ลบห้อง '+n+' แล้ว','','delete');
     setTimeout(()=>{renderManage();renderDashboard();},100);
   } catch(e) {
-    DB.rooms = [...DB.rooms, n].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
+    DB.rooms=[...DB.rooms,n].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
     actionPopupError?.('ลบห้องไม่สำเร็จ: '+e.message)||toast('ลบห้องไม่สำเร็จ: '+e.message,'err');
   }
 }
@@ -5156,13 +5152,11 @@ async function saveEditScore() {
   const {sid, hwNum, maxScore, hwTitle} = _editingSubmission;
   const stu = DB.students.find(s => s.id === sid);
   if(!stu) return;
-  // Validate score range
   if(newScore !== null) {
-    if(isNaN(newScore)) { toast('กรุณากรอกตัวเลข','warn'); return; }
-    if(newScore < 0) { toast('คะแนนต้องไม่ติดลบ','warn'); return; }
-    if(newScore > maxScore) { toast(`คะแนนเกิน ${maxScore} (คะแนนเต็ม)`,'warn'); return; }
+    if(isNaN(newScore)){toast('กรุณากรอกตัวเลข','warn');return;}
+    if(newScore < 0){toast('คะแนนต้องไม่ติดลบ','warn');return;}
+    if(newScore > maxScore){toast(`คะแนนเกิน ${maxScore} (คะแนนเต็ม)`,'warn');return;}
   }
-
   showActionPopup('กำลังบันทึกคะแนน', stu.name + ' · ชิ้นที่ ' + hwNum, 'edit');
 
   try {
@@ -5805,7 +5799,7 @@ function toggleAnnouncementEnabled(checked) {
 }
 
 async function saveAnnouncement(overrideEnabled) {
-  // debug log removed
+
   const btn = document.getElementById('announce-save-btn');
   const statusEl = document.getElementById('announce-status');
   const showStatus = (msg, ok) => {
