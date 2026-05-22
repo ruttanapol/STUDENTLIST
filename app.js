@@ -602,16 +602,7 @@ async function sbAddHomework(hw) {
 }
 
 async function sbDeleteHomework(num,room){
-  if(USE_SUPABASE){
-    const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';
-    let q=SB.from('homeworks').delete().eq('num',num).eq('teacher_id',tid);
-    if(room!==undefined)q=q.eq('room',room);
-    const{error}=await q;if(error)throw error;
-    await reloadHomeworks();
-  }else{
-    DB.homeworks=DB.homeworks.filter(h=>!(h.num===num&&(room===undefined||h.room===room)));
-    saveDB();
-  }
+  if(USE_SUPABASE){const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';let q=SB.from('homeworks').delete().eq('num',num).eq('teacher_id',tid);if(room!==undefined)q=q.eq('room',room);const{error}=await q;if(error)throw error;await reloadHomeworks();}else{DB.homeworks=DB.homeworks.filter(h=>!(h.num===num&&(room===undefined||h.room===room)));saveDB();}
 }
 
 async function sbRecordSubmission(sub) {
@@ -1964,10 +1955,7 @@ async function onHWFieldChange(){
     if(!num||!title)return;
     // ตรวจ plan limit ถ้าเป็นงานใหม่
     const isNewHWAutoSave=!DB.homeworks.find(h=>h.num===num&&h.room===_hwRoom);
-    if(isNewHWAutoSave){
-      const autoSaveLimit=checkPlanLimit('homework');
-      if(!autoSaveLimit.ok){toast(autoSaveLimit.msg,'warn');return;}
-    }
+    if(isNewHWAutoSave){const autoSaveLimit=checkPlanLimit('homework');if(!autoSaveLimit.ok){toast(autoSaveLimit.msg,'warn');return;}}
     await sbAddHomework({num,title,subject,maxScore,room:_hwRoom});
     lsSet('hw_current',{num,title,subject,maxScore});
     if(badge){badge.style.display='';setTimeout(()=>badge.style.display='none',2000);}
@@ -2260,10 +2248,7 @@ async function saveEditStu(){
     await sbUpdateStudent(oldId,{id:newId,name:newName,room:newRoom});
     closeEditStu();
     actionPopupDone('แก้ไขเรียบร้อย ✅',newName+' · '+newRoom,'edit');
-    setTimeout(()=>{
-      renderManage();
-      if(_editStuFromRoom){viewRoomStudents(_editStuFromRoom);_editStuFromRoom='';}
-    },100);
+    setTimeout(()=>{renderManage();if(_editStuFromRoom){viewRoomStudents(_editStuFromRoom);_editStuFromRoom='';}},100);
   } catch(e){toast('แก้ไขไม่สำเร็จ: '+e.message,'err');}
 }
 
@@ -2389,20 +2374,7 @@ function renderXLPreview(filename){
 
 function cancelXLImport(){xlImportData=[];document.getElementById('xl-preview').style.display='none';document.getElementById('xl-file').value='';document.getElementById('xl-preview-body').innerHTML='';}
 
-async function addRoom(){
-  const n=document.getElementById('n-room').value.trim();
-  if(!n){toast('กรอกชื่อห้อง','warn');return;}
-  if(DB.rooms.includes(n)){toast('ห้องนี้มีอยู่แล้ว','warn');return;}
-  const limit=checkPlanLimit('room');if(!limit.ok){showUpgradeModal(limit.msg);return;}
-  showActionPopup('กำลังเพิ่มห้อง '+n,'','add');
-  try{
-    DB.rooms=[...new Set([...DB.rooms,n])].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
-    await sbSaveSettings('rooms',DB.rooms);
-    actionPopupDone('เพิ่มห้อง '+n+' แล้ว','','add');
-    setTimeout(()=>renderManage(),100);
-    document.getElementById('n-room').value='';
-  }catch(e){DB.rooms=DB.rooms.filter(r=>r!==n);actionPopupError?.('เพิ่มห้องไม่สำเร็จ: '+e.message)||toast('เพิ่มห้องไม่สำเร็จ: '+e.message,'err');}
-}
+async function addRoom(){const n=document.getElementById('n-room').value.trim();if(!n){toast('กรอกชื่อห้อง','warn');return;}if(DB.rooms.includes(n)){toast('ห้องนี้มีอยู่แล้ว','warn');return;}const limit=checkPlanLimit('room');if(!limit.ok){showUpgradeModal(limit.msg);return;}showActionPopup('กำลังเพิ่มห้อง '+n,'','add');try{DB.rooms=[...new Set([...DB.rooms,n])].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));await sbSaveSettings('rooms',DB.rooms);actionPopupDone('เพิ่มห้อง '+n+' แล้ว','','add');setTimeout(()=>renderManage(),100);document.getElementById('n-room').value='';}catch(e){DB.rooms=DB.rooms.filter(r=>r!==n);actionPopupError?.('เพิ่มห้องไม่สำเร็จ: '+e.message)||toast('เพิ่มห้องไม่สำเร็จ: '+e.message,'err');}}
 
 async function delRoom(n){
   showActionPopup('กำลังลบห้อง',n,'delete');
@@ -2478,29 +2450,9 @@ async function delSubj(n){
   renderManage();
 }
 
-async function addHW(){
-  const num=parseInt(document.getElementById('n-hwnum').value);
-  const title=document.getElementById('n-hwtitle').value.trim();
-  const subject=document.getElementById('n-hwsubj').value;
-  const maxScore=parseInt(document.getElementById('n-hwmaxscore')?.value)||100;
-  const room=_hwRoom;
-  if(!num||!title){toast('กรอกให้ครบ','warn');return;}
-  if(!room){toast('กรุณาเลือกห้องเรียนก่อน','warn');return;}
-  if(DB.homeworks.find(h=>h.num===num&&h.room===room)){toast('งานครั้งที่ '+num+' ของ '+room+' มีแล้ว','warn');return;}
-  const limit=checkPlanLimit('homework');
-  if(!limit.ok){showUpgradeModal(limit.msg);return;}
-  try{await sbAddHomework({num,title,subject,maxScore,room});renderManage();toast('เพิ่มงานครั้งที่ '+num+' ('+room+')');document.getElementById('n-hwnum').value='';document.getElementById('n-hwtitle').value='';}
-  catch(e){toast('เพิ่มไม่สำเร็จ: '+e.message,'err');}
-}
+async function addHW(){const num=parseInt(document.getElementById('n-hwnum').value);const title=document.getElementById('n-hwtitle').value.trim();const subject=document.getElementById('n-hwsubj').value;const maxScore=parseInt(document.getElementById('n-hwmaxscore')?.value)||100;const room=_hwRoom;if(!num||!title){toast('กรอกให้ครบ','warn');return;}if(!room){toast('กรุณาเลือกห้องเรียนก่อน','warn');return;}if(DB.homeworks.find(h=>h.num===num&&h.room===room)){toast('งานครั้งที่ '+num+' ของ '+room+' มีแล้ว','warn');return;}const limit=checkPlanLimit('homework');if(!limit.ok){showUpgradeModal(limit.msg);return;}try{await sbAddHomework({num,title,subject,maxScore,room});renderManage();toast('เพิ่มงานครั้งที่ '+num+' ('+room+')');document.getElementById('n-hwnum').value='';document.getElementById('n-hwtitle').value='';}catch(e){toast('เพิ่มไม่สำเร็จ: '+e.message,'err');}}
 
-async function delHW(num,room){
-  room=(room!==undefined)?room:_hwRoom;
-  const h=DB.homeworks.find(x=>x.num===num&&x.room===room);
-  if(!confirm('ลบงานครั้งที่ '+num+' ['+room+']'+(h?' — '+h.title:'')+'?'))return;
-  showActionPopup('กำลังลบชิ้นงาน','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');
-  try{await sbDeleteHomework(num,room);actionPopupDone('ลบชิ้นงานแล้ว','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');renderManage();}
-  catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}
-}
+async function delHW(num,room){room=(room!==undefined)?room:_hwRoom;const h=DB.homeworks.find(x=>x.num===num&&x.room===room);if(!confirm('ลบงานครั้งที่ '+num+' ['+room+']'+(h?' — '+h.title:'')+'?'))return;showActionPopup('กำลังลบชิ้นงาน','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');try{await sbDeleteHomework(num,room);actionPopupDone('ลบชิ้นงานแล้ว','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');renderManage();}catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}}
 
 async function clearScans(){
   if(!confirm('ล้างข้อมูลการส่งงานทั้งหมด?'))return;
@@ -2788,30 +2740,15 @@ function renderManage(){
         </div>`;
       }).join('')
     :'<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;grid-column:1/-1;">ยังไม่มีห้องเรียน</div>';
-  // HW room selector
   populateHWRoomSelect();
   const hwList=document.getElementById('hw-card-list');
   if(hwList){
     const hwsToShow=_hwRoom?DB.homeworks.filter(h=>!h.room||h.room===_hwRoom):[];
-    if(!_hwRoom){
-      hwList.innerHTML='<div style="font-size:13px;color:#92400E;text-align:center;padding:16px;background:#FFF7ED;border-radius:10px;border:1.5px solid #FED7AA;">👆 เลือกห้องเรียนด้านบนก่อน จึงจะเพิ่มชิ้นงานได้</div>';
-    }else if(!hwsToShow.length){
-      hwList.innerHTML=`<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">ยังไม่มีชิ้นงานสำหรับ ${_hwRoom}</div>`;
+    if(!_hwRoom){hwList.innerHTML='<div style="font-size:13px;color:#92400E;text-align:center;padding:16px;background:#FFF7ED;border-radius:10px;border:1.5px solid #FED7AA;">👆 เลือกห้องเรียนด้านบนก่อน จึงจะเพิ่มชิ้นงานได้</div>';
+    }else if(!hwsToShow.length){hwList.innerHTML=`<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">ยังไม่มีชิ้นงานสำหรับ ${_hwRoom}</div>`;
     }else{
       const roomStus=DB.students.filter(s=>s.room===_hwRoom);
-      hwList.innerHTML=hwsToShow.map(h=>{
-        const locked=isHWLocked(h);
-        const now=new Date();
-        let dlBadge='<span class="deadline-badge dl-none">ไม่มีกำหนด</span>';
-        if(h.deadline){const dl=new Date(h.deadline);const diff=Math.round((dl-now)/86400000);
-          if(diff<0)dlBadge=`<span class="deadline-badge dl-late">เกิน ${Math.abs(diff)} วัน</span>`;
-          else if(diff<=3)dlBadge=`<span class="deadline-badge dl-soon">เหลือ ${diff} วัน</span>`;
-          else dlBadge=`<span class="deadline-badge dl-ok">${dl.toLocaleDateString('th-TH',{day:'numeric',month:'short'})}</span>`;}
-        const submitted=Object.keys(DB.submissions).filter(k=>{const[sid]=k.split('_'+h.num);return k===sid+'_'+h.num&&roomStus.some(s=>s.id===sid);}).length;
-        const lockedOverlay=locked?`<div style="position:absolute;inset:0;background:rgba(239,68,68,0.08);border-radius:12px;display:flex;align-items:center;justify-content:flex-end;padding:0 10px;pointer-events:none;"><span style="font-size:11px;font-weight:700;color:var(--red);background:#FEE2E2;padding:3px 8px;border-radius:20px;border:1px solid #FCA5A5;">🔒 ล็อค</span></div>`:'';
-        const wrapStyle=locked?'position:relative;opacity:0.7;':'position:relative;';
-        return `<div class="hw-card-item" style="${wrapStyle}">${lockedOverlay}<div class="hw-card-num" style="${locked?'background:#FEE2E2;color:var(--red);':''}">${h.num}</div><div class="hw-card-info"><div class="hw-card-title">${h.title}${locked?' <span style="font-size:11px;color:var(--red);">🔒</span>':''}</div><div class="hw-card-sub">${h.subject||''} · เต็ม ${h.maxScore||100} · ส่ง ${submitted}/${roomStus.length} · ${dlBadge}</div>${h.fileUrl?'<div style="margin-top:4px;display:flex;align-items:center;gap:6px;"><span style="font-size:12px;">'+getFileIcon(h.fileName)+'</span><span style="font-size:11px;color:var(--green-dark);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">'+(h.fileName||'ไฟล์แนบ')+'</span><button onclick="removeHWFile('+h.num+')" style="padding:2px 6px;font-size:10px;border-radius:6px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบไฟล์</button></div>':''}</div>${locked?`<button onclick="openRenewalFlow()" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#FEE2E2;color:var(--red);cursor:pointer;white-space:nowrap;">💳 ต่ออายุ</button>`:`<button onclick="openEditHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;margin-right:4px;white-space:nowrap;">แก้ไข</button><button onclick="delHW(${h.num},'${h.room}')" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;">ลบ</button>`}</div>`;
-      }).join('');
+      hwList.innerHTML=hwsToShow.map(h=>{const locked=isHWLocked(h);const now=new Date();let dlBadge='<span class="deadline-badge dl-none">ไม่มีกำหนด</span>';if(h.deadline){const dl=new Date(h.deadline);const diff=Math.round((dl-now)/86400000);if(diff<0)dlBadge=`<span class="deadline-badge dl-late">เกิน ${Math.abs(diff)} วัน</span>`;else if(diff<=3)dlBadge=`<span class="deadline-badge dl-soon">เหลือ ${diff} วัน</span>`;else dlBadge=`<span class="deadline-badge dl-ok">${dl.toLocaleDateString('th-TH',{day:'numeric',month:'short'})}</span>`;}const submitted=Object.keys(DB.submissions).filter(k=>{const[sid]=k.split('_'+h.num);return k===sid+'_'+h.num&&roomStus.some(s=>s.id===sid);}).length;const lo=locked?`<div style="position:absolute;inset:0;background:rgba(239,68,68,0.08);border-radius:12px;display:flex;align-items:center;justify-content:flex-end;padding:0 10px;pointer-events:none;"><span style="font-size:11px;font-weight:700;color:var(--red);background:#FEE2E2;padding:3px 8px;border-radius:20px;border:1px solid #FCA5A5;">🔒 ล็อค</span></div>`:'';const ws=locked?'position:relative;opacity:0.7;':'position:relative;';return `<div class="hw-card-item" style="${ws}">${lo}<div class="hw-card-num" style="${locked?'background:#FEE2E2;color:var(--red);':''}">${h.num}</div><div class="hw-card-info"><div class="hw-card-title">${h.title}${locked?' <span style="font-size:11px;color:var(--red);">🔒</span>':''}</div><div class="hw-card-sub">${h.subject||''} · เต็ม ${h.maxScore||100} · ส่ง ${submitted}/${roomStus.length} · ${dlBadge}</div>${h.fileUrl?'<div style="margin-top:4px;display:flex;align-items:center;gap:6px;"><span style="font-size:12px;">'+getFileIcon(h.fileName)+'</span><span style="font-size:11px;color:var(--green-dark);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">'+(h.fileName||'ไฟล์แนบ')+'</span><button onclick="removeHWFile('+h.num+')" style="padding:2px 6px;font-size:10px;border-radius:6px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบไฟล์</button></div>':''}</div>${locked?`<button onclick="openRenewalFlow()" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#FEE2E2;color:var(--red);cursor:pointer;white-space:nowrap;">💳 ต่ออายุ</button>`:`<button onclick="openEditHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;margin-right:4px;white-space:nowrap;">แก้ไข</button><button onclick="delHW(${h.num},'${h.room}')" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;">ลบ</button>`}</div>`;}).join('');
     }
   }
 }
@@ -3762,64 +3699,14 @@ function renderSubjectsFull() {
 
 // ===== DROPDOWN SCAN WITH SUBJECT FILTER =====
 
-function populateHWDropdown() {
-  const subjFilter = document.getElementById('hw-subj-filter');
-  const hwDd = document.getElementById('hw-select-dropdown');
-  if(!hwDd) return;
-
-  // populate subject filter
-  if(subjFilter) {
-    const curSubj = subjFilter.value;
-    subjFilter.innerHTML = '<option value="">— ทุกวิชา —</option>';
-    getSubjectNames().forEach(n => {
-      const opt = document.createElement('option');
-      opt.value = n; opt.textContent = n;
-      subjFilter.appendChild(opt);
-    });
-    if(curSubj) subjFilter.value = curSubj;
-  }
-
-  // populate hw dropdown (filter by subject)
-  const filterVal = subjFilter ? subjFilter.value : '';
-  const cur = hwDd.value;
-  hwDd.innerHTML = '<option value="">— เลือกชิ้นงาน —</option>';
-  
-  DB.homeworks
-    .filter(h => (!filterVal || h.subject === filterVal) && !isHWLocked(h))
-    .forEach(h => {
-      const opt = document.createElement('option');
-      opt.value = h.num;
-      const perHW = h.maxScore || 100;
-      const dl = h.deadline ? ' · ส่ง ' + new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '';
-      opt.textContent = 'ครั้งที่ ' + h.num + ' — ' + h.title + ' (เต็ม ' + perHW + ')' + dl;
-      hwDd.appendChild(opt);
-    });
-  
-  if(cur) hwDd.value = cur;
-}
+function populateHWDropdown(){const srs=document.getElementById('scan-room-filter');if(srs){const cr=srs.value;const ar=[...new Set([...DB.rooms,...DB.students.map(s=>s.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));srs.innerHTML='<option value="">— ทุกห้อง —</option>'+ar.map(r=>`<option value="${r}" ${r===cr?'selected':''}>${r}</option>`).join('');}const sf=document.getElementById('hw-subj-filter');const dd=document.getElementById('hw-select-dropdown');if(!dd)return;if(sf){const cs=sf.value;sf.innerHTML='<option value="">— ทุกวิชา —</option>';getSubjectNames().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sf.appendChild(o);});if(cs)sf.value=cs;}const rf=srs?srs.value:'';const fv=sf?sf.value:'';const cur=dd.value;dd.innerHTML='<option value="">— เลือกชิ้นงาน —</option>';DB.homeworks.filter(h=>(!rf||!h.room||h.room===rf)&&(!fv||h.subject===fv)&&!isHWLocked(h)).forEach(h=>{const o=document.createElement('option');o.value=h.num+'|'+(h.room||'');const dl=h.deadline?' · ส่ง '+new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short'}):'';const rt=h.room?` [${h.room}]`:'';o.textContent='ครั้งที่ '+h.num+' — '+h.title+rt+' (เต็ม '+(h.maxScore||100)+')'+dl;dd.appendChild(o);});if(cur)dd.value=cur;}
 
 function filterHWBySubject(){populateHWDropdown();document.getElementById('hw-selected-detail').style.display='none';const dd=document.getElementById('hw-select-dropdown');if(dd)dd.value='';document.getElementById('hw-num-input').value='';document.getElementById('hw-title-input').value='';document.getElementById('hw-maxscore-input').value='';}
-
-function populateHWRoomSelect(){
-  const sel=document.getElementById('hw-room-select');
-  if(!sel)return;
-  const allR=[...new Set([...DB.rooms,...DB.students.map(s=>s.room)])].filter(Boolean)
-    .sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
-  if(!allR.length){sel.innerHTML='<option value="">— ยังไม่มีห้องเรียน (ไปเพิ่มที่แท็บ 🏫 ห้องเรียน) —</option>';return;}
-  const cur=sel.value||_hwRoom;
-  sel.innerHTML='<option value="">— เลือกห้องเรียน —</option>'+
-    allR.map(r=>`<option value="${r}" ${r===cur?'selected':''}>${r}</option>`).join('');
-  if(cur&&allR.includes(cur))sel.value=cur;
-}
+function populateHWRoomSelect(){const sel=document.getElementById('hw-room-select');if(!sel)return;const allR=[...new Set([...DB.rooms,...DB.students.map(s=>s.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));if(!allR.length){sel.innerHTML='<option value="">— ยังไม่มีห้องเรียน (ไปเพิ่มที่แท็บ 🏫 ห้องเรียน) —</option>';return;}const cur=sel.value||_hwRoom;sel.innerHTML='<option value="">— เลือกห้องเรียน —</option>'+allR.map(r=>`<option value="${r}" ${r===cur?'selected':''}>${r}</option>`).join('');if(cur&&allR.includes(cur))sel.value=cur;}
 function setHWRoom(room){_hwRoom=room;renderManage();}
 function filterScanByRoom(){populateHWDropdown();document.getElementById('hw-selected-detail').style.display='none';const dd=document.getElementById('hw-select-dropdown');if(dd)dd.value='';}
 
-function selectHWFromDropdown(val){
-  if(!val){document.getElementById('hw-selected-detail').style.display='none';document.getElementById('hw-num-input').value='';document.getElementById('hw-title-input').value='';document.getElementById('hw-maxscore-input').value='';return;}
-  const[numStr,hwRoom]=val.split('|');
-  const num=parseInt(numStr);
-  const hw=DB.homeworks.find(h=>h.num===num&&(h.room===(hwRoom||'')||(!h.room&&!hwRoom)));
-  if(!hw)return;
+function selectHWFromDropdown(val){if(!val){document.getElementById('hw-selected-detail').style.display='none';document.getElementById('hw-num-input').value='';document.getElementById('hw-title-input').value='';document.getElementById('hw-maxscore-input').value='';return;}const[ns,hr]=val.split('|');const num=parseInt(ns);const hw=DB.homeworks.find(h=>h.num===num&&(h.room===(hr||'')||(!h.room&&!hr)));if(!hw)return;
 
   // ใช้ maxScore ของชิ้นงานโดยตรง (ระบบใหม่กำหนดคะแนนต่อชิ้นงาน)
   const scorePerHW = hw.maxScore || 100;
@@ -3889,34 +3776,8 @@ function filterRoomModal() {
   renderRoomModal(filtered);
 }
 
-function renderRoomModal(students){
-  const el=document.getElementById('room-stu-list');
-  if(!students.length){el.innerHTML='<div class="empty">ไม่พบนักเรียน</div>';return;}
-  el.innerHTML=students.map((s,i)=>{
-    const stuHWs=DB.homeworks.filter(h=>!h.room||h.room===s.room);
-    const hwCount=stuHWs.length;
-    const doneCount=stuHWs.filter(h=>DB.submissions[s.id+'_'+h.num]).length;
-    const pct=hwCount>0?Math.round(doneCount/hwCount*100):0;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);">
-      <div style="width:30px;height:30px;border-radius:50%;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--purple);flex-shrink:0;">${i+1}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:15px;font-weight:700;color:var(--text);">${s.name}</div>
-        <div style="font-size:12px;color:var(--text2);">🪪 ${s.id}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0;margin-right:6px;">
-        <div style="font-size:13px;font-weight:700;color:${pct>=80?'var(--green-dark)':pct>=50?'#B45309':'var(--red)'};">${doneCount}/${hwCount}</div>
-        <div style="font-size:11px;color:var(--text3);">${pct}%</div>
-      </div>
-      <button onclick="openEditStuFromRoom('${s.id}')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;white-space:nowrap;flex-shrink:0;">✏️ แก้ไข</button>
-    </div>`;
-  }).join('');
-}
-function openEditStuFromRoom(id){
-  const title=document.getElementById('room-stu-modal-title');
-  _editStuFromRoom=title?title.textContent.replace('🏫 ',''):'';
-  closeRoomModal();
-  openEditStu(id);
-}
+function renderRoomModal(students){const el=document.getElementById('room-stu-list');if(!students.length){el.innerHTML='<div class="empty">ไม่พบนักเรียน</div>';return;}el.innerHTML=students.map((s,i)=>{const sh=DB.homeworks.filter(h=>!h.room||h.room===s.room);const hc=sh.length;const dc=sh.filter(h=>DB.submissions[s.id+'_'+h.num]).length;const pct=hc>0?Math.round(dc/hc*100):0;return `<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);"><div style="width:30px;height:30px;border-radius:50%;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--purple);flex-shrink:0;">${i+1}</div><div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:700;color:var(--text);">${s.name}</div><div style="font-size:12px;color:var(--text2);">🪪 ${s.id}</div></div><div style="text-align:right;flex-shrink:0;margin-right:6px;"><div style="font-size:13px;font-weight:700;color:${pct>=80?'var(--green-dark)':pct>=50?'#B45309':'var(--red)'};">${dc}/${hc}</div><div style="font-size:11px;color:var(--text3);">${pct}%</div></div><button onclick="openEditStuFromRoom('${s.id}')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;white-space:nowrap;flex-shrink:0;">✏️ แก้ไข</button></div>`;}).join('');}
+function openEditStuFromRoom(id){const t=document.getElementById('room-stu-modal-title');_editStuFromRoom=t?t.textContent.replace('🏫 ',''):'';closeRoomModal();openEditStu(id);}
 
 function closeRoomModal() {
   document.getElementById('room-stu-modal').style.display = 'none';
@@ -5158,16 +5019,7 @@ function adjustEditScore(delta) {
   input.value = newVal;
 }
 
-async function saveEditScore() {
-  if(!_editingSubmission) return;
-  const scoreInput=document.getElementById('esm-score');
-  const rawVal=scoreInput?.value??'';
-  const newScore=rawVal!==''?parseFloat(rawVal):null;
-  if(newScore!==null){
-    if(isNaN(newScore)){toast('กรุณากรอกตัวเลข','warn');return;}
-    if(newScore<0){toast('คะแนนต้องไม่ติดลบ','warn');return;}
-    if(newScore>_editingSubmission.maxScore){toast(`คะแนนเกิน ${_editingSubmission.maxScore}`,'warn');return;}
-  }
+async function saveEditScore(){if(!_editingSubmission)return;const scoreInput=document.getElementById('esm-score');const rv=scoreInput?.value??'';const newScore=rv!==''?parseFloat(rv):null;if(newScore!==null){if(isNaN(newScore)){toast('กรุณากรอกตัวเลข','warn');return;}if(newScore<0){toast('คะแนนต้องไม่ติดลบ','warn');return;}if(newScore>_editingSubmission.maxScore){toast(`คะแนนเกิน ${_editingSubmission.maxScore}`,'warn');return;}}
   const {sid, hwNum, maxScore, hwTitle} = _editingSubmission;
   const stu = DB.students.find(s => s.id === sid);
   if(!stu) return;

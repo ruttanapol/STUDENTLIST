@@ -769,12 +769,8 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
         <div id="hw-save-badge" style="font-size:11px;font-weight:700;color:var(--green-dark);background:var(--green-light);padding:3px 10px;border-radius:20px;display:none;">✓ บันทึกแล้ว</div>
       </div>
       <!-- Step 0: เลือกห้องเรียน -->
-      <div style="margin-bottom:10px;">
-        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">0️⃣ เลือกห้องเรียน</div>
-        <select id="scan-room-filter" onchange="filterScanByRoom()" onfocus="populateHWDropdown()"
-          style="font-size:15px;padding:12px 14px;font-weight:600;color:var(--blue-dark);border-color:#BFDBFE;background:var(--blue-light);width:100%;border-radius:10px;border-width:1.5px;">
-          <option value="">— ทุกห้อง —</option>
-        </select>
+      <div style="margin-bottom:10px;"><div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">0️⃣ เลือกห้องเรียน</div>
+        <select id="scan-room-filter" onchange="filterScanByRoom()" onfocus="populateHWDropdown()" style="font-size:15px;padding:12px 14px;font-weight:600;color:var(--blue-dark);border-color:#BFDBFE;background:var(--blue-light);width:100%;border-radius:10px;border-width:1.5px;"><option value="">— ทุกห้อง —</option></select>
       </div>
       <!-- Step 1: เลือกวิชา -->
       <div style="margin-bottom:10px;">
@@ -1042,12 +1038,8 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     </div>
     <div class="card">
       <div class="card-title">📝 เพิ่ม / แก้ไขชิ้นงาน</div>
-      <div style="margin-bottom:12px;">
-        <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">🏫 ห้องเรียน</div>
-        <select id="hw-room-select" onchange="setHWRoom(this.value)" onfocus="populateHWRoomSelect()"
-          style="font-size:15px;padding:12px;font-weight:700;color:var(--blue-dark);border-color:#BFDBFE;background:var(--blue-light);width:100%;border-radius:12px;border-width:2px;cursor:pointer;">
-          <option value="">— คลิกเพื่อเลือกห้องเรียน —</option>
-        </select>
+      <div style="margin-bottom:12px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">🏫 ห้องเรียน</div>
+        <select id="hw-room-select" onchange="setHWRoom(this.value)" onfocus="populateHWRoomSelect()" style="font-size:15px;padding:12px;font-weight:700;color:var(--blue-dark);border-color:#BFDBFE;background:var(--blue-light);width:100%;border-radius:12px;border-width:2px;cursor:pointer;"><option value="">— คลิกเพื่อเลือกห้องเรียน —</option></select>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <div style="flex:0 0 64px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">ครั้งที่</div><input type="number" id="n-hwnum" placeholder="1" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--purple);" onkeydown="if(event.key==='Enter')document.getElementById('n-hwtitle').focus()"></div>
