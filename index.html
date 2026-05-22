@@ -768,14 +768,6 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
         <div class="card-title" style="margin:0;color:var(--purple);">📝 งานที่กำลังตรวจ</div>
         <div id="hw-save-badge" style="font-size:11px;font-weight:700;color:var(--green-dark);background:var(--green-light);padding:3px 10px;border-radius:20px;display:none;">✓ บันทึกแล้ว</div>
       </div>
-      <!-- Step 0: เลือกห้องเรียน -->
-      <div style="margin-bottom:10px;">
-        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">0️⃣ เลือกห้องเรียน</div>
-        <select id="scan-room-filter" onchange="filterScanByRoom()" onfocus="populateHWDropdown()"
-          style="font-size:15px;padding:12px 14px;font-weight:600;color:var(--blue-dark);border-color:#BFDBFE;background:var(--blue-light);width:100%;border-radius:10px;border-width:1.5px;">
-          <option value="">— ทุกห้อง —</option>
-        </select>
-      </div>
       <!-- Step 1: เลือกวิชา -->
       <div style="margin-bottom:10px;">
         <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;">1️⃣ เลือกวิชา</div>
@@ -857,7 +849,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
         </div>
       </div>
       <div class="manual-row">
-        <input type="number" id="manual-id" placeholder="รหัสนักเรียน..." inputmode="numeric" onkeydown="if(event.key==='Enter')submitManual()">
+        <input type="number" id="manual-id" placeholder="รหัสนักเรียน..." inputmode="numeric">
         <input type="number" id="manual-score" placeholder="คะแนน" inputmode="numeric" min="0"
           style="flex:0 0 80px;margin:0;text-align:center;font-weight:700;color:var(--purple);">
         <button class="mini-btn" onclick="submitManual()" style="min-height:48px;padding:0 18px;font-size:15px;border-radius:12px;">ยืนยัน</button>
@@ -969,7 +961,7 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     <div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#FAF5FF,#EDE9FE);">
       <div class="card-title" style="color:var(--purple);">🏫 ห้องเรียน</div>
       <div style="display:flex;gap:8px;">
-        <input type="text" id="n-room" placeholder="เช่น ม.1/1" style="flex:1;margin:0;" onkeydown="if(event.key==='Enter')addRoom()">
+        <input type="text" id="n-room" placeholder="เช่น ม.1/1" style="flex:1;margin:0;">
         <button class="mini-btn" onclick="addRoom()" style="border-color:var(--purple);color:var(--purple);background:var(--purple-light);min-height:48px;padding:0 16px;">+ เพิ่ม</button>
       </div>
       <div class="room-card-grid" id="room-chips"></div>
@@ -980,8 +972,8 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     <div class="card">
       <div class="card-title">👤 เพิ่มนักเรียนรายคน</div>
       <div style="display:flex;gap:8px;">
-        <div style="flex:0 0 100px;"><label class="lbl" style="margin-top:0;">รหัส</label><input type="text" id="ns-id" placeholder="66011" inputmode="numeric" onkeydown="if(event.key==='Enter')document.getElementById('ns-name').focus()"></div>
-        <div style="flex:1;"><label class="lbl" style="margin-top:0;">ชื่อ-สกุล</label><input type="text" id="ns-name" placeholder="ชื่อ นามสกุล" onkeydown="if(event.key==='Enter')addStudent()"></div>
+        <div style="flex:0 0 100px;"><label class="lbl" style="margin-top:0;">รหัส</label><input type="text" id="ns-id" placeholder="66011" inputmode="numeric"></div>
+        <div style="flex:1;"><label class="lbl" style="margin-top:0;">ชื่อ-สกุล</label><input type="text" id="ns-name" placeholder="ชื่อ นามสกุล"></div>
       </div>
       <label class="lbl">ห้อง</label><select id="ns-room"></select>
       <button class="add-btn" onclick="addStudent()">+ เพิ่มนักเรียน</button>
@@ -1042,18 +1034,9 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
     </div>
     <div class="card">
       <div class="card-title">📝 เพิ่ม / แก้ไขชิ้นงาน</div>
-      <div style="margin-bottom:12px;">
-        <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">🏫 ห้องเรียน</div>
-        <select id="hw-room-select"
-          onchange="setHWRoom(this.value)"
-          onfocus="populateHWRoomSelect()"
-          style="font-size:15px;padding:12px;font-weight:700;color:var(--blue-dark);border-color:#BFDBFE;background:var(--blue-light);width:100%;border-radius:12px;border-width:2px;cursor:pointer;">
-          <option value="">— คลิกเพื่อเลือกห้องเรียน —</option>
-        </select>
-      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <div style="flex:0 0 64px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">ครั้งที่</div><input type="number" id="n-hwnum" placeholder="1" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--purple);" onkeydown="if(event.key==='Enter')document.getElementById('n-hwtitle').focus()"></div>
-        <div style="flex:1;min-width:120px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">หัวข้องาน</div><input type="text" id="n-hwtitle" placeholder="เช่น แบบฝึกหัดบทที่ 1" onkeydown="if(event.key==='Enter')saveHWWithFile()"></div>
+        <div style="flex:0 0 64px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">ครั้งที่</div><input type="number" id="n-hwnum" placeholder="1" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--purple);"></div>
+        <div style="flex:1;min-width:120px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">หัวข้องาน</div><input type="text" id="n-hwtitle" placeholder="เช่น แบบฝึกหัดบทที่ 1"></div>
         <div style="flex:0 0 100px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">วิชา</div><select id="n-hwsubj" style="font-size:13px;padding:8px;" onchange="onSubjChangeInHW()"></select></div>
         <div style="flex:0 0 80px;"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">คะแนนต่อชิ้น</div><input type="number" id="n-hwmaxscore" placeholder="100" inputmode="numeric" min="1" style="text-align:center;font-weight:700;color:var(--blue);" value="100"></div>
       </div>
