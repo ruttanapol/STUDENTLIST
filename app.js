@@ -498,8 +498,8 @@ async function reloadHomeworks() {
   populateHWDropdown();
 }
 
-let _currentStuId = null; // track which student is viewing
-let _hwRoom = ''; // ห้องที่เลือกใน manage homework tab
+let _currentStuId = null;
+let _hwRoom = '';
 
 function renderStudentIfOpen() {
   if(_currentStuId) {
@@ -576,33 +576,39 @@ async function sbDeleteStudent(id) {
 async function sbAddHomework(hw) {
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
-    await SB.from('homeworks').delete().eq('num',hw.num).eq('teacher_id',tid).eq('room',hw.room||'');
+    await SB.from('homeworks').delete().eq('num',hw.num).eq('teacher_id',tid);
     const {error} = await SB.from('homeworks').insert({
-      num: hw.num, title: hw.title, subject: hw.subject||'',
-      max_score: hw.maxScore||100, teacher_id: tid,
+      num: hw.num,
+      title: hw.title,
+      subject: hw.subject||'',
+      max_score: hw.maxScore||100,
+      teacher_id: tid,
       deadline: hw.deadline && hw.deadline.trim() !== '' ? hw.deadline : null,
-      file_url: hw.fileUrl||null, file_name: hw.fileName||null, room: hw.room||''
+      file_url: hw.fileUrl||null,
+      file_name: hw.fileName||null
     });
     if(error) throw error;
     await reloadHomeworks();
   } else {
-    const existing = DB.homeworks.find(h => h.num === hw.num && h.room === (hw.room||''));
+    const existing = DB.homeworks.find(h => h.num === hw.num);
     if(existing) { existing.title=hw.title; existing.subject=hw.subject; existing.maxScore=hw.maxScore; existing.deadline=hw.deadline||null; existing.fileUrl=hw.fileUrl||''; existing.fileName=hw.fileName||''; }
     else { DB.homeworks.push(hw); DB.homeworks.sort((a,b)=>a.num-b.num); }
-    saveDB(); renderManage(); populateHWDropdown(); renderSubjectsFull();
+    saveDB();
+    renderManage();
+    populateHWDropdown();
+    renderSubjectsFull();
   }
 }
 
 async function sbDeleteHomework(num, room) {
   if(USE_SUPABASE) {
-    const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
-    let q = SB.from('homeworks').delete().eq('num', num).eq('teacher_id', tid);
-    if(room !== undefined) q = q.eq('room', room);
-    const {error} = await q;
-    if(error) throw error;
+    const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';
+    let q=SB.from('homeworks').delete().eq('num',num).eq('teacher_id',tid);
+    if(room!==undefined) q=q.eq('room',room);
+    const{error}=await q;if(error)throw error;
     await reloadHomeworks();
   } else {
-    DB.homeworks = DB.homeworks.filter(h => !(h.num===num && (room===undefined||h.room===room)));
+    DB.homeworks=DB.homeworks.filter(h=>!(h.num===num&&(room===undefined||h.room===room)));
     saveDB();
   }
 }
@@ -1800,8 +1806,8 @@ let _currentStuDB = null;   // temp DB for student view
 let _currentStuTeacher = null; // teacher info for student view
 
 function renderStudentView(s, stuDB){
-  const db = stuDB || {student:s, homeworks:DB.homeworks, submissions:DB.submissions};
-  const roomHWs = roomHWs.filter(h=>!h.room||h.room===s.room);
+  const db=stuDB||{student:s,homeworks:DB.homeworks,submissions:DB.submissions};
+  const roomHWs=roomHWs.filter(h=>!h.room||h.room===s.room);
   const teacher = _currentStuTeacher;
   document.getElementById('stu-avatar').textContent=s.name.substring(0,2);
   document.getElementById('stu-display-name').textContent=s.name;
@@ -1877,7 +1883,7 @@ async function refreshStudentView(){
   // โหลดทั้ง submissions และ homeworks
   const [subRes, hwRes] = await Promise.all([
     SB.from('submissions').select('*').eq('student_id', _currentStuId).eq('teacher_id', tid),
-    SB.from('homeworks').select('*').eq('teacher_id', tid).eq('room', _currentStuDB.student.room).order('num')
+    SB.from('homeworks').select('*').eq('teacher_id',tid).eq('room',_currentStuDB.student.room).order('num')
   ]);
 
   // อัพเดต homeworks
@@ -1956,10 +1962,10 @@ async function onHWFieldChange(){
     const maxScore=parseInt(document.getElementById('hw-maxscore-input').value)||100;
     if(!num||!title)return;
     // ตรวจ plan limit ถ้าเป็นงานใหม่
-    const isNewHWAutoSave = !DB.homeworks.find(h => h.num===num && h.room===_hwRoom);
-    if(isNewHWAutoSave) {
-      const autoSaveLimit = checkPlanLimit('homework');
-      if(!autoSaveLimit.ok) { toast(autoSaveLimit.msg, 'warn'); return; }
+    const isNewHWAutoSave=!DB.homeworks.find(h=>h.num===num&&h.room===_hwRoom);
+    if(isNewHWAutoSave){
+      const autoSaveLimit=checkPlanLimit('homework');
+      if(!autoSaveLimit.ok){toast(autoSaveLimit.msg,'warn');return;}
     }
     await sbAddHomework({num,title,subject,maxScore,room:_hwRoom});
     lsSet('hw_current',{num,title,subject,maxScore});
@@ -2177,7 +2183,7 @@ function renderTable(){
     const stuHWs=DB.homeworks.filter(h=>h.room===s.room);
     const done=stuHWs.filter(h=>DB.submissions[s.id+'_'+h.num]).length;
     const pct=stuHWs.length?Math.round(done/stuHWs.length*100):0;
-    const dots = stuHWs.map(h => {
+    const dots=stuHWs.map(h=>{
   const sub = DB.submissions[s.id+'_'+h.num];
   const scoreLabel = (sub && sub.score !== null && sub.score !== undefined) ? sub.score : '';
   const onclick = sub ? `openEditScoreById('${s.id}',${h.num})` : '';
@@ -2255,7 +2261,7 @@ async function saveEditStu(){
   } catch(e){toast('แก้ไขไม่สำเร็จ: '+e.message,'err');}
 }
 
-// openEditScore(sid,hwNum) → รวมเข้า openEditScoreById แล้ว
+// openEditScore → ใช้ openEditScoreById แทน (ผ่าน modal ที่ดีกว่า)
 
 let xlImportData=[];
 function downloadTemplate(){
@@ -2381,8 +2387,7 @@ async function addRoom(){
   const n=document.getElementById('n-room').value.trim();
   if(!n){toast('กรอกชื่อห้อง','warn');return;}
   if(DB.rooms.includes(n)){toast('ห้องนี้มีอยู่แล้ว','warn');return;}
-  const limit=checkPlanLimit('room');
-  if(!limit.ok){showUpgradeModal(limit.msg);return;}
+  const limit=checkPlanLimit('room');if(!limit.ok){showUpgradeModal(limit.msg);return;}
   showActionPopup('กำลังเพิ่มห้อง '+n,'','add');
   try{
     DB.rooms=[...new Set([...DB.rooms,n])].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
@@ -2390,10 +2395,7 @@ async function addRoom(){
     actionPopupDone('เพิ่มห้อง '+n+' แล้ว','','add');
     setTimeout(()=>renderManage(),100);
     document.getElementById('n-room').value='';
-  }catch(e){
-    DB.rooms=DB.rooms.filter(r=>r!==n);
-    actionPopupError?.('เพิ่มห้องไม่สำเร็จ: '+e.message)||toast('เพิ่มห้องไม่สำเร็จ: '+e.message,'err');
-  }
+  }catch(e){DB.rooms=DB.rooms.filter(r=>r!==n);actionPopupError?.('เพิ่มห้องไม่สำเร็จ: '+e.message)||toast('เพิ่มห้องไม่สำเร็จ: '+e.message,'err');}
 }
 
 async function delRoom(n){
@@ -2431,10 +2433,7 @@ async function delRoom(n){
     await sbSaveSettings('rooms',DB.rooms);
     actionPopupDone('ลบห้อง '+n+' แล้ว','','delete');
     setTimeout(()=>{renderManage();renderDashboard();},100);
-  }catch(e){
-    DB.rooms=[...DB.rooms,n].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
-    actionPopupError?.('ลบห้องไม่สำเร็จ: '+e.message)||toast('ลบห้องไม่สำเร็จ: '+e.message,'err');
-  }
+  }catch(e){DB.rooms=[...DB.rooms,n].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));actionPopupError?.('ลบห้องไม่สำเร็จ: '+e.message)||toast('ลบห้องไม่สำเร็จ: '+e.message,'err');}
 }
 
 async function addStudent(){
@@ -2482,14 +2481,14 @@ async function addHW(){
   if(!num||!title){toast('กรอกให้ครบ','warn');return;}
   if(!room){toast('กรุณาเลือกห้องเรียนก่อน','warn');return;}
   if(DB.homeworks.find(h=>h.num===num&&h.room===room)){toast('งานครั้งที่ '+num+' ของ '+room+' มีแล้ว','warn');return;}
-  const limit = checkPlanLimit('homework');
-  if(!limit.ok){ showUpgradeModal(limit.msg); return; }
+  const limit=checkPlanLimit('homework');
+  if(!limit.ok){showUpgradeModal(limit.msg);return;}
   try{await sbAddHomework({num,title,subject,maxScore,room});renderManage();toast('เพิ่มงานครั้งที่ '+num+' ('+room+')');document.getElementById('n-hwnum').value='';document.getElementById('n-hwtitle').value='';}
   catch(e){toast('เพิ่มไม่สำเร็จ: '+e.message,'err');}
 }
 
-async function delHW(num, room){
-  room = (room!==undefined) ? room : _hwRoom;
+async function delHW(num,room){
+  room=(room!==undefined)?room:_hwRoom;
   const h=DB.homeworks.find(x=>x.num===num&&x.room===room);
   if(!confirm('ลบงานครั้งที่ '+num+' ['+room+']'+(h?' — '+h.title:'')+'?'))return;
   showActionPopup('กำลังลบชิ้นงาน','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');
@@ -2529,7 +2528,7 @@ async function clearAllStudents(){
   } else {
     DB.students=[];DB.submissions=[];saveDB();
   }
-  actionPopupDone('ลบรายชื่อนักเรียนแล้ว','ลบ '+count+' คนสำเร็จ','delete');setTimeout(()=>renderManage(),100);
+  renderManage();actionPopupDone('ลบรายชื่อนักเรียนแล้ว','ลบ '+count+' คนสำเร็จ','delete');
 }
 
 // ╔══════════════════════════════════════════════════════╗
@@ -2699,10 +2698,10 @@ async function saveHW(){
   const maxScore=parseInt(document.getElementById('n-hwmaxscore').value)||100;
   const deadlineRaw=document.getElementById('n-hwdeadline')?document.getElementById('n-hwdeadline').value:'';
   const deadline = deadlineRaw && deadlineRaw.trim() !== '' ? deadlineRaw : null;
-  const room = _hwRoom;
+  const room=_hwRoom;
   if(!num||!title){toast('กรอกให้ครบ','warn');return;}
   if(!room){toast('กรุณาเลือกห้องเรียนก่อน','warn');return;}
-  const isNew = !DB.homeworks.find(h => h.num===num && h.room===room);
+  const isNew=!DB.homeworks.find(h=>h.num===num&&h.room===room);
   if(isNew){
     const limit = checkPlanLimit('homework');
     if(!limit.ok){ showUpgradeModal(limit.msg); return; }
@@ -2783,14 +2782,8 @@ function renderManage(){
         </div>`;
       }).join('')
     :'<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;grid-column:1/-1;">ยังไม่มีห้องเรียน</div>';
-  // HW room selector + cards (filtered by _hwRoom)
-  const hwRoomSel=document.getElementById('hw-room-select');
-  if(hwRoomSel){
-    const saved=_hwRoom||hwRoomSel.value;
-    hwRoomSel.innerHTML='<option value="">— เลือกห้องเรียนก่อน —</option>'+
-      allRooms.map(r=>`<option value="${r}" ${r===saved?'selected':''}>${r}</option>`).join('');
-    if(saved&&allRooms.includes(saved)){hwRoomSel.value=saved;_hwRoom=saved;}
-  }
+  // HW room selector (refresh ทุกครั้ง ไม่ขึ้นกับ timing)
+  populateHWRoomSelect();
   const hwList=document.getElementById('hw-card-list');
   if(hwList){
     const hwsToShow=_hwRoom?DB.homeworks.filter(h=>h.room===_hwRoom):[];
@@ -3011,7 +3004,7 @@ async function confirmXLImport(){
     await sbImportStudents(newStudents);
     const newRooms=[...new Set(newStudents.map(s=>s.room))].filter(r=>!DB.rooms.includes(r));
     if(newRooms.length){
-      DB.rooms=[...new Set([...DB.rooms,...newRooms])].sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
+      DB.rooms=[...new Set([...DB.rooms,...newRooms])].sort();
       await sbSaveSettings('rooms', DB.rooms);
     }
     cancelXLImport();renderManage();
@@ -3764,57 +3757,43 @@ function renderSubjectsFull() {
 // ===== DROPDOWN SCAN WITH SUBJECT FILTER =====
 
 function populateHWDropdown() {
-  // populate scan room dropdown
-  const scanRoomSel=document.getElementById('scan-room-filter');
-  if(scanRoomSel){
-    const curR=scanRoomSel.value;
-    const allR=[...new Set([...DB.rooms,...DB.students.map(s=>s.room)])].filter(Boolean).sort();
-    scanRoomSel.innerHTML='<option value="">— ทุกห้อง —</option>'+
-      allR.map(r=>`<option value="${r}" ${r===curR?'selected':''}>${r}</option>`).join('');
-  }
-  const subjFilter=document.getElementById('hw-subj-filter');
-  const hwDd=document.getElementById('hw-select-dropdown');
+  const subjFilter = document.getElementById('hw-subj-filter');
+  const hwDd = document.getElementById('hw-select-dropdown');
   if(!hwDd) return;
-  if(subjFilter){
-    const curSubj=subjFilter.value;
-    subjFilter.innerHTML='<option value="">— ทุกวิชา —</option>';
-    getSubjectNames().forEach(n=>{const opt=document.createElement('option');opt.value=n;opt.textContent=n;subjFilter.appendChild(opt);});
-    if(curSubj) subjFilter.value=curSubj;
+
+  // populate subject filter
+  if(subjFilter) {
+    const curSubj = subjFilter.value;
+    subjFilter.innerHTML = '<option value="">— ทุกวิชา —</option>';
+    getSubjectNames().forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      subjFilter.appendChild(opt);
+    });
+    if(curSubj) subjFilter.value = curSubj;
   }
-  const roomFilter=scanRoomSel?scanRoomSel.value:'';
-  const filterVal=subjFilter?subjFilter.value:'';
-  const cur=hwDd.value;
-  hwDd.innerHTML='<option value="">— เลือกชิ้นงาน —</option>';
+
+  // populate hw dropdown (filter by subject)
+  const filterVal = subjFilter ? subjFilter.value : '';
+  const cur = hwDd.value;
+  hwDd.innerHTML = '<option value="">— เลือกชิ้นงาน —</option>';
+  
   DB.homeworks
-    .filter(h=>(!roomFilter||h.room===roomFilter)&&(!filterVal||h.subject===filterVal)&&!isHWLocked(h))
-    .forEach(h=>{
-      const opt=document.createElement('option');
-      opt.value=h.num;
-      const perHW=h.maxScore||100;
-      const dl=h.deadline?' · ส่ง '+new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short'}):'';
-      const roomTag=h.room?` [${h.room}]`:'';
-      opt.textContent='ครั้งที่ '+h.num+' — '+h.title+roomTag+' (เต็ม '+perHW+')'+dl;
+    .filter(h => (!filterVal || h.subject === filterVal) && !isHWLocked(h))
+    .forEach(h => {
+      const opt = document.createElement('option');
+      opt.value = h.num;
+      const perHW = h.maxScore || 100;
+      const dl = h.deadline ? ' · ส่ง ' + new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '';
+      opt.textContent = 'ครั้งที่ ' + h.num + ' — ' + h.title + ' (เต็ม ' + perHW + ')' + dl;
       hwDd.appendChild(opt);
     });
-  if(cur) hwDd.value=cur;
+  
+  if(cur) hwDd.value = cur;
 }
 
-function filterHWBySubject() {
-  populateHWDropdown();
-  document.getElementById('hw-selected-detail').style.display = 'none';
-  const dd = document.getElementById('hw-select-dropdown');
-  if(dd) dd.value = '';
-  document.getElementById('hw-num-input').value = '';
-  document.getElementById('hw-title-input').value = '';
-  document.getElementById('hw-maxscore-input').value = '';
-}
-function setHWRoom(room){ _hwRoom=room; renderManage(); }
-function filterScanByRoom(){
-  populateHWDropdown();
-  document.getElementById('hw-selected-detail').style.display='none';
-  const dd=document.getElementById('hw-select-dropdown');
-  if(dd) dd.value='';
-}
+function filterHWBySubject(){populateHWDropdown();document.getElementById('hw-selected-detail').style.display='none';const dd=document.getElementById('hw-select-dropdown');if(dd)dd.value='';document.getElementById('hw-num-input').value='';document.getElementById('hw-title-input').value='';document.getElementById('hw-maxscore-input').value='';}
+function filterScanByRoom(){populateHWDropdown();document.getElementById('hw-selected-detail').style.display='none';const dd=document.getElementById('hw-select-dropdown');if(dd)dd.value='';}
 
 function selectHWFromDropdown(numStr) {
   if(!numStr) {
@@ -4018,13 +3997,10 @@ async function saveHWWithFile() {
   const fileInput = document.getElementById('hw-file-input');
   const file = fileInput?.files[0];
 
-  if(!num || !title) { toast('กรอกให้ครบ','warn'); return; }
-
   // ตรวจ plan limit (เฉพาะงานใหม่ ไม่ใช่ update)
-  const room = _hwRoom;
-  if(!num||!title){ toast('กรอกให้ครบ','warn'); return; }
-  if(!room){ toast('กรุณาเลือกห้องเรียนก่อน','warn'); return; }
-  const isNewHW = !DB.homeworks.find(h => h.num===num && h.room===room);
+  const room=_hwRoom;
+  if(!room){toast('กรุณาเลือกห้องเรียนก่อน','warn');return;}
+  const isNewHW=!DB.homeworks.find(h=>h.num===num&&h.room===room);
   if(isNewHW) {
     const hwLimit = checkPlanLimit('homework');
     if(!hwLimit.ok) { showUpgradeModal(hwLimit.msg); return; }
@@ -4151,10 +4127,9 @@ function checkPlanLimit(type, extra) {
       return { ok: true };
     }
     case 'homework': {
-      const hwCount = _hwRoom ? DB.homeworks.filter(h=>h.room===_hwRoom).length : DB.homeworks.length;
-      if (hwCount >= FREE_LIMITS.homeworks)
-        return { ok: false, msg: `แพลน Free จำกัด ${FREE_LIMITS.homeworks} ชิ้นงาน/ห้อง 🔒`, upgrade: true };
-      return { ok: true };
+      const hwCount=_hwRoom?DB.homeworks.filter(h=>h.room===_hwRoom).length:DB.homeworks.length;
+      if(hwCount>=FREE_LIMITS.homeworks) return{ok:false,msg:`แพลน Free จำกัด ${FREE_LIMITS.homeworks} ชิ้นงาน/ห้อง 🔒`,upgrade:true};
+      return{ok:true};
     }
     case 'excel':
       return { ok: false, msg: 'Export Excel เฉพาะแพลน Premium 🔒', upgrade: true };
@@ -5167,16 +5142,17 @@ function adjustEditScore(delta) {
 async function saveEditScore() {
   if(!_editingSubmission) return;
   const scoreInput = document.getElementById('esm-score');
-  const rawVal = scoreInput?.value ?? '';
-  const newScore = rawVal !== '' ? parseFloat(rawVal) : null;
+  const rawVal=scoreInput?.value??'';
+  const newScore=rawVal!==''?parseFloat(rawVal):null;
+  if(newScore!==null){
+    if(isNaN(newScore)){toast('กรุณากรอกตัวเลข','warn');return;}
+    if(newScore<0){toast('คะแนนต้องไม่ติดลบ','warn');return;}
+    if(newScore>_editingSubmission.maxScore){toast(`คะแนนเกิน ${_editingSubmission.maxScore}`,'warn');return;}
+  }
   const {sid, hwNum, maxScore, hwTitle} = _editingSubmission;
   const stu = DB.students.find(s => s.id === sid);
   if(!stu) return;
-  if(newScore !== null){
-    if(isNaN(newScore)){toast('กรุณากรอกตัวเลข','warn');return;}
-    if(newScore < 0){toast('คะแนนต้องไม่ติดลบ','warn');return;}
-    if(newScore > maxScore){toast(`คะแนนเกิน ${maxScore} (คะแนนเต็ม)`,'warn');return;}
-  }
+
   showActionPopup('กำลังบันทึกคะแนน', stu.name + ' · ชิ้นที่ ' + hwNum, 'edit');
 
   try {
