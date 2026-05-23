@@ -362,7 +362,14 @@ async function loadFromSupabase() {
 
   DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room}));
   DB.rooms = [...new Set(DB.students.map(s => s.room))].sort();
+  // ตรวจว่า room column มีหรือยัง
+  const _hwHasRoom = hwRes.data && hwRes.data.length > 0 && 'room' in hwRes.data[0];
+  const _hwNeedsMigration = hwRes.data && hwRes.data.length > 0 && !_hwHasRoom;
   DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||'', fileUrl: r.file_url||'', fileName: r.file_name||'', room: r.room||''}));
+  // แสดง banner ถ้ายังไม่รัน SQL migration
+  if(_hwNeedsMigration) {
+    setTimeout(() => showRoomMigrationBanner(), 800);
+  }
 
   const subs = {};
   (subRes.data || []).forEach(r => {
@@ -3702,6 +3709,27 @@ function renderSubjectsFull() {
 function populateHWDropdown(){const srs=document.getElementById('scan-room-filter');if(srs){const cr=srs.value;const ar=[...new Set([...DB.rooms,...DB.students.map(s=>s.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));srs.innerHTML='<option value="">— ทุกห้อง —</option>'+ar.map(r=>`<option value="${r}" ${r===cr?'selected':''}>${r}</option>`).join('');}const sf=document.getElementById('hw-subj-filter');const dd=document.getElementById('hw-select-dropdown');if(!dd)return;if(sf){const cs=sf.value;sf.innerHTML='<option value="">— ทุกวิชา —</option>';getSubjectNames().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sf.appendChild(o);});if(cs)sf.value=cs;}const rf=srs?srs.value:'';const fv=sf?sf.value:'';const cur=dd.value;dd.innerHTML='<option value="">— เลือกชิ้นงาน —</option>';DB.homeworks.filter(h=>(!rf||!h.room||h.room===rf)&&(!fv||h.subject===fv)&&!isHWLocked(h)).forEach(h=>{const o=document.createElement('option');o.value=h.num+'|'+(h.room||'');const dl=h.deadline?' · ส่ง '+new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short'}):'';const rt=h.room?` [${h.room}]`:'';o.textContent='ครั้งที่ '+h.num+' — '+h.title+rt+' (เต็ม '+(h.maxScore||100)+')'+dl;dd.appendChild(o);});if(cur)dd.value=cur;}
 
 function filterHWBySubject(){populateHWDropdown();document.getElementById('hw-selected-detail').style.display='none';const dd=document.getElementById('hw-select-dropdown');if(dd)dd.value='';document.getElementById('hw-num-input').value='';document.getElementById('hw-title-input').value='';document.getElementById('hw-maxscore-input').value='';}
+function showRoomMigrationBanner(){
+  const existing = document.getElementById('room-migration-banner');
+  if(existing) return;
+  const banner = document.createElement('div');
+  banner.id = 'room-migration-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#DC2626;color:#fff;padding:16px 20px;font-size:14px;font-weight:600;display:flex;align-items:flex-start;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+  banner.innerHTML = `
+    <div style="font-size:24px;flex-shrink:0;">⚠️</div>
+    <div style="flex:1;">
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px;">ต้องรัน SQL ใน Supabase ก่อน!</div>
+      <div style="margin-bottom:8px;opacity:0.95;">งานยังทับกันข้ามห้องเพราะ ตาราง <b>homeworks</b> ยังไม่มีคอลัมน์ <b>room</b></div>
+      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:13px;user-select:all;margin-bottom:8px;">
+        ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT '';
+      </div>
+      <div style="opacity:0.9;font-size:12px;">ไปที่ Supabase → SQL Editor → วางคำสั่งด้านบน → กด Run</div>
+    </div>
+    <button onclick="document.getElementById('room-migration-banner').remove()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:18px;flex-shrink:0;font-weight:700;">✕</button>
+  `;
+  document.body.prepend(banner);
+}
+
 function populateHWRoomSelect(){const sel=document.getElementById('hw-room-select');if(!sel)return;const allR=[...new Set([...DB.rooms,...DB.students.map(s=>s.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));if(!allR.length){sel.innerHTML='<option value="">— ยังไม่มีห้องเรียน (ไปเพิ่มที่แท็บ 🏫 ห้องเรียน) —</option>';return;}const cur=sel.value||_hwRoom;sel.innerHTML='<option value="">— เลือกห้องเรียน —</option>'+allR.map(r=>`<option value="${r}" ${r===cur?'selected':''}>${r}</option>`).join('');if(cur&&allR.includes(cur))sel.value=cur;}
 function setHWRoom(room){_hwRoom=room;renderManage();}
 function filterScanByRoom(){populateHWDropdown();document.getElementById('hw-selected-detail').style.display='none';const dd=document.getElementById('hw-select-dropdown');if(dd)dd.value='';}
