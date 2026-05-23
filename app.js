@@ -362,14 +362,12 @@ async function loadFromSupabase() {
 
   DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room}));
   DB.rooms = [...new Set(DB.students.map(s => s.room))].sort();
-  // ตรวจว่า room column มีหรือยัง
-  const _hwHasRoom = hwRes.data && hwRes.data.length > 0 && 'room' in hwRes.data[0];
-  const _hwNeedsMigration = hwRes.data && hwRes.data.length > 0 && !_hwHasRoom;
-  DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||'', fileUrl: r.file_url||'', fileName: r.file_name||'', room: r.room||''}));
-  // แสดง banner ถ้ายังไม่รัน SQL migration
-  if(_hwNeedsMigration) {
-    setTimeout(() => showRoomMigrationBanner(), 800);
-  }
+  // ตรวจ room column
+  const _hwAny = hwRes.data || [];
+  const _hwHasRoom = _hwAny.length > 0 ? ('room' in _hwAny[0]) : await checkRoomColumnExists();
+  _hwRoomColumnReady = _hwHasRoom;
+  DB.homeworks = _hwAny.map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||'', fileUrl: r.file_url||'', fileName: r.file_name||'', room: r.room||''}));
+  if(!_hwHasRoom) setTimeout(()=>showRoomMigrationBanner(),800);
 
   const subs = {};
   (subRes.data || []).forEach(r => {
@@ -507,6 +505,7 @@ async function reloadHomeworks() {
 
 let _currentStuId = null;
 let _hwRoom = '';
+let _hwRoomColumnReady = null; // null=ยังไม่รู้, true=มี, false=ยังไม่มี
 let _editStuFromRoom = '';
 
 function renderStudentIfOpen() {
@@ -2457,7 +2456,10 @@ async function delSubj(n){
   renderManage();
 }
 
-async function addHW(){const num=parseInt(document.getElementById('n-hwnum').value);const title=document.getElementById('n-hwtitle').value.trim();const subject=document.getElementById('n-hwsubj').value;const maxScore=parseInt(document.getElementById('n-hwmaxscore')?.value)||100;const room=_hwRoom;if(!num||!title){toast('กรอกให้ครบ','warn');return;}if(!room){toast('กรุณาเลือกห้องเรียนก่อน','warn');return;}if(DB.homeworks.find(h=>h.num===num&&h.room===room)){toast('งานครั้งที่ '+num+' ของ '+room+' มีแล้ว','warn');return;}const limit=checkPlanLimit('homework');if(!limit.ok){showUpgradeModal(limit.msg);return;}try{await sbAddHomework({num,title,subject,maxScore,room});renderManage();toast('เพิ่มงานครั้งที่ '+num+' ('+room+')');document.getElementById('n-hwnum').value='';document.getElementById('n-hwtitle').value='';}catch(e){toast('เพิ่มไม่สำเร็จ: '+e.message,'err');}}
+async function addHW(){
+  // บล็อกถ้า room column ยังไม่มี
+  if(_hwRoomColumnReady === false){showRoomMigrationBanner();return;}
+  const num=parseInt(document.getElementById('n-hwnum').value);const title=document.getElementById('n-hwtitle').value.trim();const subject=document.getElementById('n-hwsubj').value;const maxScore=parseInt(document.getElementById('n-hwmaxscore')?.value)||100;const room=_hwRoom;if(!num||!title){toast('กรอกให้ครบ','warn');return;}if(!room){toast('กรุณาเลือกห้องเรียนก่อน','warn');return;}if(DB.homeworks.find(h=>h.num===num&&h.room===room)){toast('งานครั้งที่ '+num+' ของ '+room+' มีแล้ว','warn');return;}const limit=checkPlanLimit('homework');if(!limit.ok){showUpgradeModal(limit.msg);return;}try{await sbAddHomework({num,title,subject,maxScore,room});renderManage();toast('เพิ่มงานครั้งที่ '+num+' ('+room+')');document.getElementById('n-hwnum').value='';document.getElementById('n-hwtitle').value='';}catch(e){toast('เพิ่มไม่สำเร็จ: '+e.message,'err');}}
 
 async function delHW(num,room){room=(room!==undefined)?room:_hwRoom;const h=DB.homeworks.find(x=>x.num===num&&x.room===room);if(!confirm('ลบงานครั้งที่ '+num+' ['+room+']'+(h?' — '+h.title:'')+'?'))return;showActionPopup('กำลังลบชิ้นงาน','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');try{await sbDeleteHomework(num,room);actionPopupDone('ลบชิ้นงานแล้ว','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');renderManage();}catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}}
 
@@ -2657,6 +2659,8 @@ function switchManageTab(tab, btn){
 // ╚══════════════════════════════════════════════════════╝
 // ===== HW SAVE (supports edit+add) =====
 async function saveHW(){
+  // บล็อกถ้า room column ยังไม่มี
+  if(_hwRoomColumnReady === false){showRoomMigrationBanner();return;}
   const num=parseInt(document.getElementById('n-hwnum').value);
   const title=document.getElementById('n-hwtitle').value.trim();
   const subject=document.getElementById('n-hwsubj').value;
@@ -3709,25 +3713,49 @@ function renderSubjectsFull() {
 function populateHWDropdown(){const srs=document.getElementById('scan-room-filter');if(srs){const cr=srs.value;const ar=[...new Set([...DB.rooms,...DB.students.map(s=>s.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));srs.innerHTML='<option value="">— ทุกห้อง —</option>'+ar.map(r=>`<option value="${r}" ${r===cr?'selected':''}>${r}</option>`).join('');}const sf=document.getElementById('hw-subj-filter');const dd=document.getElementById('hw-select-dropdown');if(!dd)return;if(sf){const cs=sf.value;sf.innerHTML='<option value="">— ทุกวิชา —</option>';getSubjectNames().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sf.appendChild(o);});if(cs)sf.value=cs;}const rf=srs?srs.value:'';const fv=sf?sf.value:'';const cur=dd.value;dd.innerHTML='<option value="">— เลือกชิ้นงาน —</option>';DB.homeworks.filter(h=>(!rf||!h.room||h.room===rf)&&(!fv||h.subject===fv)&&!isHWLocked(h)).forEach(h=>{const o=document.createElement('option');o.value=h.num+'|'+(h.room||'');const dl=h.deadline?' · ส่ง '+new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short'}):'';const rt=h.room?` [${h.room}]`:'';o.textContent='ครั้งที่ '+h.num+' — '+h.title+rt+' (เต็ม '+(h.maxScore||100)+')'+dl;dd.appendChild(o);});if(cur)dd.value=cur;}
 
 function filterHWBySubject(){populateHWDropdown();document.getElementById('hw-selected-detail').style.display='none';const dd=document.getElementById('hw-select-dropdown');if(dd)dd.value='';document.getElementById('hw-num-input').value='';document.getElementById('hw-title-input').value='';document.getElementById('hw-maxscore-input').value='';}
+async function checkRoomColumnExists(){
+  if(!SB) return true;
+  try {
+    const {data,error}=await SB.from('homeworks').select('room').limit(1);
+    if(error && error.message && error.message.includes('room')) return false;
+    return true;
+  } catch(e){ return false; }
+}
+
 function showRoomMigrationBanner(){
-  const existing = document.getElementById('room-migration-banner');
-  if(existing) return;
-  const banner = document.createElement('div');
-  banner.id = 'room-migration-banner';
-  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#DC2626;color:#fff;padding:16px 20px;font-size:14px;font-weight:600;display:flex;align-items:flex-start;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
-  banner.innerHTML = `
-    <div style="font-size:24px;flex-shrink:0;">⚠️</div>
-    <div style="flex:1;">
-      <div style="font-size:16px;font-weight:800;margin-bottom:6px;">ต้องรัน SQL ใน Supabase ก่อน!</div>
-      <div style="margin-bottom:8px;opacity:0.95;">งานยังทับกันข้ามห้องเพราะ ตาราง <b>homeworks</b> ยังไม่มีคอลัมน์ <b>room</b></div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:13px;user-select:all;margin-bottom:8px;">
-        ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT '';
+  if(document.getElementById('room-migration-modal')) return;
+  const m=document.createElement('div');
+  m.id='room-migration-modal';
+  m.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.innerHTML=`
+    <div style="background:#fff;border-radius:20px;padding:28px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:48px;">🚨</div>
+        <div style="font-size:20px;font-weight:800;color:#DC2626;margin-top:8px;">ต้องรัน SQL ก่อน!</div>
       </div>
-      <div style="opacity:0.9;font-size:12px;">ไปที่ Supabase → SQL Editor → วางคำสั่งด้านบน → กด Run</div>
+      <div style="background:#FEF2F2;border:2px solid #FCA5A5;border-radius:12px;padding:16px;margin-bottom:16px;">
+        <p style="font-size:14px;color:#7F1D1D;font-weight:600;margin:0 0 10px;">งานทับกันข้ามห้องเพราะตาราง <b>homeworks</b> ยังไม่มีคอลัมน์ <b>room</b></p>
+        <p style="font-size:13px;color:#991B1B;margin:0;">ต้องรันคำสั่งนี้ใน Supabase SQL Editor ก่อน 1 ครั้ง:</p>
+      </div>
+      <div onclick="navigator.clipboard?.writeText(this.dataset.sql);this.style.background='#D1FAE5';this.querySelector('span').textContent='✅ คัดลอกแล้ว!'"
+        data-sql="ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT '';"
+        style="background:#1E293B;color:#A5F3FC;border-radius:12px;padding:14px 16px;font-family:monospace;font-size:13px;cursor:pointer;margin-bottom:8px;position:relative;user-select:all;">
+        ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT '';<br>
+        <span style="position:absolute;bottom:8px;right:12px;font-size:11px;color:#64748B;font-family:sans-serif;">👆 คลิกเพื่อคัดลอก</span>
+      </div>
+      <div style="font-size:12px;color:#64748B;margin-bottom:20px;line-height:1.6;">
+        1️⃣ ไปที่ <b>supabase.com</b> → เปิด project ของครู<br>
+        2️⃣ คลิก <b>SQL Editor</b> ในเมนูซ้าย<br>
+        3️⃣ วางคำสั่งด้านบน → กด <b>Run</b><br>
+        4️⃣ รีเฟรชหน้านี้
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="window.location.reload()" style="flex:1;padding:14px;background:#2563EB;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">🔄 รันแล้ว รีเฟรช</button>
+        <button onclick="document.getElementById('room-migration-modal').remove()" style="padding:14px 16px;background:#F1F5F9;color:#64748B;border:none;border-radius:12px;font-size:14px;cursor:pointer;">ปิด</button>
+      </div>
     </div>
-    <button onclick="document.getElementById('room-migration-banner').remove()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:18px;flex-shrink:0;font-weight:700;">✕</button>
   `;
-  document.body.prepend(banner);
+  document.body.appendChild(m);
 }
 
 function populateHWRoomSelect(){const sel=document.getElementById('hw-room-select');if(!sel)return;const allR=[...new Set([...DB.rooms,...DB.students.map(s=>s.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));if(!allR.length){sel.innerHTML='<option value="">— ยังไม่มีห้องเรียน (ไปเพิ่มที่แท็บ 🏫 ห้องเรียน) —</option>';return;}const cur=sel.value||_hwRoom;sel.innerHTML='<option value="">— เลือกห้องเรียน —</option>'+allR.map(r=>`<option value="${r}" ${r===cur?'selected':''}>${r}</option>`).join('');if(cur&&allR.includes(cur))sel.value=cur;}
