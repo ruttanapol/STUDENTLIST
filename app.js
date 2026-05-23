@@ -578,7 +578,7 @@ async function sbDeleteStudent(id) {
 async function sbAddHomework(hw) {
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
-    // DELETE กรองด้วย room ด้วย → ไม่ทับงานห้องอื่น
+    // DELETE เฉพาะห้องนั้น ไม่ทับห้องอื่น
     await SB.from('homeworks').delete()
       .eq('num', hw.num)
       .eq('teacher_id', tid)
@@ -592,17 +592,16 @@ async function sbAddHomework(hw) {
       deadline: hw.deadline && hw.deadline.trim() !== '' ? hw.deadline : null,
       file_url: hw.fileUrl || null,
       file_name: hw.fileName || null,
-      room: hw.room || ''   // ← บันทึก room ด้วยทุกครั้ง
+      room: hw.room || ''   // ← จำเป็นต้องส่ง ไม่งั้น Supabase error
     });
     if(error) throw error;
     await reloadHomeworks();
   } else {
-    // local: กรอง room ด้วย
     const existing = DB.homeworks.find(h => h.num === hw.num && h.room === (hw.room || ''));
     if(existing) {
-      existing.title = hw.title; existing.subject = hw.subject;
-      existing.maxScore = hw.maxScore; existing.deadline = hw.deadline || null;
-      existing.fileUrl = hw.fileUrl || ''; existing.fileName = hw.fileName || '';
+      existing.title=hw.title; existing.subject=hw.subject;
+      existing.maxScore=hw.maxScore; existing.deadline=hw.deadline||null;
+      existing.fileUrl=hw.fileUrl||''; existing.fileName=hw.fileName||'';
     } else {
       DB.homeworks.push(hw);
       DB.homeworks.sort((a,b) => a.num - b.num);
