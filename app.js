@@ -578,27 +578,36 @@ async function sbDeleteStudent(id) {
 async function sbAddHomework(hw) {
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
-    await SB.from('homeworks').delete().eq('num',hw.num).eq('teacher_id',tid);
+    // DELETE กรองด้วย room ด้วย → ไม่ทับงานห้องอื่น
+    await SB.from('homeworks').delete()
+      .eq('num', hw.num)
+      .eq('teacher_id', tid)
+      .eq('room', hw.room || '');
     const {error} = await SB.from('homeworks').insert({
       num: hw.num,
       title: hw.title,
-      subject: hw.subject||'',
-      max_score: hw.maxScore||100,
+      subject: hw.subject || '',
+      max_score: hw.maxScore || 100,
       teacher_id: tid,
       deadline: hw.deadline && hw.deadline.trim() !== '' ? hw.deadline : null,
-      file_url: hw.fileUrl||null,
-      file_name: hw.fileName||null
+      file_url: hw.fileUrl || null,
+      file_name: hw.fileName || null,
+      room: hw.room || ''   // ← บันทึก room ด้วยทุกครั้ง
     });
     if(error) throw error;
     await reloadHomeworks();
   } else {
-    const existing = DB.homeworks.find(h => h.num === hw.num);
-    if(existing) { existing.title=hw.title; existing.subject=hw.subject; existing.maxScore=hw.maxScore; existing.deadline=hw.deadline||null; existing.fileUrl=hw.fileUrl||''; existing.fileName=hw.fileName||''; }
-    else { DB.homeworks.push(hw); DB.homeworks.sort((a,b)=>a.num-b.num); }
-    saveDB();
-    renderManage();
-    populateHWDropdown();
-    renderSubjectsFull();
+    // local: กรอง room ด้วย
+    const existing = DB.homeworks.find(h => h.num === hw.num && h.room === (hw.room || ''));
+    if(existing) {
+      existing.title = hw.title; existing.subject = hw.subject;
+      existing.maxScore = hw.maxScore; existing.deadline = hw.deadline || null;
+      existing.fileUrl = hw.fileUrl || ''; existing.fileName = hw.fileName || '';
+    } else {
+      DB.homeworks.push(hw);
+      DB.homeworks.sort((a,b) => a.num - b.num);
+    }
+    saveDB(); renderManage(); populateHWDropdown(); renderSubjectsFull();
   }
 }
 
