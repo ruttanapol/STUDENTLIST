@@ -578,22 +578,18 @@ async function sbDeleteStudent(id) {
 async function sbAddHomework(hw) {
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
-    // DELETE เฉพาะห้องนั้น ไม่ทับห้องอื่น
-    await SB.from('homeworks').delete()
-      .eq('num', hw.num)
-      .eq('teacher_id', tid)
-      .eq('room', hw.room || '');
-    const {error} = await SB.from('homeworks').insert({
+    // UPSERT: ไม่ชน Primary Key (num, teacher_id, room)
+    const {error} = await SB.from('homeworks').upsert({
       num: hw.num,
+      teacher_id: tid,
+      room: hw.room || '',
       title: hw.title,
       subject: hw.subject || '',
       max_score: hw.maxScore || 100,
-      teacher_id: tid,
       deadline: hw.deadline && hw.deadline.trim() !== '' ? hw.deadline : null,
       file_url: hw.fileUrl || null,
-      file_name: hw.fileName || null,
-      room: hw.room || ''   // ← จำเป็นต้องส่ง ไม่งั้น Supabase error
-    });
+      file_name: hw.fileName || null
+    }, { onConflict: 'num,teacher_id,room' });
     if(error) throw error;
     await reloadHomeworks();
   } else {
