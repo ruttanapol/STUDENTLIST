@@ -1909,7 +1909,7 @@ function showAP(id,btn){
     if(!isPremium()) { showUpgradeModal('🔒 ฟีเจอร์เช็คชื่อสำหรับ Premium เท่านั้น'); return; }
   }
   // sync sidebar nav items
-  ['scan','dash','manage','attend'].forEach(function(p){
+  ['scan','dash','manage','attend','calendar'].forEach(function(p){
     var sn = document.getElementById('snav-'+p);
     if(sn) sn.classList.toggle('on', p===id);
   });
@@ -1920,6 +1920,7 @@ function showAP(id,btn){
   if(id==='dash') renderDashboard();
   if(id==='manage') renderManage();
   if(id==='attend') initAttendanceTab();
+  if(id==='calendar') initCalendarTab();
 }
 
 function ts(){return new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});}
@@ -4874,6 +4875,318 @@ async function exportSecGradeExcel() {
   toast('Export สำเร็จ ✅');
 }
 
+
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  SECTION M: CALENDAR                                ║
+// ╚══════════════════════════════════════════════════════╝
+
+let _calYear = new Date().getFullYear();
+let _calMonth = new Date().getMonth(); // 0-11
+let _calEvents = [];          // [{id,date,time,title,desc,color,notifyBefore}]
+let _calSelectedDate = null;  // 'YYYY-MM-DD'
+let _calNotifyTimer = null;
+let _calNotifiedIds = new Set(JSON.parse(localStorage.getItem('cal_notified')||'[]'));
+
+// ── Load / Save ─────────────────────────────────────────
+async function loadCalendarEvents() {
+  if(!USE_SUPABASE || !CURRENT_TEACHER) return;
+  const key = 'calendar_' + CURRENT_TEACHER.id;
+  const {data} = await SB.from('settings').select('value').eq('key', key).maybeSingle();
+  _calEvents = Array.isArray(data?.value) ? data.value : [];
+}
+
+async function saveCalendarEvents() {
+  if(!USE_SUPABASE || !CURRENT_TEACHER) return;
+  const key = 'calendar_' + CURRENT_TEACHER.id;
+  await SB.from('settings').upsert({key, value: _calEvents}, {onConflict: 'key'});
+}
+
+// ── Init ─────────────────────────────────────────────────
+async function initCalendarTab() {
+  if(!_calEvents.length) await loadCalendarEvents();
+  const now = new Date();
+  _calYear = now.getFullYear();
+  _calMonth = now.getMonth();
+  renderCalendar();
+  requestCalNotifyPermission();
+  scheduleCalNotifyCheck();
+  updateCalNavDot();
+}
+
+// ── Render Calendar ──────────────────────────────────────
+function renderCalendar() {
+  const label = document.getElementById('cal-month-label');
+  const grid = document.getElementById('cal-grid');
+  if(!label || !grid) return;
+
+  const thMonths = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                    'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  label.textContent = thMonths[_calMonth] + ' ' + (_calYear + 543);
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayStr = toCalDateStr(today);
+  const firstDay = new Date(_calYear, _calMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(_calYear, _calMonth+1, 0).getDate();
+  const prevDays = new Date(_calYear, _calMonth, 0).getDate();
+
+  let cells = '';
+  // Prev month filler
+  for(let i = firstDay-1; i >= 0; i--) {
+    const d = prevDays - i;
+    const ds = toCalDateStr(new Date(_calYear, _calMonth-1, d));
+    cells += buildCalCell(d, ds, true, todayStr);
+  }
+  // Current month
+  for(let d = 1; d <= daysInMonth; d++) {
+    const ds = toCalDateStr(new Date(_calYear, _calMonth, d));
+    cells += buildCalCell(d, ds, false, todayStr);
+  }
+  // Next month filler
+  const total = firstDay + daysInMonth;
+  const rem = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for(let d = 1; d <= rem; d++) {
+    const ds = toCalDateStr(new Date(_calYear, _calMonth+1, d));
+    cells += buildCalCell(d, ds, true, todayStr);
+  }
+  grid.innerHTML = cells;
+
+  // Highlight selected
+  if(_calSelectedDate) {
+    const sel = grid.querySelector('[data-date="'+_calSelectedDate+'"]');
+    if(sel) sel.classList.add('selected');
+    renderCalDayEvents(_calSelectedDate);
+  }
+}
+
+function buildCalCell(d, dateStr, otherMonth, todayStr) {
+  const evts = _calEvents.filter(e => e.date === dateStr);
+  const isToday = dateStr === todayStr;
+  const dots = evts.slice(0,4).map(e =>
+    `<div class="cal-dot" style="background:${e.color||'#2563EB'};"></div>`
+  ).join('');
+  const cls = ['cal-day', isToday?'today':'', otherMonth?'other-month':''].filter(Boolean).join(' ');
+  return `<div class="${cls}" data-date="${dateStr}" onclick="calSelectDay('${dateStr}')">
+    <div class="cal-day-num">${d}</div>
+    ${evts.length ? `<div class="cal-dots">${dots}${evts.length>4?'<div style="font-size:8px;color:var(--text3);">+${evts.length-4}</div>':''}</div>` : ''}
+  </div>`;
+}
+
+function toCalDateStr(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function calMove(dir) {
+  _calMonth += dir;
+  if(_calMonth < 0) { _calMonth = 11; _calYear--; }
+  if(_calMonth > 11) { _calMonth = 0; _calYear++; }
+  renderCalendar();
+}
+
+function calSelectDay(dateStr) {
+  _calSelectedDate = dateStr;
+  document.querySelectorAll('.cal-day.selected').forEach(el => el.classList.remove('selected'));
+  const sel = document.querySelector(`[data-date="${dateStr}"]`);
+  if(sel) sel.classList.add('selected');
+  renderCalDayEvents(dateStr);
+  const fab = document.getElementById('cal-add-fab');
+  if(fab) fab.style.display = 'flex';
+}
+
+function renderCalDayEvents(dateStr) {
+  const label = document.getElementById('cal-day-label');
+  const list = document.getElementById('cal-event-list');
+  if(!label || !list) return;
+
+  const d = new Date(dateStr + 'T00:00:00');
+  const thDays = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  label.textContent = `📅 วัน${thDays[d.getDay()]} ${d.getDate()} ${['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][d.getMonth()]} ${d.getFullYear()+543}`;
+
+  const evts = _calEvents.filter(e => e.date === dateStr).sort((a,b) => (a.time||'99:99').localeCompare(b.time||'99:99'));
+  if(!evts.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px;">ไม่มีกิจกรรมวันนี้<br><span style="font-size:11px;">กด ＋ เพื่อเพิ่ม</span></div>';
+    return;
+  }
+  list.innerHTML = evts.map(e => `
+    <div class="cal-event-item" onclick="openCalendarEventModal('${dateStr}','${e.id}')">
+      <div class="cal-event-color" style="background:${e.color||'#2563EB'};"></div>
+      <div class="cal-event-info">
+        <div class="cal-event-title">${e.title}</div>
+        <div class="cal-event-time">${e.time ? '🕐 ' + e.time : '📅 ทั้งวัน'}${e.notifyBefore>=0?' · 🔔':''}
+        </div>
+        ${e.desc ? `<div class="cal-event-desc">💬 ${e.desc}</div>` : ''}
+      </div>
+      <div style="font-size:18px;color:var(--text3);">›</div>
+    </div>
+  `).join('');
+}
+
+// ── Modal ─────────────────────────────────────────────────
+function openCalendarEventModal(dateStr, eventId) {
+  const modal = document.getElementById('cal-event-modal');
+  if(!modal) return;
+  const evt = eventId ? _calEvents.find(e => e.id === eventId) : null;
+
+  document.getElementById('cal-modal-title').textContent = evt ? '✏️ แก้ไขกิจกรรม' : '➕ เพิ่มกิจกรรม';
+  document.getElementById('cal-evt-id').value = eventId || '';
+  document.getElementById('cal-evt-title').value = evt ? evt.title : '';
+  document.getElementById('cal-evt-date').value = evt ? evt.date : (dateStr || toCalDateStr(new Date()));
+  document.getElementById('cal-evt-time').value = evt ? (evt.time||'') : '';
+  document.getElementById('cal-evt-desc').value = evt ? (evt.desc||'') : '';
+  document.getElementById('cal-delete-btn').style.display = evt ? 'block' : 'none';
+
+  // color chips
+  const curColor = evt ? (evt.color||'#2563EB') : '#2563EB';
+  document.querySelectorAll('.color-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.color === curColor);
+  });
+
+  // notify chips
+  const curNotify = evt ? (evt.notifyBefore ?? 0) : 0;
+  document.querySelectorAll('.notify-chip').forEach(c => {
+    c.classList.toggle('active', parseInt(c.dataset.val) === curNotify);
+  });
+
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('cal-evt-title').focus(), 100);
+}
+
+function closeCalEventModal() {
+  const modal = document.getElementById('cal-event-modal');
+  if(modal) modal.style.display = 'none';
+}
+
+function selectCalColor(el) {
+  document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+function selectCalNotify(el) {
+  document.querySelectorAll('.notify-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+async function saveCalendarEvent() {
+  const title = document.getElementById('cal-evt-title').value.trim();
+  const date = document.getElementById('cal-evt-date').value;
+  if(!title) { toast('กรุณากรอกชื่อกิจกรรม','warn'); return; }
+  if(!date) { toast('กรุณาเลือกวันที่','warn'); return; }
+
+  const id = document.getElementById('cal-evt-id').value || Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  const color = document.querySelector('.color-chip.active')?.dataset.color || '#2563EB';
+  const notifyBefore = parseInt(document.querySelector('.notify-chip.active')?.dataset.val ?? '0');
+
+  const evt = {
+    id, date,
+    time: document.getElementById('cal-evt-time').value || null,
+    title,
+    desc: document.getElementById('cal-evt-desc').value.trim() || null,
+    color,
+    notifyBefore
+  };
+
+  const idx = _calEvents.findIndex(e => e.id === id);
+  if(idx >= 0) _calEvents[idx] = evt;
+  else _calEvents.push(evt);
+
+  try {
+    await saveCalendarEvents();
+    closeCalEventModal();
+    renderCalendar();
+    if(_calSelectedDate === date) renderCalDayEvents(date);
+    else { _calSelectedDate = date; renderCalendar(); renderCalDayEvents(date); }
+    updateCalNavDot();
+    toast('บันทึกกิจกรรมแล้ว ✅');
+    scheduleCalNotifyCheck();
+  } catch(e) { toast('บันทึกไม่สำเร็จ: '+e.message,'err'); }
+}
+
+async function deleteCalendarEvent() {
+  const id = document.getElementById('cal-evt-id').value;
+  if(!id) return;
+  const evt = _calEvents.find(e => e.id === id);
+  if(!confirm('ลบกิจกรรม "'+( evt?.title||id)+'"?')) return;
+  _calEvents = _calEvents.filter(e => e.id !== id);
+  try {
+    await saveCalendarEvents();
+    closeCalEventModal();
+    renderCalendar();
+    if(_calSelectedDate) renderCalDayEvents(_calSelectedDate);
+    updateCalNavDot();
+    toast('ลบกิจกรรมแล้ว','warn');
+  } catch(e) { toast('ลบไม่สำเร็จ: '+e.message,'err'); }
+}
+
+// ── Notifications ────────────────────────────────────────
+function requestCalNotifyPermission() {
+  const status = document.getElementById('cal-notify-status');
+  if(!('Notification' in window)) { if(status) status.textContent='⚠️ เบราว์เซอร์ไม่รองรับการแจ้งเตือน'; return; }
+  if(Notification.permission === 'default') {
+    if(status) status.textContent = '🔔 แตะที่นี่เพื่อเปิดการแจ้งเตือน';
+    if(status) status.style.cursor = 'pointer';
+    if(status) status.onclick = () => Notification.requestPermission().then(p => {
+      status.textContent = p==='granted'?'✅ เปิดการแจ้งเตือนแล้ว':'❌ ปฏิเสธการแจ้งเตือน';
+      status.style.cursor = '';
+      status.onclick = null;
+    });
+  } else if(Notification.permission === 'granted') {
+    if(status) status.textContent = '✅ การแจ้งเตือนเปิดอยู่';
+  } else {
+    if(status) status.textContent = '❌ การแจ้งเตือนถูกปิด (ตั้งค่าในเบราว์เซอร์)';
+  }
+}
+
+function scheduleCalNotifyCheck() {
+  if(_calNotifyTimer) clearInterval(_calNotifyTimer);
+  checkCalNotifications(); // check ทันที
+  _calNotifyTimer = setInterval(checkCalNotifications, 60000); // ทุก 1 นาที
+}
+
+function checkCalNotifications() {
+  if(Notification.permission !== 'granted') return;
+  const now = new Date();
+  _calEvents.forEach(evt => {
+    if(evt.notifyBefore < 0) return; // ไม่แจ้ง
+
+    let notifyAt;
+    if(evt.time) {
+      // มีเวลา: แจ้งก่อน notifyBefore นาที
+      const evtDateTime = new Date(evt.date + 'T' + evt.time);
+      notifyAt = new Date(evtDateTime.getTime() - evt.notifyBefore * 60000);
+    } else {
+      // ทั้งวัน: แจ้งวันนั้นเวลา 08:00 (หรือวันก่อนถ้า notifyBefore=1440)
+      if(evt.notifyBefore === 1440) {
+        const prev = new Date(evt.date + 'T08:00:00');
+        prev.setDate(prev.getDate() - 1);
+        notifyAt = prev;
+      } else {
+        notifyAt = new Date(evt.date + 'T08:00:00');
+      }
+    }
+
+    const diffMs = notifyAt - now;
+    const notifyKey = evt.id + '_' + notifyAt.toISOString().slice(0,16);
+
+    // แจ้งถ้าถึงเวลาแล้ว (ภายใน 2 นาทีที่ผ่านมา) และยังไม่เคยแจ้ง
+    if(diffMs >= -120000 && diffMs <= 0 && !_calNotifiedIds.has(notifyKey)) {
+      _calNotifiedIds.add(notifyKey);
+      localStorage.setItem('cal_notified', JSON.stringify([..._calNotifiedIds].slice(-100)));
+      new Notification('📅 ' + evt.title, {
+        body: evt.time ? `เวลา ${evt.time} · ${evt.desc||''}` : (evt.desc || 'วันนี้มีกิจกรรม'),
+        icon: '/favicon.ico',
+        tag: notifyKey
+      });
+    }
+  });
+}
+
+function updateCalNavDot() {
+  const dot = document.getElementById('cal-bnav-dot');
+  if(!dot) return;
+  const todayStr = toCalDateStr(new Date());
+  const hasToday = _calEvents.some(e => e.date === todayStr);
+  dot.style.background = hasToday ? 'var(--red)' : '';
+  dot.style.opacity = hasToday ? '1' : '0';
+}
 
 // ╔══════════════════════════════════════════════════════╗
 // ║  SECTION L: APP INITIALIZATION                     ║
