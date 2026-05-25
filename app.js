@@ -577,21 +577,20 @@ async function sbDeleteStudent(id) {
 
 async function sbAddHomework(hw) {
   if(USE_SUPABASE) {
-    const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
-    const {error} = await SB.from('homeworks').upsert({
-      num: hw.num, teacher_id: tid, room: hw.room || '',
-      title: hw.title, subject: hw.subject || '',
-      max_score: hw.maxScore || 100,
-      deadline: hw.deadline && hw.deadline.trim() !== '' ? hw.deadline : null,
-      file_url: hw.fileUrl || null, file_name: hw.fileName || null
-    }, { onConflict: 'num,teacher_id,room' });
-    if(error) throw error;
+    const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';
+    const {error}=await SB.from('homeworks').upsert({
+      num:hw.num,teacher_id:tid,room:hw.room||'',title:hw.title,
+      subject:hw.subject||'',max_score:hw.maxScore||100,
+      deadline:hw.deadline&&hw.deadline.trim()!==''?hw.deadline:null,
+      file_url:hw.fileUrl||null,file_name:hw.fileName||null
+    },{onConflict:'num,teacher_id,room'});
+    if(error)throw error;
     await reloadHomeworks();
   } else {
-    const existing = DB.homeworks.find(h => h.num === hw.num && h.room === (hw.room||''));
-    if(existing) { existing.title=hw.title; existing.subject=hw.subject; existing.maxScore=hw.maxScore; existing.deadline=hw.deadline||null; existing.fileUrl=hw.fileUrl||''; existing.fileName=hw.fileName||''; }
-    else { DB.homeworks.push(hw); DB.homeworks.sort((a,b)=>a.num-b.num); }
-    saveDB(); renderManage(); populateHWDropdown(); renderSubjectsFull();
+    const existing=DB.homeworks.find(h=>h.num===hw.num&&h.room===(hw.room||''));
+    if(existing){existing.title=hw.title;existing.subject=hw.subject;existing.maxScore=hw.maxScore;existing.deadline=hw.deadline||null;existing.fileUrl=hw.fileUrl||'';existing.fileName=hw.fileName||'';}
+    else{DB.homeworks.push(hw);DB.homeworks.sort((a,b)=>a.num-b.num);}
+    saveDB();renderManage();populateHWDropdown();renderSubjectsFull();
   }
 }
 
@@ -1793,7 +1792,7 @@ let _currentStuTeacher = null; // teacher info for student view
 
 function renderStudentView(s, stuDB){
   const db=stuDB||{student:s,homeworks:DB.homeworks,submissions:DB.submissions};
-  const roomHWs=roomHWs.filter(h=>!h.room||h.room===s.room);
+  const roomHWs=db.homeworks.filter(h=>!h.room||h.room===s.room);
   const teacher = _currentStuTeacher;
   document.getElementById('stu-avatar').textContent=s.name.substring(0,2);
   document.getElementById('stu-display-name').textContent=s.name;
@@ -2453,9 +2452,7 @@ async function delSubj(n){
   renderManage();
 }
 
-async function addHW(){
-  if(_hwRoomColumnReady === false){showRoomMigrationBanner();return;}
-  const num=parseInt(document.getElementById('n-hwnum').value);const title=document.getElementById('n-hwtitle').value.trim();const subject=document.getElementById('n-hwsubj').value;const maxScore=parseInt(document.getElementById('n-hwmaxscore')?.value)||100;const room=_hwRoom;if(!num||!title){toast('กรอกให้ครบ','warn');return;}if(!room){toast('กรุณาเลือกห้องเรียนก่อน','warn');return;}if(DB.homeworks.find(h=>h.num===num&&h.room===room)){toast('งานครั้งที่ '+num+' ของ '+room+' มีแล้ว','warn');return;}const limit=checkPlanLimit('homework');if(!limit.ok){showUpgradeModal(limit.msg);return;}try{await sbAddHomework({num,title,subject,maxScore,room});renderManage();toast('เพิ่มงานครั้งที่ '+num+' ('+room+')');document.getElementById('n-hwnum').value='';document.getElementById('n-hwtitle').value='';}catch(e){toast('เพิ่มไม่สำเร็จ: '+e.message,'err');}}
+async function addHW(){const num=parseInt(document.getElementById('n-hwnum').value);const title=document.getElementById('n-hwtitle').value.trim();const subject=document.getElementById('n-hwsubj').value;const maxScore=parseInt(document.getElementById('n-hwmaxscore')?.value)||100;const room=_hwRoom;if(!num||!title){toast('กรอกให้ครบ','warn');return;}if(!room){toast('กรุณาเลือกห้องเรียนก่อน','warn');return;}if(DB.homeworks.find(h=>h.num===num&&h.room===room)){toast('งานครั้งที่ '+num+' ของ '+room+' มีแล้ว','warn');return;}const limit=checkPlanLimit('homework');if(!limit.ok){showUpgradeModal(limit.msg);return;}try{await sbAddHomework({num,title,subject,maxScore,room});renderManage();toast('เพิ่มงานครั้งที่ '+num+' ('+room+')');document.getElementById('n-hwnum').value='';document.getElementById('n-hwtitle').value='';}catch(e){toast('เพิ่มไม่สำเร็จ: '+e.message,'err');}}
 
 async function delHW(num,room){room=(room!==undefined)?room:_hwRoom;const h=DB.homeworks.find(x=>x.num===num&&x.room===room);if(!confirm('ลบงานครั้งที่ '+num+' ['+room+']'+(h?' — '+h.title:'')+'?'))return;showActionPopup('กำลังลบชิ้นงาน','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');try{await sbDeleteHomework(num,room);actionPopupDone('ลบชิ้นงานแล้ว','ครั้งที่ '+num+(h?' · '+h.title:''),'delete');renderManage();}catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}}
 
@@ -2491,7 +2488,7 @@ async function clearAllStudents(){
   } else {
     DB.students=[];DB.submissions=[];saveDB();
   }
-  actionPopupDone('ลบรายชื่อนักเรียนแล้ว','ลบ '+count+' คนสำเร็จ','delete'); setTimeout(()=>renderManage(),100);
+  renderManage();actionPopupDone('ลบรายชื่อนักเรียนแล้ว','ลบ '+count+' คนสำเร็จ','delete');
 }
 
 // ╔══════════════════════════════════════════════════════╗
@@ -3707,34 +3704,6 @@ function renderSubjectsFull() {
 function populateHWDropdown(){const srs=document.getElementById('scan-room-filter');if(srs){const cr=srs.value;const ar=[...new Set([...DB.rooms,...DB.students.map(s=>s.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));srs.innerHTML='<option value="">— ทุกห้อง —</option>'+ar.map(r=>`<option value="${r}" ${r===cr?'selected':''}>${r}</option>`).join('');}const sf=document.getElementById('hw-subj-filter');const dd=document.getElementById('hw-select-dropdown');if(!dd)return;if(sf){const cs=sf.value;sf.innerHTML='<option value="">— ทุกวิชา —</option>';getSubjectNames().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sf.appendChild(o);});if(cs)sf.value=cs;}const rf=srs?srs.value:'';const fv=sf?sf.value:'';const cur=dd.value;dd.innerHTML='<option value="">— เลือกชิ้นงาน —</option>';DB.homeworks.filter(h=>(!rf||!h.room||h.room===rf)&&(!fv||h.subject===fv)&&!isHWLocked(h)).forEach(h=>{const o=document.createElement('option');o.value=h.num+'|'+(h.room||'');const dl=h.deadline?' · ส่ง '+new Date(h.deadline).toLocaleDateString('th-TH',{day:'numeric',month:'short'}):'';const rt=h.room?` [${h.room}]`:'';o.textContent='ครั้งที่ '+h.num+' — '+h.title+rt+' (เต็ม '+(h.maxScore||100)+')'+dl;dd.appendChild(o);});if(cur)dd.value=cur;}
 
 function filterHWBySubject(){populateHWDropdown();document.getElementById('hw-selected-detail').style.display='none';const dd=document.getElementById('hw-select-dropdown');if(dd)dd.value='';document.getElementById('hw-num-input').value='';document.getElementById('hw-title-input').value='';document.getElementById('hw-maxscore-input').value='';}
-async function checkRoomColumnExists(){
-  if(!SB) return true;
-  try { const {error}=await SB.from('homeworks').select('room').limit(1); return !(error?.message?.includes('room')); }
-  catch(e){ return false; }
-}
-function showRoomMigrationBanner(){
-  if(document.getElementById('room-migration-modal')) return;
-  const m=document.createElement('div');m.id='room-migration-modal';
-  m.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;padding:20px;';
-  m.innerHTML=`<div style="background:#fff;border-radius:20px;padding:28px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
-    <div style="text-align:center;margin-bottom:16px;"><div style="font-size:48px;">🚨</div>
-    <div style="font-size:20px;font-weight:800;color:#DC2626;margin-top:8px;">ต้องรัน SQL ก่อน!</div></div>
-    <div style="background:#FEF2F2;border:2px solid #FCA5A5;border-radius:12px;padding:16px;margin-bottom:16px;">
-      <p style="font-size:13px;color:#991B1B;font-weight:600;margin:0 0 8px;">ตาราง <b>homeworks</b> ยังไม่มีคอลัมน์ <b>room</b> → งานทับกันข้ามห้อง</p>
-      <p style="font-size:12px;color:#7F1D1D;margin:0;">รัน SQL นี้ใน Supabase แล้วรีเฟรชหน้า</p>
-    </div>
-    <div onclick="navigator.clipboard?.writeText('ALTER TABLE homeworks DROP CONSTRAINT IF EXISTS homeworks_pkey; ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT \'\'; ALTER TABLE homeworks ADD PRIMARY KEY (num, teacher_id, room);');this.style.background='#D1FAE5'" style="background:#1E293B;color:#A5F3FC;border-radius:12px;padding:14px;font-family:monospace;font-size:12px;cursor:pointer;margin-bottom:12px;white-space:pre-wrap;user-select:all;">ALTER TABLE homeworks DROP CONSTRAINT IF EXISTS homeworks_pkey;
-ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT '';
-ALTER TABLE homeworks ADD PRIMARY KEY (num, teacher_id, room);
-<span style="color:#64748B;font-family:sans-serif;font-size:11px;">👆 คลิกเพื่อคัดลอก SQL ทั้งหมด</span></div>
-    <div style="font-size:12px;color:#64748B;margin-bottom:16px;">Supabase → SQL Editor → วาง → Run → รีเฟรชหน้า</div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="window.location.reload()" style="flex:1;padding:14px;background:#2563EB;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">🔄 รันแล้ว รีเฟรช</button>
-      <button onclick="document.getElementById('room-migration-modal').remove()" style="padding:14px 16px;background:#F1F5F9;color:#64748B;border:none;border-radius:12px;cursor:pointer;">ปิด</button>
-    </div>
-  </div>`;
-  document.body.appendChild(m);
-}
 function populateHWRoomSelect(){const sel=document.getElementById('hw-room-select');if(!sel)return;const allR=[...new Set([...DB.rooms,...DB.students.map(s=>s.room)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));if(!allR.length){sel.innerHTML='<option value="">— ยังไม่มีห้องเรียน (ไปเพิ่มที่แท็บ 🏫 ห้องเรียน) —</option>';return;}const cur=sel.value||_hwRoom;sel.innerHTML='<option value="">— เลือกห้องเรียน —</option>'+allR.map(r=>`<option value="${r}" ${r===cur?'selected':''}>${r}</option>`).join('');if(cur&&allR.includes(cur))sel.value=cur;}
 function setHWRoom(room){_hwRoom=room;renderManage();}
 function filterScanByRoom(){populateHWDropdown();document.getElementById('hw-selected-detail').style.display='none';const dd=document.getElementById('hw-select-dropdown');if(dd)dd.value='';}
@@ -4895,152 +4864,6 @@ async function exportSecGradeExcel() {
 }
 
 
-
-// ╔══════════════════════════════════════════════════════╗
-// ║  SECTION M: CALENDAR                                ║
-// ╚══════════════════════════════════════════════════════╝
-let _calYear=new Date().getFullYear(),_calMonth=new Date().getMonth();
-let _calEvents=[],_calSelectedDate=null,_calNotifyTimer=null;
-let _calNotifiedIds=new Set(JSON.parse(localStorage.getItem('cal_notified')||'[]'));
-
-async function loadCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;const{data}=await SB.from('settings').select('value').eq('key','calendar_'+CURRENT_TEACHER.id).maybeSingle();_calEvents=Array.isArray(data?.value)?data.value:[];}
-async function saveCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;await SB.from('settings').upsert({key:'calendar_'+CURRENT_TEACHER.id,value:_calEvents},{onConflict:'key'});}
-
-async function initCalendarTab(){
-  if(!_calEvents.length)await loadCalendarEvents();
-  const n=new Date();_calYear=n.getFullYear();_calMonth=n.getMonth();
-  renderCalendar();requestCalNotifyPermission();scheduleCalNotifyCheck();updateCalNavDot();
-}
-
-function renderCalendar(){
-  const label=document.getElementById('cal-month-label');const grid=document.getElementById('cal-grid');
-  if(!label||!grid)return;
-  const thM=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-  label.textContent=thM[_calMonth]+' '+(_calYear+543);
-  const today=new Date();today.setHours(0,0,0,0);const todayStr=toCalDateStr(today);
-  const firstDay=new Date(_calYear,_calMonth,1).getDay();
-  const dim=new Date(_calYear,_calMonth+1,0).getDate();
-  const prevDim=new Date(_calYear,_calMonth,0).getDate();
-  let cells='';
-  for(let i=firstDay-1;i>=0;i--)cells+=buildCalCell(prevDim-i,toCalDateStr(new Date(_calYear,_calMonth-1,prevDim-i)),true,todayStr);
-  for(let d=1;d<=dim;d++)cells+=buildCalCell(d,toCalDateStr(new Date(_calYear,_calMonth,d)),false,todayStr);
-  const rem=(firstDay+dim)%7===0?0:7-(firstDay+dim)%7;
-  for(let d=1;d<=rem;d++)cells+=buildCalCell(d,toCalDateStr(new Date(_calYear,_calMonth+1,d)),true,todayStr);
-  grid.innerHTML=cells;
-  if(_calSelectedDate){const s=grid.querySelector('[data-date="'+_calSelectedDate+'"]');if(s)s.classList.add('selected');renderCalDayEvents(_calSelectedDate);}
-}
-
-function buildCalCell(d,ds,other,todayStr){
-  const evts=_calEvents.filter(e=>e.date===ds);
-  const dots=evts.slice(0,4).map(e=>`<div class="cal-dot" style="background:${e.color||'#2563EB'};"></div>`).join('');
-  const cls=['cal-day',ds===todayStr?'today':'',other?'other-month':''].filter(Boolean).join(' ');
-  const dotHtml = evts.length ? '<div class="cal-dots">'+dots+(evts.length>4?'<div style="font-size:8px;color:var(--text3);">+'+( evts.length-4)+'</div>':'')+'</div>' : '';
-  return '<div class="'+cls+'" data-date="'+ds+'" onclick="calSelectDay(\''+ds+'\')"><div class="cal-day-num">'+d+'</div>'+dotHtml+'</div>';
-}
-
-function toCalDateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function calMove(dir){_calMonth+=dir;if(_calMonth<0){_calMonth=11;_calYear--;}if(_calMonth>11){_calMonth=0;_calYear++;}renderCalendar();}
-
-function calSelectDay(ds){
-  _calSelectedDate=ds;
-  document.querySelectorAll('.cal-day.selected').forEach(el=>el.classList.remove('selected'));
-  const sel=document.querySelector(`[data-date="${ds}"]`);if(sel)sel.classList.add('selected');
-  renderCalDayEvents(ds);
-  const fab=document.getElementById('cal-add-fab');if(fab)fab.style.display='flex';
-}
-
-function renderCalDayEvents(ds){
-  const label=document.getElementById('cal-day-label');const list=document.getElementById('cal-event-list');
-  if(!label||!list)return;
-  const d=new Date(ds+'T00:00:00');
-  const thD=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
-  const thMo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  label.textContent=`📅 วัน${thD[d.getDay()]} ${d.getDate()} ${thMo[d.getMonth()]} ${d.getFullYear()+543}`;
-  const evts=_calEvents.filter(e=>e.date===ds).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
-  if(!evts.length){list.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px;">ไม่มีกิจกรรมวันนี้<br><span style="font-size:11px;">กด ＋ เพื่อเพิ่ม</span></div>';return;}
-  list.innerHTML=evts.map(e=>`<div class="cal-event-item" onclick="openCalendarEventModal('${ds}','${e.id}')"><div class="cal-event-color" style="background:${e.color||'#2563EB'};"></div><div class="cal-event-info"><div class="cal-event-title">${e.title}</div><div class="cal-event-time">${e.time?'🕐 '+e.time:'📅 ทั้งวัน'}${e.notifyBefore>=0?' · 🔔':''}</div>${e.desc?`<div class="cal-event-desc">💬 ${e.desc}</div>`:''}</div><div style="font-size:18px;color:var(--text3);">›</div></div>`).join('');
-}
-
-function openCalendarEventModal(ds,eid){
-  const modal=document.getElementById('cal-event-modal');if(!modal)return;
-  const evt=eid?_calEvents.find(e=>e.id===eid):null;
-  document.getElementById('cal-modal-title').textContent=evt?'✏️ แก้ไขกิจกรรม':'➕ เพิ่มกิจกรรม';
-  document.getElementById('cal-evt-id').value=eid||'';
-  document.getElementById('cal-evt-title').value=evt?evt.title:'';
-  document.getElementById('cal-evt-date').value=evt?evt.date:(ds||toCalDateStr(new Date()));
-  document.getElementById('cal-evt-time').value=evt?(evt.time||''):'';
-  document.getElementById('cal-evt-desc').value=evt?(evt.desc||''):'';
-  document.getElementById('cal-delete-btn').style.display=evt?'block':'none';
-  const cc=evt?(evt.color||'#2563EB'):'#2563EB';
-  document.querySelectorAll('.color-chip').forEach(c=>c.classList.toggle('active',c.dataset.color===cc));
-  const cn=evt?(evt.notifyBefore??0):0;
-  document.querySelectorAll('.notify-chip').forEach(c=>c.classList.toggle('active',parseInt(c.dataset.val)===cn));
-  modal.style.display='flex';
-  setTimeout(()=>document.getElementById('cal-evt-title').focus(),100);
-}
-
-function closeCalEventModal(){const m=document.getElementById('cal-event-modal');if(m)m.style.display='none';}
-function selectCalColor(el){document.querySelectorAll('.color-chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
-function selectCalNotify(el){document.querySelectorAll('.notify-chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
-
-async function saveCalendarEvent(){
-  const title=document.getElementById('cal-evt-title').value.trim();
-  const date=document.getElementById('cal-evt-date').value;
-  if(!title){toast('กรุณากรอกชื่อกิจกรรม','warn');return;}
-  if(!date){toast('กรุณาเลือกวันที่','warn');return;}
-  const id=document.getElementById('cal-evt-id').value||Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  const color=document.querySelector('.color-chip.active')?.dataset.color||'#2563EB';
-  const notifyBefore=parseInt(document.querySelector('.notify-chip.active')?.dataset.val??'0');
-  const evt={id,date,time:document.getElementById('cal-evt-time').value||null,title,desc:document.getElementById('cal-evt-desc').value.trim()||null,color,notifyBefore};
-  const idx=_calEvents.findIndex(e=>e.id===id);
-  if(idx>=0)_calEvents[idx]=evt;else _calEvents.push(evt);
-  try{await saveCalendarEvents();closeCalEventModal();_calSelectedDate=date;renderCalendar();renderCalDayEvents(date);updateCalNavDot();toast('บันทึกกิจกรรมแล้ว ✅');scheduleCalNotifyCheck();}
-  catch(e){toast('บันทึกไม่สำเร็จ: '+e.message,'err');}
-}
-
-async function deleteCalendarEvent(){
-  const id=document.getElementById('cal-evt-id').value;if(!id)return;
-  const evt=_calEvents.find(e=>e.id===id);
-  if(!confirm('ลบกิจกรรม "'+(evt?.title||id)+'"?'))return;
-  _calEvents=_calEvents.filter(e=>e.id!==id);
-  try{await saveCalendarEvents();closeCalEventModal();renderCalendar();if(_calSelectedDate)renderCalDayEvents(_calSelectedDate);updateCalNavDot();toast('ลบกิจกรรมแล้ว','warn');}
-  catch(e){toast('ลบไม่สำเร็จ: '+e.message,'err');}
-}
-
-function requestCalNotifyPermission(){
-  const s=document.getElementById('cal-notify-status');if(!s)return;
-  if(!('Notification'in window)){s.textContent='⚠️ เบราว์เซอร์ไม่รองรับการแจ้งเตือน';return;}
-  if(Notification.permission==='default'){s.textContent='🔔 แตะที่นี่เพื่อเปิดการแจ้งเตือน';s.style.cursor='pointer';s.onclick=()=>Notification.requestPermission().then(p=>{s.textContent=p==='granted'?'✅ เปิดการแจ้งเตือนแล้ว':'❌ ปฏิเสธการแจ้งเตือน';s.style.cursor='';s.onclick=null;});}
-  else if(Notification.permission==='granted'){s.textContent='✅ การแจ้งเตือนเปิดอยู่';}
-  else{s.textContent='❌ การแจ้งเตือนถูกปิด';}
-}
-
-function scheduleCalNotifyCheck(){if(_calNotifyTimer)clearInterval(_calNotifyTimer);checkCalNotifications();_calNotifyTimer=setInterval(checkCalNotifications,60000);}
-
-function checkCalNotifications(){
-  if(Notification.permission!=='granted')return;
-  const now=new Date();
-  _calEvents.forEach(evt=>{
-    if(evt.notifyBefore<0)return;
-    let notifyAt;
-    if(evt.time){const edt=new Date(evt.date+'T'+evt.time);notifyAt=new Date(edt.getTime()-evt.notifyBefore*60000);}
-    else{notifyAt=evt.notifyBefore===1440?new Date(new Date(evt.date+'T08:00:00').getTime()-86400000):new Date(evt.date+'T08:00:00');}
-    const key=evt.id+'_'+notifyAt.toISOString().slice(0,16);
-    const diff=notifyAt-now;
-    if(diff>=-120000&&diff<=0&&!_calNotifiedIds.has(key)){
-      _calNotifiedIds.add(key);localStorage.setItem('cal_notified',JSON.stringify([..._calNotifiedIds].slice(-100)));
-      new Notification('📅 '+evt.title,{body:evt.time?`เวลา ${evt.time} · ${evt.desc||''}`:(evt.desc||'วันนี้มีกิจกรรม'),icon:'/favicon.ico',tag:key});
-    }
-  });
-}
-
-function updateCalNavDot(){
-  const dot=document.getElementById('cal-bnav-dot');if(!dot)return;
-  const today=toCalDateStr(new Date());
-  const has=_calEvents.some(e=>e.date===today);
-  dot.style.background=has?'var(--red)':'';dot.style.opacity=has?'1':'0';
-}
-
 // ╔══════════════════════════════════════════════════════╗
 // ║  SECTION L: APP INITIALIZATION                     ║
 // ╚══════════════════════════════════════════════════════╝
@@ -5248,6 +5071,128 @@ async function deleteSubmission() {
     actionPopupError('ลบไม่สำเร็จ: ' + e.message);
   }
 }
+
+
+// ╔════════════════ SECTION M: CALENDAR ════════════════╗
+let _calYear=new Date().getFullYear(),_calMonth=new Date().getMonth();
+let _calEvents=[],_calSelectedDate=null,_calNotifyTimer=null;
+let _calNotifiedIds=new Set(JSON.parse(localStorage.getItem('cal_notified')||'[]'));
+
+async function loadCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;const{data}=await SB.from('settings').select('value').eq('key','calendar_'+CURRENT_TEACHER.id).maybeSingle();_calEvents=Array.isArray(data?.value)?data.value:[];}
+async function saveCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;await SB.from('settings').upsert({key:'calendar_'+CURRENT_TEACHER.id,value:_calEvents},{onConflict:'key'});}
+
+async function initCalendarTab(){
+  if(!_calEvents.length)await loadCalendarEvents();
+  const n=new Date();_calYear=n.getFullYear();_calMonth=n.getMonth();
+  renderCalendar();requestCalNotifyPermission();scheduleCalNotifyCheck();updateCalNavDot();
+}
+
+function toCalDateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+function renderCalendar(){
+  const label=document.getElementById('cal-month-label');const grid=document.getElementById('cal-grid');if(!label||!grid)return;
+  const thM=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  label.textContent=thM[_calMonth]+' '+(_calYear+543);
+  const today=new Date();today.setHours(0,0,0,0);const todayStr=toCalDateStr(today);
+  const firstDay=new Date(_calYear,_calMonth,1).getDay();const dim=new Date(_calYear,_calMonth+1,0).getDate();const prevDim=new Date(_calYear,_calMonth,0).getDate();
+  let cells='';
+  for(let i=firstDay-1;i>=0;i--){const ds=toCalDateStr(new Date(_calYear,_calMonth-1,prevDim-i));cells+=buildCalCell(prevDim-i,ds,true,todayStr);}
+  for(let d=1;d<=dim;d++){const ds=toCalDateStr(new Date(_calYear,_calMonth,d));cells+=buildCalCell(d,ds,false,todayStr);}
+  const rem=(firstDay+dim)%7===0?0:7-(firstDay+dim)%7;for(let d=1;d<=rem;d++){const ds=toCalDateStr(new Date(_calYear,_calMonth+1,d));cells+=buildCalCell(d,ds,true,todayStr);}
+  grid.innerHTML=cells;
+  if(_calSelectedDate){const s=grid.querySelector('[data-date="'+_calSelectedDate+'"]');if(s)s.classList.add('selected');renderCalDayEvents(_calSelectedDate);}
+}
+
+function buildCalCell(d,ds,other,todayStr){
+  const evts=_calEvents.filter(e=>e.date===ds);
+  const dots=evts.slice(0,4).map(e=>'<div class="cal-dot" style="background:'+(e.color||'#2563EB')+'"></div>').join('');
+  const more=evts.length>4?'<span style="font-size:9px;color:var(--text3);">+'+(evts.length-4)+'</span>':'';
+  const cls='cal-day'+(ds===todayStr?' today':'')+(other?' other-month':'');
+  return '<div class="'+cls+'" data-date="'+ds+'" onclick="calSelectDay(\''+ds+'\')">'+'<div class="cal-day-num">'+d+'</div>'+(evts.length?'<div class="cal-dots">'+dots+more+'</div>':'')+'</div>';
+}
+
+function calMove(dir){_calMonth+=dir;if(_calMonth<0){_calMonth=11;_calYear--;}if(_calMonth>11){_calMonth=0;_calYear++;}renderCalendar();}
+
+function calSelectDay(ds){
+  _calSelectedDate=ds;document.querySelectorAll('.cal-day.selected').forEach(el=>el.classList.remove('selected'));
+  const s=document.querySelector('[data-date="'+ds+'"]');if(s)s.classList.add('selected');
+  renderCalDayEvents(ds);const fab=document.getElementById('cal-add-fab');if(fab)fab.style.display='flex';
+}
+
+function renderCalDayEvents(ds){
+  const label=document.getElementById('cal-day-label');const list=document.getElementById('cal-event-list');if(!label||!list)return;
+  const d=new Date(ds+'T00:00:00');
+  const thD=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  const thMo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  label.textContent='📅 วัน'+thD[d.getDay()]+' '+d.getDate()+' '+thMo[d.getMonth()]+' '+(d.getFullYear()+543);
+  const evts=_calEvents.filter(e=>e.date===ds).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
+  if(!evts.length){list.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">ไม่มีกิจกรรม<br><span style="font-size:11px">กด ＋ เพื่อเพิ่ม</span></div>';return;}
+  list.innerHTML=evts.map(e=>'<div class="cal-event-item" onclick="openCalendarEventModal(\''+ds+'\',\''+e.id+'\')">'+'<div class="cal-event-color" style="background:'+(e.color||'#2563EB')+'"></div>'+'<div class="cal-event-info"><div class="cal-event-title">'+e.title+'</div><div class="cal-event-time">'+(e.time?'🕐 '+e.time:'📅 ทั้งวัน')+(e.notifyBefore>=0?' · 🔔':'')+'</div>'+(e.desc?'<div class="cal-event-desc">'+e.desc+'</div>':'')+'</div><div style="font-size:18px;color:var(--text3)">›</div></div>').join('');
+}
+
+function openCalendarEventModal(ds,eid){
+  const modal=document.getElementById('cal-event-modal');if(!modal)return;
+  const evt=eid?_calEvents.find(e=>e.id===eid):null;
+  document.getElementById('cal-modal-title').textContent=evt?'✏️ แก้ไขกิจกรรม':'➕ เพิ่มกิจกรรม';
+  document.getElementById('cal-evt-id').value=eid||'';document.getElementById('cal-evt-title').value=evt?evt.title:'';
+  document.getElementById('cal-evt-date').value=evt?evt.date:(ds||toCalDateStr(new Date()));
+  document.getElementById('cal-evt-time').value=evt?(evt.time||''):'';document.getElementById('cal-evt-desc').value=evt?(evt.desc||''):'';
+  document.getElementById('cal-delete-btn').style.display=evt?'block':'none';
+  const cc=evt?(evt.color||'#2563EB'):'#2563EB';document.querySelectorAll('.color-chip').forEach(c=>c.classList.toggle('active',c.dataset.color===cc));
+  const cn=evt?(evt.notifyBefore??0):0;document.querySelectorAll('.notify-chip').forEach(c=>c.classList.toggle('active',parseInt(c.dataset.val)===cn));
+  modal.style.display='flex';setTimeout(()=>document.getElementById('cal-evt-title').focus(),100);
+}
+function closeCalEventModal(){const m=document.getElementById('cal-event-modal');if(m)m.style.display='none';}
+function selectCalColor(el){document.querySelectorAll('.color-chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
+function selectCalNotify(el){document.querySelectorAll('.notify-chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
+
+async function saveCalendarEvent(){
+  const title=document.getElementById('cal-evt-title').value.trim();const date=document.getElementById('cal-evt-date').value;
+  if(!title){toast('กรุณากรอกชื่อกิจกรรม','warn');return;}if(!date){toast('กรุณาเลือกวันที่','warn');return;}
+  const id=document.getElementById('cal-evt-id').value||(Date.now().toString(36)+Math.random().toString(36).slice(2,5));
+  const color=document.querySelector('.color-chip.active')?.dataset.color||'#2563EB';
+  const notifyBefore=parseInt(document.querySelector('.notify-chip.active')?.dataset.val??'0');
+  const evt={id,date,time:document.getElementById('cal-evt-time').value||null,title,desc:document.getElementById('cal-evt-desc').value.trim()||null,color,notifyBefore};
+  const idx=_calEvents.findIndex(e=>e.id===id);if(idx>=0)_calEvents[idx]=evt;else _calEvents.push(evt);
+  try{await saveCalendarEvents();closeCalEventModal();_calSelectedDate=date;renderCalendar();renderCalDayEvents(date);updateCalNavDot();toast('บันทึกกิจกรรมแล้ว ✅');scheduleCalNotifyCheck();}
+  catch(e){toast('บันทึกไม่สำเร็จ: '+e.message,'err');}
+}
+
+async function deleteCalendarEvent(){
+  const id=document.getElementById('cal-evt-id').value;if(!id)return;
+  const evt=_calEvents.find(e=>e.id===id);if(!confirm('ลบกิจกรรม "'+(evt?.title||'')+'"?'))return;
+  _calEvents=_calEvents.filter(e=>e.id!==id);
+  try{await saveCalendarEvents();closeCalEventModal();renderCalendar();if(_calSelectedDate)renderCalDayEvents(_calSelectedDate);updateCalNavDot();toast('ลบแล้ว','warn');}
+  catch(e){toast('ลบไม่สำเร็จ: '+e.message,'err');}
+}
+
+function requestCalNotifyPermission(){
+  const s=document.getElementById('cal-notify-status');if(!s)return;
+  if(!('Notification'in window)){s.textContent='⚠️ เบราว์เซอร์ไม่รองรับการแจ้งเตือน';return;}
+  if(Notification.permission==='default'){s.textContent='🔔 แตะที่นี่เพื่อเปิดการแจ้งเตือน';s.style.cursor='pointer';s.onclick=()=>Notification.requestPermission().then(p=>{s.textContent=p==='granted'?'✅ เปิดการแจ้งเตือนแล้ว':'❌ ปฏิเสธ';s.style.cursor='';s.onclick=null;});}
+  else if(Notification.permission==='granted')s.textContent='✅ การแจ้งเตือนเปิดอยู่';
+  else s.textContent='❌ การแจ้งเตือนถูกปิด';
+}
+
+function scheduleCalNotifyCheck(){if(_calNotifyTimer)clearInterval(_calNotifyTimer);checkCalNotifications();_calNotifyTimer=setInterval(checkCalNotifications,60000);}
+
+function checkCalNotifications(){
+  if(Notification.permission!=='granted')return;const now=new Date();
+  _calEvents.forEach(evt=>{
+    if(evt.notifyBefore<0)return;
+    let notifyAt;
+    if(evt.time){const edt=new Date(evt.date+'T'+evt.time);notifyAt=new Date(edt.getTime()-evt.notifyBefore*60000);}
+    else if(evt.notifyBefore===1440){notifyAt=new Date(new Date(evt.date+'T08:00:00').getTime()-86400000);}
+    else{notifyAt=new Date(evt.date+'T08:00:00');}
+    const key=evt.id+'_'+notifyAt.toISOString().slice(0,16);const diff=notifyAt-now;
+    if(diff>=-120000&&diff<=0&&!_calNotifiedIds.has(key)){
+      _calNotifiedIds.add(key);localStorage.setItem('cal_notified',JSON.stringify([..._calNotifiedIds].slice(-100)));
+      new Notification('📅 '+evt.title,{body:evt.time?'เวลา '+evt.time+(evt.desc?' · '+evt.desc:''):(evt.desc||'วันนี้มีกิจกรรม'),tag:key});
+    }
+  });
+}
+
+function updateCalNavDot(){const dot=document.getElementById('cal-bnav-dot');if(!dot)return;const has=_calEvents.some(e=>e.date===toCalDateStr(new Date()));dot.style.opacity=has?'1':'0';dot.style.background=has?'var(--red)':'';}
 
 window.addEventListener('load', () => {
   checkSetupOnLoad();
