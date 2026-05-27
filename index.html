@@ -763,6 +763,21 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   </div>
   <div id="s-admin-main">
   <div id="ap-scan" class="page on">
+    <!-- Scanner Connection Status Bar -->
+    <div id="scanner-status-bar" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#F8FAFC;border-bottom:1.5px solid var(--border);gap:10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div id="scanner-dot" class="scanner-dot scanner-dot-idle"></div>
+        <div>
+          <div id="scanner-status-text" style="font-size:13px;font-weight:700;color:var(--text)">รอเชื่อมต่อสแกนเนอร์</div>
+          <div id="scanner-last-scan" style="font-size:11px;color:var(--text3)">เสียบ USB หรือเปิด Bluetooth แล้วสแกนได้เลย</div>
+        </div>
+      </div>
+      <button id="scanner-test-btn" onclick="testScannerConnection()" 
+        style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:#fff;font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;">
+        🔌 ทดสอบ
+      </button>
+    </div>
+
     <div class="card" style="border-color:#C4B5FD;background:linear-gradient(135deg,#FAF5FF,#EDE9FE);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <div class="card-title" style="margin:0;color:var(--purple);">📝 งานที่กำลังตรวจ</div>
