@@ -1426,28 +1426,6 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
   </div>
 
 
-  <!-- ===== CALENDAR PAGE ===== -->
-  <div id="ap-calendar" class="page">
-    <div class="cal-header">
-      <button class="cal-nav-btn" onclick="calMove(-1)">‹</button>
-      <div style="text-align:center">
-        <div class="cal-month-title" id="cal-month-label">—</div>
-        <div id="cal-notify-status" style="font-size:11px;color:var(--text3)"></div>
-      </div>
-      <button class="cal-nav-btn" onclick="calMove(1)">›</button>
-    </div>
-    <div class="cal-grid" style="margin-bottom:0">
-      <div class="cal-dow">อา</div><div class="cal-dow">จ</div><div class="cal-dow">อ</div>
-      <div class="cal-dow">พ</div><div class="cal-dow">พฤ</div><div class="cal-dow">ศ</div><div class="cal-dow">ส</div>
-    </div>
-    <div class="cal-grid" id="cal-grid"></div>
-    <div id="cal-day-label" style="padding:10px 16px 6px;font-size:14px;font-weight:700;color:var(--text2)"></div>
-    <div class="cal-event-list" id="cal-event-list">
-      <div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">เลือกวันเพื่อดูกิจกรรม</div>
-    </div>
-    <button class="cal-add-fab" id="cal-add-fab" onclick="openCalendarEventModal(null,null)">＋</button>
-  </div>
-
   <!-- ===== CALENDAR EVENT MODAL ===== -->
   <div id="cal-event-modal" class="edit-modal-overlay" style="display:none" onclick="if(event.target===this)closeCalEventModal()">
     <div class="edit-modal-box" style="max-width:420px">
@@ -1485,7 +1463,31 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
       <button onclick="closeCalEventModal()" style="width:100%;margin-top:8px;padding:12px;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;font-size:14px;color:var(--text2);cursor:pointer">ยกเลิก</button>
     </div>
   </div>
-    </div><!-- end s-admin-main -->
+
+
+  <!-- ===== CALENDAR PAGE ===== -->
+  <div id="ap-calendar" class="page">
+    <div class="cal-header">
+      <button class="cal-nav-btn" onclick="calMove(-1)">‹</button>
+      <div style="text-align:center">
+        <div class="cal-month-title" id="cal-month-label">—</div>
+        <div id="cal-notify-status" style="font-size:11px;color:var(--text3)"></div>
+      </div>
+      <button class="cal-nav-btn" onclick="calMove(1)">›</button>
+    </div>
+    <div class="cal-grid" style="margin-bottom:0">
+      <div class="cal-dow">อา</div><div class="cal-dow">จ</div><div class="cal-dow">อ</div>
+      <div class="cal-dow">พ</div><div class="cal-dow">พฤ</div><div class="cal-dow">ศ</div><div class="cal-dow">ส</div>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div id="cal-day-label" style="padding:10px 16px 6px;font-size:14px;font-weight:700;color:var(--text2)"></div>
+    <div class="cal-event-list" id="cal-event-list">
+      <div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">เลือกวันเพื่อดูกิจกรรม</div>
+    </div>
+    <button class="cal-add-fab" id="cal-add-fab" onclick="openCalendarEventModal(null,null)">＋</button>
+  </div>
+
+      </div><!-- end s-admin-main -->
 </div><!-- end s-admin-body -->
 
   <div class="bnav">
