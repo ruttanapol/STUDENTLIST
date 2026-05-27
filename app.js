@@ -1894,7 +1894,6 @@ function showAP(id,btn){
   // Feature flag gate
   if(id==='attend') {
     if(!checkFeatureGate('attendance','เช็คชื่อ')) return;
-    if(!isPremium()) { showUpgradeModal('🔒 ฟีเจอร์เช็คชื่อสำหรับ Premium เท่านั้น'); return; }
   }
   // sync sidebar nav items
   ['scan','dash','manage','attend','calendar'].forEach(function(p){
@@ -2585,14 +2584,11 @@ function buildExportData(){
   const collectScore = collectInp ? (parseFloat(collectInp.value)||0) : 0;
   const hwTotalMax = selectedHWs.reduce((s,h)=>s+(h.maxScore||100),0);
   return selectedRooms.map(room=>{
-    // filter homeworks ที่เป็นของ room นี้เท่านั้น
-    const roomHWs=selectedHWs.filter(h=>!h.room||h.room===room);
-    const hwTotalMax=roomHWs.reduce((s,h)=>s+(h.maxScore||100),0);
     const students=DB.students.filter(s=>s.room===room).sort((a,b)=>a.id.localeCompare(b.id));
     const rows=students.map((s,idx)=>{
       const row={เลขที่:idx+1,เลขประจำตัว:s.id,'ชื่อ-นามสกุล':s.name,ห้อง:s.room};
       let totalScore=0,totalMax=0,doneCount=0;
-      roomHWs.forEach(h=>{const sub=DB.submissions[s.id+'_'+h.num];const maxScore=sub?.maxScore||h.maxScore||100;if(sub){doneCount++;const sc=(sub.score!==null&&sub.score!==undefined)?sub.score:maxScore;totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:'✓';}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
+      selectedHWs.forEach(h=>{const sub=DB.submissions[s.id+'_'+h.num];const maxScore=sub?.maxScore||h.maxScore||100;if(sub){doneCount++;const sc=(sub.score!==null&&sub.score!==undefined)?sub.score:maxScore;totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:'✓';}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
       row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
       row['คะแนนรวม']=totalScore;
       row['คะแนนเต็มรวม']=hwTotalMax;
@@ -2603,7 +2599,7 @@ function buildExportData(){
       }
       return row;
     });
-    return{room,students,rows,homeworks:roomHWs,collectScore,hwTotalMax};
+    return{room,students,rows,homeworks:selectedHWs,collectScore,hwTotalMax};
   });
 }
 async function doExport(){
@@ -6033,6 +6029,7 @@ function onAttDateChange() {
 }
 
 async function saveAttendance() {
+  if(!isPremium()) { showUpgradeModal('🔒 การบันทึกเช็คชื่อเฉพาะแพลน Premium'); return; }
   if(!SB || !CURRENT_TEACHER) { toast('ต้องเชื่อมต่อก่อน','err'); return; }
   const room = document.getElementById('att-room-sel')?.value || '';
   const date = document.getElementById('att-date')?.value || '';
