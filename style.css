@@ -129,7 +129,7 @@ body { background:var(--bg); overscroll-behavior:none; }
 
 /* ===== BOTTOM NAV (mobile only) ===== */
 .bnav {
-  display:flex;border-top:none;
+  display:flex;border-top:none;overflow:hidden;
   background:#fff;
   padding:6px 0 calc(8px + env(safe-area-inset-bottom));
   box-shadow:0 -4px 20px rgba(0,0,0,0.08);
@@ -137,11 +137,12 @@ body { background:var(--bg); overscroll-behavior:none; }
 }
 .bnav-btn {
   flex:1;display:flex;flex-direction:column;
-  align-items:center;gap:2px;padding:8px 4px 4px;
+  align-items:center;gap:1px;padding:6px 2px 4px;
   background:none;border:none;cursor:pointer;
-  color:var(--text3);font-size:11px;font-weight:600;
-  transition:color .15s;min-height:52px;
+  color:var(--text3);font-size:10px;font-weight:600;
+  transition:color .15s;min-height:52px;min-width:0;
 }
+.bnav-btn svg { flex-shrink:0; width:22px; height:22px; }
 .bnav-btn.on{color:var(--blue);}
 .bnav-btn .bnav-dot{width:4px;height:4px;border-radius:50%;background:var(--blue);margin-top:2px;display:none;}
 .bnav-btn.on .bnav-dot{display:block;}

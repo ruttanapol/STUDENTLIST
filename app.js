@@ -5078,11 +5078,6 @@ let _calYear=new Date().getFullYear(),_calMonth=new Date().getMonth();
 let _calEvents=[],_calSelectedDate=null,_calNotifyTimer=null;
 let _calNotifiedIds=new Set(JSON.parse(localStorage.getItem('cal_notified')||'[]'));
 
-// Scanner connection tracking
-let _scannerLastSeen = null;   // timestamp ของ scan ล่าสุด
-let _scannerStatusTimer = null; // timer ตรวจ timeout
-let _scannerIsActive = false;   // สถานะปัจจุบัน
-
 async function loadCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;const{data}=await SB.from('settings').select('value').eq('key','calendar_'+CURRENT_TEACHER.id).maybeSingle();_calEvents=Array.isArray(data?.value)?data.value:[];}
 async function saveCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;await SB.from('settings').upsert({key:'calendar_'+CURRENT_TEACHER.id,value:_calEvents},{onConflict:'key'});}
 
@@ -5197,76 +5192,6 @@ function checkCalNotifications(){
   });
 }
 
-// ── Scanner Status Functions ─────────────────────────────
-function updateScannerStatus(state) {
-  // state: 'idle' | 'active' | 'scanning'
-  const dot = document.getElementById('scanner-dot');
-  const text = document.getElementById('scanner-status-text');
-  const sub = document.getElementById('scanner-last-scan');
-  const btn = document.getElementById('scanner-test-btn');
-  if(!dot || !text) return;
-
-  // remove all state classes
-  dot.className = 'scanner-dot scanner-dot-' + state;
-
-  if(state === 'scanning') {
-    text.textContent = '🟢 กำลังสแกน...';
-    text.style.color = '#15803D';
-    sub.textContent = 'รับข้อมูลจากสแกนเนอร์';
-    if(btn) { btn.style.background='#DCFCE7'; btn.style.borderColor='#86EFAC'; btn.textContent='✅ เชื่อมต่อแล้ว'; }
-  } else if(state === 'active') {
-    const t = _scannerLastSeen;
-    const ago = t ? Math.round((Date.now()-t)/1000) : 0;
-    const agoStr = ago < 60 ? ago+'วิที่แล้ว' : Math.round(ago/60)+'นาทีที่แล้ว';
-    text.textContent = '🟡 สแกนเนอร์พร้อมใช้';
-    text.style.color = '#B45309';
-    sub.textContent = 'สแกนล่าสุด: ' + agoStr;
-    if(btn) { btn.style.background='#FEF3C7'; btn.style.borderColor='#FCD34D'; btn.textContent='🔌 เชื่อมต่อ'; }
-  } else {
-    text.textContent = 'รอเชื่อมต่อสแกนเนอร์';
-    text.style.color = 'var(--text)';
-    sub.textContent = 'เสียบ USB หรือเปิด Bluetooth แล้วสแกนได้เลย';
-    if(btn) { btn.style.background='#fff'; btn.style.borderColor='var(--border)'; btn.style.color='var(--text2)'; btn.textContent='🔌 ทดสอบ'; }
-    _scannerIsActive = false;
-  }
-}
-
-function onScannerDetected() {
-  // เรียกเมื่อ detect rapid keystrokes (scanner)
-  _scannerLastSeen = Date.now();
-  _scannerIsActive = true;
-  updateScannerStatus('scanning');
-
-  // หลัง 1.5 วิ เปลี่ยนเป็น active (ไม่ idle)
-  clearTimeout(_scannerStatusTimer);
-  _scannerStatusTimer = setTimeout(() => {
-    updateScannerStatus('active');
-    // หลัง 30 วิ ไม่มีสแกน → กลับ idle
-    _scannerStatusTimer = setTimeout(() => {
-      updateScannerStatus('idle');
-    }, 30000);
-  }, 1500);
-}
-
-function testScannerConnection() {
-  const btn = document.getElementById('scanner-test-btn');
-  const sub = document.getElementById('scanner-last-scan');
-  if(!btn) return;
-  const orig = btn.textContent;
-  btn.textContent = '⌨️ สแกนบาร์โค้ดใดก็ได้...';
-  btn.style.background = '#EFF6FF';
-  btn.style.borderColor = '#93C5FD';
-  if(sub) sub.textContent = 'รอรับสัญญาณจากสแกนเนอร์ (10 วินาที)';
-  setTimeout(() => {
-    if(!_scannerIsActive) {
-      btn.textContent = orig;
-      btn.style.background = '#fff';
-      btn.style.borderColor = 'var(--border)';
-      if(sub) sub.textContent = 'ไม่พบสแกนเนอร์ — ลองเสียบ USB ใหม่';
-    }
-  }, 10000);
-}
-
 function updateCalNavDot(){const dot=document.getElementById('cal-bnav-dot');if(!dot)return;const has=_calEvents.some(e=>e.date===toCalDateStr(new Date()));dot.style.opacity=has?'1':'0';dot.style.background=has?'var(--red)':'';}
 
 window.addEventListener('load', () => {
@@ -5295,11 +5220,11 @@ window.addEventListener('load', () => {
     if(!scanPage || !scanPage.classList.contains('on')) return;
 
     if(e.key === 'Enter') {
+      // Enter = จบการสแกน
       if(barcodeBuffer.length >= MIN_LENGTH) {
         const code = barcodeBuffer.trim();
         barcodeBuffer = '';
         clearTimeout(barcodeTimer);
-        onScannerDetected(); // แสดงสถานะสแกนสำเร็จ
         recordScan(code);
       }
       barcodeBuffer = '';
@@ -5310,8 +5235,7 @@ window.addEventListener('load', () => {
     if(e.key && e.key.length === 1) {
       barcodeBuffer += e.key;
       clearTimeout(barcodeTimer);
-      // แสดงสถานะ "กำลังรับข้อมูล" ทันทีที่มี input เร็ว
-      if(barcodeBuffer.length === 1) onScannerDetected();
+      // ถ้าไม่มี input ใหม่ใน 50ms ถือว่าสแกนเสร็จ
       barcodeTimer = setTimeout(() => {
         if(barcodeBuffer.length >= MIN_LENGTH) {
           const code = barcodeBuffer.trim();
