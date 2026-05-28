@@ -1913,7 +1913,11 @@ function showAP(id,btn){
   if(id==='dash') renderDashboard();
   if(id==='manage') renderManage();
   if(id==='attend') initAttendanceTab();
-  if(id==='calendar') initCalendarTab();
+  if(id==='calendar') {
+    // Self-heal: สร้าง calendar page ถ้ายังไม่มีใน HTML
+    if(!document.getElementById('ap-calendar')) _injectCalendarHTML();
+    initCalendarTab();
+  }
 }
 
 function ts(){return new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});}
@@ -5206,7 +5210,132 @@ function checkCalNotifications(){
 
 function updateCalNavDot(){const dot=document.getElementById('cal-bnav-dot');if(!dot)return;const has=_calEvents.some(e=>e.date===toCalDateStr(new Date()));dot.style.opacity=has?'1':'0';dot.style.background=has?'var(--red)':'';}
 
+
+// ════════ CALENDAR: Self-heal HTML injection ════════
+function _injectCalendarHTML(){
+  if(document.getElementById('ap-calendar')) return;
+  const main = document.getElementById('s-admin-main') || document.getElementById('s-admin') || document.body;
+
+  // Calendar page
+  const page = document.createElement('div');
+  page.id = 'ap-calendar';
+  page.className = 'page';
+  page.innerHTML = `
+    <div class="cal-header">
+      <button class="cal-nav-btn" onclick="calMove(-1)">&#8249;</button>
+      <div style="text-align:center">
+        <div class="cal-month-title" id="cal-month-label">—</div>
+        <div id="cal-notify-status" style="font-size:11px;color:var(--text3)"></div>
+      </div>
+      <button class="cal-nav-btn" onclick="calMove(1)">&#8250;</button>
+    </div>
+    <div class="cal-grid" style="margin-bottom:0">
+      <div class="cal-dow">อา</div><div class="cal-dow">จ</div><div class="cal-dow">อ</div>
+      <div class="cal-dow">พ</div><div class="cal-dow">พฤ</div><div class="cal-dow">ศ</div><div class="cal-dow">ส</div>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div id="cal-day-label" style="padding:10px 16px 6px;font-size:14px;font-weight:700;color:var(--text2)"></div>
+    <div class="cal-event-list" id="cal-event-list">
+      <div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">เลือกวันเพื่อดูกิจกรรม</div>
+    </div>
+    <button class="cal-add-fab" id="cal-add-fab" onclick="openCalendarEventModal(null,null)" style="display:none">&#xFF0B;</button>
+  `;
+  main.appendChild(page);
+
+  // Calendar modal
+  if(!document.getElementById('cal-event-modal')){
+    const modal = document.createElement('div');
+    modal.id = 'cal-event-modal';
+    modal.className = 'edit-modal-overlay';
+    modal.style.display = 'none';
+    modal.setAttribute('onclick', "if(event.target===this)closeCalEventModal()");
+    modal.innerHTML = `
+      <div class="edit-modal-box" style="max-width:420px">
+        <div style="font-size:17px;font-weight:800;color:var(--text);margin-bottom:16px" id="cal-modal-title">&#xFF0B; เพิ่มกิจกรรม</div>
+        <input type="hidden" id="cal-evt-id">
+        <label class="lbl" style="margin-top:0">ชื่อกิจกรรม</label>
+        <input type="text" id="cal-evt-title" placeholder="เช่น ประชุมผู้ปกครอง">
+        <div style="display:flex;gap:10px">
+          <div style="flex:1"><label class="lbl">วันที่</label><input type="date" id="cal-evt-date"></div>
+          <div style="flex:1"><label class="lbl">เวลา</label><input type="time" id="cal-evt-time"></div>
+        </div>
+        <label class="lbl">คำอธิบาย</label>
+        <input type="text" id="cal-evt-desc" placeholder="รายละเอียด">
+        <label class="lbl">สีกิจกรรม</label>
+        <div style="display:flex;gap:10px;margin-bottom:14px">
+          <div class="color-chip active" data-color="#2563EB" onclick="selectCalColor(this)" style="background:#2563EB;width:32px;height:32px;border-radius:50%;border:3px solid var(--text);cursor:pointer"></div>
+          <div class="color-chip" data-color="#16A34A" onclick="selectCalColor(this)" style="background:#16A34A;width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer"></div>
+          <div class="color-chip" data-color="#DC2626" onclick="selectCalColor(this)" style="background:#DC2626;width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer"></div>
+          <div class="color-chip" data-color="#D97706" onclick="selectCalColor(this)" style="background:#D97706;width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer"></div>
+          <div class="color-chip" data-color="#7C3AED" onclick="selectCalColor(this)" style="background:#7C3AED;width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer"></div>
+          <div class="color-chip" data-color="#DB2777" onclick="selectCalColor(this)" style="background:#DB2777;width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer"></div>
+        </div>
+        <label class="lbl">แจ้งเตือน</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+          <div class="notify-chip" data-val="-1" onclick="selectCalNotify(this)" style="padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;background:#fff;color:var(--text2)">ไม่แจ้ง</div>
+          <div class="notify-chip active" data-val="0" onclick="selectCalNotify(this)" style="padding:7px 14px;border-radius:20px;border:1.5px solid var(--blue);font-size:13px;font-weight:600;cursor:pointer;background:var(--blue);color:#fff">วันนั้น 8:00</div>
+          <div class="notify-chip" data-val="30" onclick="selectCalNotify(this)" style="padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;background:#fff;color:var(--text2)">30 นาทีก่อน</div>
+          <div class="notify-chip" data-val="60" onclick="selectCalNotify(this)" style="padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;background:#fff;color:var(--text2)">1 ชม.ก่อน</div>
+          <div class="notify-chip" data-val="1440" onclick="selectCalNotify(this)" style="padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;background:#fff;color:var(--text2)">วันก่อน</div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="add-btn" onclick="saveCalendarEvent()" style="flex:1">&#x1F4BE; บันทึก</button>
+          <button id="cal-delete-btn" onclick="deleteCalendarEvent()" style="display:none;padding:14px 16px;background:var(--red-light);color:var(--red);border:1.5px solid var(--red);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer">&#x1F5D1;&#xFE0F;</button>
+        </div>
+        <button onclick="closeCalEventModal()" style="width:100%;margin-top:8px;padding:12px;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;font-size:14px;color:var(--text2);cursor:pointer">ยกเลิก</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  // Inject CSS ถ้ายังไม่มี
+  if(!document.getElementById('cal-css')){
+    const style = document.createElement('style');
+    style.id = 'cal-css';
+    style.textContent = `
+      .cal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px}
+      .cal-nav-btn{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2)}
+      .cal-month-title{font-size:18px;font-weight:800;color:var(--text);text-align:center}
+      .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 10px 6px}
+      .cal-dow{text-align:center;font-size:11px;font-weight:700;color:var(--text3);padding:6px 0}
+      .cal-day{min-height:54px;border-radius:10px;padding:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;transition:background .12s}
+      .cal-day:hover{background:var(--blue-light)}
+      .cal-day.today .cal-day-num{background:var(--blue);color:#fff;border-radius:50%}
+      .cal-day.selected{background:var(--purple-light)}
+      .cal-day.other-month{opacity:.3}
+      .cal-day-num{font-size:13px;font-weight:600;color:var(--text);width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+      .cal-dots{display:flex;flex-wrap:wrap;justify-content:center;gap:2px;margin-top:2px;max-width:44px}
+      .cal-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+      .cal-event-list{padding:0 14px 90px}
+      .cal-event-item{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#fff;border-radius:12px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.06);border:1.5px solid var(--border);cursor:pointer}
+      .cal-event-color{width:4px;min-height:36px;border-radius:4px;flex-shrink:0;margin-top:2px}
+      .cal-event-info{flex:1;min-width:0}
+      .cal-event-title{font-size:14px;font-weight:700;color:var(--text)}
+      .cal-event-time{font-size:12px;color:var(--text3);margin-top:2px}
+      .cal-event-desc{font-size:12px;color:var(--text2);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .cal-add-fab{position:fixed;bottom:82px;right:18px;width:52px;height:52px;border-radius:50%;background:var(--blue);color:#fff;border:none;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(37,99,235,.4);align-items:center;justify-content:center;z-index:100}
+      .color-chip.active{border-color:var(--text)!important;transform:scale(1.15)}
+      .notify-chip.active{background:var(--blue)!important;border-color:var(--blue)!important;color:#fff!important}
+    `;
+    document.head.appendChild(style);
+  }
+
+  // bnav button ถ้ายังไม่มี
+  if(!document.getElementById('bnav-calendar')){
+    const bnav = document.querySelector('.bnav');
+    if(bnav){
+      const btn = document.createElement('button');
+      btn.className = 'bnav-btn';
+      btn.id = 'bnav-calendar';
+      btn.setAttribute('onclick', "showAP('calendar',this)");
+      btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="15" r="1" fill="currentColor"/><circle cx="12" cy="15" r="1" fill="currentColor"/><circle cx="16" cy="15" r="1" fill="currentColor"/></svg><div class="bnav-label">ปฏิทิน</div><div class="bnav-dot" id="cal-bnav-dot" style="opacity:0"></div>';
+      bnav.appendChild(btn);
+    }
+  }
+}
+
 window.addEventListener('load', () => {
+  _injectCalendarHTML(); // ensure calendar exists
   checkSetupOnLoad();
   checkResetRedirect();
   initMobileModals();
