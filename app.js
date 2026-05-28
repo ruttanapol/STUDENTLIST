@@ -1900,9 +1900,15 @@ function showAP(id,btn){
     var sn = document.getElementById('snav-'+p);
     if(sn) sn.classList.toggle('on', p===id);
   });
-  document.querySelectorAll('#s-admin .page').forEach(p=>p.classList.remove('on'));
+  // ซ่อนทุก page
+  document.querySelectorAll('#s-admin .page').forEach(p=>{
+    p.classList.remove('on');
+    p.style.display='none';
+  });
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('on'));
-  document.getElementById('ap-'+id).classList.add('on');
+  // แสดง page ที่เลือก — ใช้ทั้ง class + inline style เผื่อ CSS override
+  const targetPage = document.getElementById('ap-'+id);
+  if(targetPage){ targetPage.classList.add('on'); targetPage.style.display='block'; }
   btn.classList.add('on');
   if(id==='dash') renderDashboard();
   if(id==='manage') renderManage();
@@ -5081,9 +5087,16 @@ async function loadCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;co
 async function saveCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;await SB.from('settings').upsert({key:'calendar_'+CURRENT_TEACHER.id,value:_calEvents},{onConflict:'key'});}
 
 async function initCalendarTab(){
-  if(!_calEvents.length)await loadCalendarEvents();
-  const n=new Date();_calYear=n.getFullYear();_calMonth=n.getMonth();
-  renderCalendar();requestCalNotifyPermission();scheduleCalNotifyCheck();updateCalNavDot();
+  try {
+    if(!_calEvents.length) await loadCalendarEvents();
+  } catch(e) {
+    console.warn('[Calendar] loadCalendarEvents error:', e.message);
+  }
+  const n=new Date(); _calYear=n.getFullYear(); _calMonth=n.getMonth();
+  renderCalendar();
+  requestCalNotifyPermission();
+  scheduleCalNotifyCheck();
+  updateCalNavDot();
 }
 
 function toCalDateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
