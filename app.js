@@ -1972,9 +1972,17 @@ function updateConflictWarn(){
   else{warn.style.display='none';}
 }
 
-function _toArabicNums(s){return (s||'').replace(/[๐-๙]/g,function(c){return c.charCodeAt(0)-3664;});}
+
+function _normBarcode(s){
+  if(!s) return String(s);
+  s=s.replace(/[๐-๙]/g,function(c){return c.charCodeAt(0)-3664;});
+  var m={'ๅ':'1','/':'2','-':'3','ภ':'4','ถ':'5','ุ':'6','ึ':'7','ค':'8','ต':'9','จ':'0','=':'1','!':'1','@':'2','#':'3','%':'5','^':'6','&':'7','*':'8','(':'9',')':'0'};
+  if(!/^\d+$/.test(s)) s=s.split('').map(function(c){return m[c]||c;}).join('');
+  return s.trim();
+}
+
 async function recordScan(sid, scoreOverride){
-  sid = _toArabicNums(sid).trim();
+  sid=_normBarcode(sid);
   if(!checkFeatureGate('barcode_scan','สแกนบาร์โค้ด', false)) return;
   const hwNum=parseInt(document.getElementById('hw-num-input').value)||1;
   const hwTitle=document.getElementById('hw-title-input').value.trim()||'ชิ้นที่ '+hwNum;
@@ -2030,7 +2038,7 @@ playScanSuccess();
   document.getElementById('scan-count').textContent=log.querySelectorAll('.log-item').length+' รายการ';
 }
 
-function submitManual(){const v=_toArabicNums(document.getElementById('manual-id').value.trim());if(v){recordScan(v);document.getElementById('manual-id').value='';document.getElementById('manual-id').focus();}}
+function submitManual(){const v=document.getElementById('manual-id').value.trim();if(v){recordScan(v);document.getElementById('manual-id').value='';}}
 
 // ===== MOBILE UX HELPERS =====
 function dismissKeyboard(){
@@ -5080,6 +5088,9 @@ async function deleteSubmission() {
 
 
 // ╔════════════════ SECTION M: CALENDAR ════════════════╗
+let _calYear=new Date().getFullYear(),_calMonth=new Date().getMonth();
+let _calEvents=[],_calSelectedDate=null,_calNotifyTimer=null;
+let _calNotifiedIds=new Set(JSON.parse(localStorage.getItem('cal_notified')||'[]'));
 
 async function loadCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;const{data}=await SB.from('settings').select('value').eq('key','calendar_'+CURRENT_TEACHER.id).maybeSingle();_calEvents=Array.isArray(data?.value)?data.value:[];}
 async function saveCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;await SB.from('settings').upsert({key:'calendar_'+CURRENT_TEACHER.id,value:_calEvents},{onConflict:'key'});}
@@ -5205,184 +5216,241 @@ function checkCalNotifications(){
 function updateCalNavDot(){const dot=document.getElementById('cal-bnav-dot');if(!dot)return;const has=_calEvents.some(e=>e.date===toCalDateStr(new Date()));dot.style.opacity=has?'1':'0';dot.style.background=has?'var(--red)':'';}
 
 
-// Scanner status
-var _scannerLastSeen=0, _scannerStatusTimer=null, _scannerActive=false;
-function updateScannerStatus(state){
-  var dot=document.getElementById('scanner-dot');
-  var txt=document.getElementById('scanner-status-text');
-  var sub=document.getElementById('scanner-last-scan');
-  if(!dot||!txt)return;
-  dot.className='scanner-dot scanner-dot-'+state;
-  if(state==='scanning'){txt.textContent='🟢 กำลังสแกน...';txt.style.color='#15803D';if(sub)sub.textContent='รับข้อมูลจากสแกนเนอร์';}
-  else if(state==='active'){var ago=Math.round((Date.now()-_scannerLastSeen)/1000);txt.textContent='🟡 สแกนเนอร์พร้อมใช้';txt.style.color='#B45309';if(sub)sub.textContent='สแกนล่าสุด: '+ago+'วิที่แล้ว';}
-  else{txt.textContent='รอเชื่อมต่อสแกนเนอร์';txt.style.color='var(--text)';if(sub)sub.textContent='เสียบ USB หรือเปิด Bluetooth';_scannerActive=false;}
-}
-function onScannerDetected(){
-  _scannerLastSeen=Date.now();_scannerActive=true;
-  updateScannerStatus('scanning');
-  clearTimeout(_scannerStatusTimer);
-  _scannerStatusTimer=setTimeout(function(){
-    updateScannerStatus('active');
-    _scannerStatusTimer=setTimeout(function(){updateScannerStatus('idle');},30000);
-  },1500);
-}
-
-
 /* ===== CALENDAR ===== */
-var _CY=new Date().getFullYear(),_CM=new Date().getMonth(),_CE=[],_CD='',_CT=null;
-var _CN=new Set(JSON.parse(localStorage.getItem('_cn')||'[]'));
+var _CY=new Date().getFullYear(), _CM=new Date().getMonth(),
+    _CE=[], _CD='', _CT=null,
+    _CN=new Set(JSON.parse(localStorage.getItem('_cn')||'[]'));
 
 function _showCal(){
-  if(!document.getElementById('_cov'))_mkCal();
+  if(!document.getElementById('_cov')) _mkCal();
   var ov=document.getElementById('_cov');
   ov.style.cssText='display:flex;flex-direction:column;position:fixed;inset:0;z-index:9999;background:#F1F5F9;overflow-y:auto;';
   _initCal();
 }
-function _hideCal(){
-  var ov=document.getElementById('_cov');
-  if(ov)ov.style.display='none';
-  var f=document.getElementById('_cfab');if(f)f.style.display='none';
-  document.querySelectorAll('.bnav-btn').forEach(function(b){b.classList.remove('on');});
-}
+
 function _mkCal(){
-  /* --- CSS --- */
   var st=document.createElement('style');
-  st.id='_calCSS';
-  st.innerHTML=[
-    '.cday{min-height:52px;border-radius:10px;padding:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;}',
-    '.cday:hover,.cday.cs{background:#EDE9FE;}',
-    '.cday.ct .cn{background:#2563EB;color:#fff;border-radius:50%;}',
-    '.cday.co{opacity:.3;}',
-    '.cn{font-size:13px;font-weight:600;color:#0F172A;width:26px;height:26px;display:flex;align-items:center;justify-content:center;}'
-  ].join('');
+  st.innerHTML='.cd{min-height:52px;border-radius:10px;padding:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;}.cd:hover,.cd.cs{background:#EDE9FE;}.cd.ct .cn{background:#2563EB;color:#fff;border-radius:50%;}.cd.co{opacity:.3;}.cn{font-size:13px;font-weight:600;color:#0F172A;width:26px;height:26px;display:flex;align-items:center;justify-content:center;}';
   document.head.appendChild(st);
 
-  /* --- overlay --- */
-  var ov=document.createElement('div');ov.id='_cov';
+  var ov=document.createElement('div'); ov.id='_cov';
 
   /* header */
   var hd=document.createElement('div');
   hd.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff;border-bottom:1.5px solid #e2e8f0;position:sticky;top:0;z-index:1;';
-  var bp=_btn('‹','calMove(-1)','width:36px;height:36px;border-radius:50%;border:1.5px solid #e2e8f0;background:#fff;font-size:22px;cursor:pointer;');
-  var bn=_btn('›','calMove(1)','width:36px;height:36px;border-radius:50%;border:1.5px solid #e2e8f0;background:#fff;font-size:22px;cursor:pointer;');
-  var mc=document.createElement('div');mc.style.textAlign='center';
-  var ml=document.createElement('div');ml.id='_cml';ml.style.cssText='font-size:18px;font-weight:800;color:#0F172A;';ml.textContent='—';
-  var ns=document.createElement('div');ns.id='_cns';ns.style.cssText='font-size:11px;color:#94A3B8;';
-  mc.appendChild(ml);mc.appendChild(ns);
-  hd.appendChild(bp);hd.appendChild(mc);hd.appendChild(bn);
+  var bp=document.createElement('button'); bp.innerHTML='&#8249;';
+  bp.style.cssText='width:36px;height:36px;border-radius:50%;border:1.5px solid #e2e8f0;background:#fff;font-size:22px;cursor:pointer;';
+  bp.onclick=function(){calMove(-1);};
+  var bn=document.createElement('button'); bn.innerHTML='&#8250;';
+  bn.style.cssText=bp.style.cssText; bn.onclick=function(){calMove(1);};
+  var mc=document.createElement('div'); mc.style.textAlign='center';
+  var ml=document.createElement('div'); ml.id='_cml';
+  ml.style.cssText='font-size:18px;font-weight:800;color:#0F172A;'; ml.textContent='—';
+  mc.appendChild(ml); hd.appendChild(bp); hd.appendChild(mc); hd.appendChild(bn);
   ov.appendChild(hd);
 
-  /* day-of-week */
+  /* DOW row */
   var dw=document.createElement('div');
   dw.style.cssText='display:grid;grid-template-columns:repeat(7,1fr);background:#fff;padding:4px 8px 0;';
   ['อา','จ','อ','พ','พฤ','ศ','ส'].forEach(function(d){
-    var c=document.createElement('div');c.style.cssText='text-align:center;font-size:11px;font-weight:700;color:#94A3B8;padding:5px 0;';c.textContent=d;dw.appendChild(c);
+    var c=document.createElement('div');
+    c.style.cssText='text-align:center;font-size:11px;font-weight:700;color:#94A3B8;padding:5px 0;';
+    c.textContent=d; dw.appendChild(c);
   });
   ov.appendChild(dw);
 
   /* grid */
-  var gr=document.createElement('div');gr.id='_cgr';
+  var gr=document.createElement('div'); gr.id='_cgr';
   gr.style.cssText='display:grid;grid-template-columns:repeat(7,1fr);gap:2px;background:#fff;padding:0 8px 8px;';
   ov.appendChild(gr);
 
   /* day label + event list */
-  var dl=document.createElement('div');dl.id='_cdl';dl.style.cssText='padding:12px 16px 6px;font-size:14px;font-weight:700;color:#475569;';ov.appendChild(dl);
-  var el=document.createElement('div');el.id='_cel';el.style.cssText='padding:0 14px 130px;';
+  var dl=document.createElement('div'); dl.id='_cdl';
+  dl.style.cssText='padding:12px 16px 6px;font-size:14px;font-weight:700;color:#475569;';
+  ov.appendChild(dl);
+  var el=document.createElement('div'); el.id='_cel';
+  el.style.cssText='padding:0 14px 130px;';
   el.innerHTML='<div style="text-align:center;color:#94A3B8;font-size:13px;padding:24px;">เลือกวันเพื่อดูกิจกรรม</div>';
   ov.appendChild(el);
+
+  /* FAB */
+  var fab=document.createElement('button'); fab.id='_cfab';
+  fab.textContent='+'; fab.onclick=function(){_openEvt('',null);};
+  fab.style.cssText='display:none;position:fixed;bottom:72px;right:18px;width:52px;height:52px;border-radius:50%;background:#2563EB;color:#fff;border:none;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(37,99,235,.4);align-items:center;justify-content:center;z-index:10001;';
+  ov.appendChild(fab);
 
   /* close bar */
   var cb=document.createElement('div');
   cb.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:10000;background:#fff;border-top:1.5px solid #e2e8f0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));';
-  var cbtn=document.createElement('button');cbtn.textContent='✕ ปิดปฏิทิน';cbtn.onclick=_hideCal;
-  cbtn.style.cssText='width:100%;padding:13px;background:#F1F5F9;border:none;border-radius:12px;font-size:14px;font-weight:700;color:#475569;cursor:pointer;';
-  cb.appendChild(cbtn);ov.appendChild(cb);
-
-  /* FAB */
-  var fab=document.createElement('button');fab.id='_cfab';fab.textContent='+';
-  fab.onclick=function(){_openEvt('',null);};
-  fab.style.cssText='display:none;position:fixed;bottom:72px;right:18px;width:52px;height:52px;border-radius:50%;background:#2563EB;color:#fff;border:none;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(37,99,235,.4);align-items:center;justify-content:center;z-index:10001;';
-  ov.appendChild(fab);
+  var cbt=document.createElement('button'); cbt.textContent='\u2715 \u0e1b\u0e34\u0e14\u0e1b\u0e0f\u0e34\u0e17\u0e34\u0e19';
+  cbt.style.cssText='width:100%;padding:13px;background:#F1F5F9;border:none;border-radius:12px;font-size:14px;font-weight:700;color:#475569;cursor:pointer;';
+  cbt.onclick=function(){
+    document.getElementById('_cov').style.display='none';
+    var f=document.getElementById('_cfab'); if(f) f.style.display='none';
+    document.querySelectorAll('.bnav-btn').forEach(function(b){b.classList.remove('on');});
+  };
+  cb.appendChild(cbt); ov.appendChild(cb);
   document.body.appendChild(ov);
 
-  /* --- event modal --- */
-  var mo=document.createElement('div');mo.id='_cmo';
+  /* modal */
+  var mo=document.createElement('div'); mo.id='_cmo';
   mo.style.cssText='display:none;position:fixed;inset:0;z-index:10002;background:rgba(0,0,0,.5);align-items:flex-end;justify-content:center;';
   mo.onclick=function(e){if(e.target===mo)mo.style.display='none';};
   var mb=document.createElement('div');
   mb.style.cssText='background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;padding:22px 18px calc(22px + env(safe-area-inset-bottom));';
-  
-  var mHTML='<div id="_cmt" style="font-size:16px;font-weight:800;color:#0F172A;margin-bottom:14px;">เพิ่มกิจกรรม</div>';
-  mHTML+='<input type="hidden" id="_ceid">';
-  mHTML+=_lbl('ชื่อกิจกรรม')+'<input id="_ctit" type="text" placeholder="เช่น ประชุม" style="'+_inp()+'margin-bottom:10px;">';
-  mHTML+='<div style="display:flex;gap:8px;margin-bottom:10px;">';
-  mHTML+='<div style="flex:1;">'+_lbl('วันที่')+'<input id="_cdat" type="date" style="'+_inp()+'"></div>';
-  mHTML+='<div style="flex:1;">'+_lbl('เวลา')+'<input id="_ctim" type="time" style="'+_inp()+'"></div></div>';
-  mHTML+=_lbl('หมายเหตุ')+'<input id="_cdsc" type="text" placeholder="รายละเอียด" style="'+_inp()+'margin-bottom:12px;">';
-  mHTML+=_lbl('สี')+'<div id="_ccl" style="display:flex;gap:8px;margin-bottom:16px;">';
+
+  function lbl(t){var l=document.createElement('label');l.style.cssText='font-size:11px;font-weight:700;color:#64748B;display:block;margin-bottom:3px;';l.textContent=t;return l;}
+  function inp(id,type,ph){var i=document.createElement('input');i.id=id;i.type=type||'text';if(ph)i.placeholder=ph;i.style.cssText='width:100%;padding:11px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;margin-bottom:10px;box-sizing:border-box;';return i;}
+
+  var tl=document.createElement('div'); tl.id='_cmt';
+  tl.style.cssText='font-size:16px;font-weight:800;color:#0F172A;margin-bottom:14px;';
+  tl.textContent='\u2795 \u0e40\u0e1e\u0e34\u0e48\u0e21\u0e01\u0e34\u0e08\u0e01\u0e23\u0e23\u0e21';
+  mb.appendChild(tl);
+
+  var hi=document.createElement('input'); hi.type='hidden'; hi.id='_ceid'; mb.appendChild(hi);
+  mb.appendChild(lbl('\u0e0a\u0e37\u0e48\u0e2d\u0e01\u0e34\u0e08\u0e01\u0e23\u0e23\u0e21'));
+  mb.appendChild(inp('_ctit','text','\u0e40\u0e0a\u0e48\u0e19 \u0e1b\u0e23\u0e30\u0e0a\u0e38\u0e21'));
+
+  var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-bottom:10px;';
+  var d1=document.createElement('div'); d1.style.flex='1';
+  d1.appendChild(lbl('\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48'));
+  var di=document.createElement('input'); di.id='_cdat'; di.type='date';
+  di.style.cssText='width:100%;padding:11px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;box-sizing:border-box;';
+  d1.appendChild(di);
+  var d2=document.createElement('div'); d2.style.flex='1';
+  d2.appendChild(lbl('\u0e40\u0e27\u0e25\u0e32'));
+  var ti=document.createElement('input'); ti.id='_ctim'; ti.type='time';
+  ti.style.cssText=di.style.cssText; d2.appendChild(ti);
+  row.appendChild(d1); row.appendChild(d2); mb.appendChild(row);
+
+  mb.appendChild(lbl('\u0e2b\u0e21\u0e32\u0e22\u0e40\u0e2b\u0e15\u0e38'));
+  mb.appendChild(inp('_cdsc','text','\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14'));
+
+  mb.appendChild(lbl('\u0e2a\u0e35'));
+  var cc=document.createElement('div'); cc.id='_ccl';
+  cc.style.cssText='display:flex;gap:8px;margin-bottom:16px;';
   ['#2563EB','#16A34A','#DC2626','#D97706','#7C3AED'].forEach(function(c,i){
-    mHTML+='<div data-c="'+c+'" onclick="_pc(this)" style="width:28px;height:28px;border-radius:50%;background:'+c+';border:3px solid '+(i===0?'#0F172A':'transparent')+';cursor:pointer;"></div>';
+    var ch=document.createElement('div'); ch.dataset.c=c;
+    ch.style.cssText='width:28px;height:28px;border-radius:50%;background:'+c+';border:3px solid '+(i===0?'#0F172A':'transparent')+';cursor:pointer;';
+    ch.onclick=function(){document.querySelectorAll('#_ccl [data-c]').forEach(function(x){x.style.border='3px solid transparent';});this.style.border='3px solid #0F172A';};
+    cc.appendChild(ch);
   });
-  mHTML+='</div>';
-  mHTML+='<div style="display:flex;gap:8px;">';
-  mHTML+='<button onclick="_saveEvt()" style="flex:1;padding:13px;background:#2563EB;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">บันทึก</button>';
-  mHTML+='<button id="_cdel" onclick="_delEvt()" style="display:none;padding:13px 16px;background:#FEE2E2;color:#DC2626;border:1.5px solid #DC2626;border-radius:12px;cursor:pointer;font-size:14px;font-weight:700;">ลบ</button>';
-  mHTML+='</div>';
-  mb.innerHTML=mHTML; var cxbtn=document.createElement('button');cxbtn.textContent='ยกเลิก';cxbtn.style.cssText='width:100%;margin-top:8px;padding:12px;background:#F1F5F9;border:none;border-radius:12px;font-size:14px;color:#64748B;cursor:pointer;';cxbtn.onclick=function(){document.getElementById('_cmo').style.display='none';};mb.appendChild(cxbtn);
-  
-  mo.appendChild(mb);document.body.appendChild(mo);
+  mb.appendChild(cc);
+
+  var br=document.createElement('div'); br.style.cssText='display:flex;gap:8px;';
+  var sb=document.createElement('button'); sb.textContent='\u{1F4BE} \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01';
+  sb.style.cssText='flex:1;padding:13px;background:#2563EB;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;';
+  sb.onclick=function(){_saveEvt();};
+  var db=document.createElement('button'); db.id='_cdel';
+  db.textContent='\u{1F5D1}\uFE0F'; db.style.cssText='display:none;padding:13px 16px;background:#FEE2E2;color:#DC2626;border:1.5px solid #DC2626;border-radius:12px;cursor:pointer;font-size:14px;font-weight:700;';
+  db.onclick=function(){_delEvt();};
+  br.appendChild(sb); br.appendChild(db); mb.appendChild(br);
+
+  var cx=document.createElement('button'); cx.textContent='\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01';
+  cx.style.cssText='width:100%;margin-top:8px;padding:12px;background:#F1F5F9;border:none;border-radius:12px;font-size:14px;color:#64748B;cursor:pointer;';
+  cx.onclick=function(){document.getElementById('_cmo').style.display='none';};
+  mb.appendChild(cx);
+
+  mo.appendChild(mb); document.body.appendChild(mo);
 }
 
-function _lbl(t){return '<label style="font-size:11px;font-weight:700;color:#64748B;display:block;margin-bottom:3px;">'+t+'</label>';}
-function _inp(){return 'width:100%;padding:11px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;box-sizing:border-box;';}
-function _btn(txt,oc,sty){var b=document.createElement('button');b.innerHTML=txt;b.setAttribute('onclick',oc);b.style.cssText=sty;return b;}
+function _ds(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
 
 async function _initCal(){
-  try{if(!_CE.length&&typeof USE_SUPABASE!=='undefined'&&USE_SUPABASE&&CURRENT_TEACHER){var r=await SB.from('settings').select('value').eq('key','cal_'+CURRENT_TEACHER.id).maybeSingle();if(r.data&&Array.isArray(r.data.value))_CE=r.data.value;}}catch(e){}
-  var n=new Date();_CY=n.getFullYear();_CM=n.getMonth();
+  try{
+    if(!_CE.length&&typeof USE_SUPABASE!=='undefined'&&USE_SUPABASE&&CURRENT_TEACHER){
+      var r=await SB.from('settings').select('value').eq('key','cal_'+CURRENT_TEACHER.id).maybeSingle();
+      if(r&&r.data&&Array.isArray(r.data.value)) _CE=r.data.value;
+    }
+  }catch(e){}
+  var n=new Date(); _CY=n.getFullYear(); _CM=n.getMonth();
   _renCal();
-  if(_CT)clearInterval(_CT);_CT=setInterval(_chkNotif,60000);_chkNotif();
+  if(_CT) clearInterval(_CT);
+  _CT=setInterval(_chkNotif,60000);
+  _chkNotif();
 }
-
-function _ds(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 
 function _renCal(){
-  var ml=document.getElementById('_cml');var gr=document.getElementById('_cgr');if(!ml||!gr)return;
-  var TH='มกราคม กุมภาพันธ์ มีนาคม เมษายน พฤษภาคม มิถุนายน กรกฎาคม สิงหาคม กันยายน ตุลาคม พฤศจิกายน ธันวาคม'.split(' ');
+  var ml=document.getElementById('_cml');
+  var gr=document.getElementById('_cgr');
+  if(!ml||!gr) return;
+  var TH=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   ml.textContent=TH[_CM]+' '+(_CY+543);
-  var now=new Date();now.setHours(0,0,0,0);var ts=_ds(now);
-  var fd=new Date(_CY,_CM,1).getDay(),dim=new Date(_CY,_CM+1,0).getDate(),pd=new Date(_CY,_CM,0).getDate();
-  while(gr.firstChild)gr.removeChild(gr.firstChild);
-  function addCell(d,ds,other){
+  var now=new Date(); now.setHours(0,0,0,0); var ts=_ds(now);
+  var fd=new Date(_CY,_CM,1).getDay();
+  var dim=new Date(_CY,_CM+1,0).getDate();
+  var pd=new Date(_CY,_CM,0).getDate();
+  while(gr.firstChild) gr.removeChild(gr.firstChild);
+  function addCell(d,ds,oth){
     var ev=_CE.filter(function(e){return e.date===ds;});
-    var cell=document.createElement('div');
-    cell.className='cday'+(ds===ts?' ct':'')+(other?' co':'')+(ds===_CD?' cs':'');
-    cell.dataset.date=ds;
-    var nm=document.createElement('div');nm.className='cn';nm.textContent=d;cell.appendChild(nm);
-    if(ev.length){var dts=document.createElement('div');dts.style.cssText='display:flex;flex-wrap:wrap;gap:2px;justify-content:center;max-width:40px;margin-top:2px;';ev.slice(0,4).forEach(function(e){var dot=document.createElement('div');dot.style.cssText='width:6px;height:6px;border-radius:50%;background:'+(e.color||'#2563EB')+';';dts.appendChild(dot);});cell.appendChild(dts);}
-    cell.onclick=(function(s){return function(){calSelectDay(s);};})(ds);
-    gr.appendChild(cell);
+    var c=document.createElement('div');
+    c.className='cd'+(ds===ts?' ct':'')+(oth?' co':'')+(ds===_CD?' cs':'');
+    c.dataset.date=ds;
+    var nm=document.createElement('div'); nm.className='cn'; nm.textContent=d; c.appendChild(nm);
+    if(ev.length){
+      var dw=document.createElement('div');
+      dw.style.cssText='display:flex;flex-wrap:wrap;gap:2px;justify-content:center;max-width:40px;margin-top:2px;';
+      ev.slice(0,4).forEach(function(e){
+        var dot=document.createElement('div');
+        dot.style.cssText='width:6px;height:6px;border-radius:50%;background:'+(e.color||'#2563EB')+';';
+        dw.appendChild(dot);
+      });
+      c.appendChild(dw);
+    }
+    c.onclick=(function(s){return function(){calSelectDay(s);};})(ds);
+    gr.appendChild(c);
   }
-  for(var i=fd-1;i>=0;i--)addCell(pd-i,_ds(new Date(_CY,_CM-1,pd-i)),true);
-  for(var d=1;d<=dim;d++)addCell(d,_ds(new Date(_CY,_CM,d)),false);
-  var rem=(fd+dim)%7===0?0:7-(fd+dim)%7;for(var d2=1;d2<=rem;d2++)addCell(d2,_ds(new Date(_CY,_CM+1,d2)),true);
-  if(_CD)_renDay(_CD);
+  for(var i=fd-1;i>=0;i--) addCell(pd-i,_ds(new Date(_CY,_CM-1,pd-i)),true);
+  for(var d=1;d<=dim;d++) addCell(d,_ds(new Date(_CY,_CM,d)),false);
+  var rem=(fd+dim)%7===0?0:7-(fd+dim)%7;
+  for(var d2=1;d2<=rem;d2++) addCell(d2,_ds(new Date(_CY,_CM+1,d2)),true);
+  if(_CD) _renDay(_CD);
 }
+
 function calMove(d){_CM+=d;if(_CM<0){_CM=11;_CY--;}if(_CM>11){_CM=0;_CY++;}_renCal();}
-function calSelectDay(ds){_CD=ds;document.querySelectorAll('.cday').forEach(function(c){c.classList.remove('cs');});document.querySelectorAll('[data-date="'+ds+'"]').forEach(function(c){c.classList.add('cs');});_renDay(ds);var f=document.getElementById('_cfab');if(f)f.style.display='flex';}
+
+function calSelectDay(ds){
+  _CD=ds;
+  document.querySelectorAll('.cd').forEach(function(c){c.classList.remove('cs');});
+  document.querySelectorAll('[data-date="'+ds+'"]').forEach(function(c){c.classList.add('cs');});
+  _renDay(ds);
+  var f=document.getElementById('_cfab'); if(f) f.style.display='flex';
+}
+
 function _renDay(ds){
-  var lb=document.getElementById('_cdl');var li=document.getElementById('_cel');if(!lb||!li)return;
+  var lb=document.getElementById('_cdl'); var li=document.getElementById('_cel');
+  if(!lb||!li) return;
   var d=new Date(ds+'T00:00:00');
-  var DD='อาทิตย์ จันทร์ อังคาร พุธ พฤหัสบดี ศุกร์ เสาร์'.split(' ');
-  var MM='ม.ค. ก.พ. มี.ค. เม.ย. พ.ค. มิ.ย. ก.ค. ส.ค. ก.ย. ต.ค. พ.ย. ธ.ค.'.split(' ');
+  var DD=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  var MM=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   lb.textContent='📅 วัน'+DD[d.getDay()]+' '+d.getDate()+' '+MM[d.getMonth()]+' '+(d.getFullYear()+543);
   var ev=_CE.filter(function(e){return e.date===ds;}).sort(function(a,b){return (a.time||'99:99').localeCompare(b.time||'99:99');});
-  while(li.firstChild)li.removeChild(li.firstChild);
-  if(!ev.length){var em=document.createElement('div');em.style.cssText='text-align:center;color:#94A3B8;font-size:13px;padding:24px;';em.textContent='ไม่มีกิจกรรม กด + เพื่อเพิ่ม';li.appendChild(em);return;}
-  ev.forEach(function(e){var row=document.createElement('div');row.style.cssText='display:flex;align-items:flex-start;gap:10px;padding:12px;background:#fff;border-radius:12px;margin-bottom:8px;border:1.5px solid #e2e8f0;cursor:pointer;';var eid=e.id;var eds=ds;row.onclick=function(){_openEvt(eds,eid);};row.innerHTML='<div style="width:4px;min-height:32px;border-radius:4px;flex-shrink:0;margin-top:2px;background:'+(e.color||'#2563EB')+'"></div><div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#0F172A;">'+e.title+'</div><div style="font-size:12px;color:#94A3B8;margin-top:2px;">'+(e.time?'🕐 '+e.time:'📅 ทั้งวัน')+'</div>'+(e.desc?'<div style="font-size:12px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e.desc+'</div>':'')+'</div><div style="color:#94A3B8;font-size:18px;">›</div>';li.appendChild(row);});
+  while(li.firstChild) li.removeChild(li.firstChild);
+  if(!ev.length){
+    var em=document.createElement('div');
+    em.style.cssText='text-align:center;color:#94A3B8;font-size:13px;padding:24px;';
+    em.textContent='ไม่มีกิจกรรม  กด + เพื่อเพิ่ม'; li.appendChild(em); return;
+  }
+  ev.forEach(function(e){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:flex-start;gap:10px;padding:12px;background:#fff;border-radius:12px;margin-bottom:8px;border:1.5px solid #e2e8f0;cursor:pointer;';
+    var eid=e.id; var eds=ds;
+    row.onclick=function(){_openEvt(eds,eid);};
+    var bar=document.createElement('div');
+    bar.style.cssText='width:4px;min-height:32px;border-radius:4px;flex-shrink:0;margin-top:2px;background:'+(e.color||'#2563EB')+';';
+    var info=document.createElement('div'); info.style.cssText='flex:1;min-width:0;';
+    var nm=document.createElement('div'); nm.style.cssText='font-size:14px;font-weight:700;color:#0F172A;'; nm.textContent=e.title;
+    var tm=document.createElement('div'); tm.style.cssText='font-size:12px;color:#94A3B8;margin-top:2px;'; tm.textContent=e.time?'🕐 '+e.time:'📅 ทั้งวัน';
+    info.appendChild(nm); info.appendChild(tm);
+    if(e.desc){var dc=document.createElement('div');dc.style.cssText='font-size:12px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';dc.textContent=e.desc;info.appendChild(dc);}
+    var ar=document.createElement('div'); ar.style.cssText='color:#94A3B8;font-size:18px;'; ar.textContent='›';
+    row.appendChild(bar); row.appendChild(info); row.appendChild(ar);
+    li.appendChild(row);
+  });
 }
+
 function _openEvt(ds,eid){
-  var mo=document.getElementById('_cmo');if(!mo)return;
+  var mo=document.getElementById('_cmo'); if(!mo) return;
   var ev=eid?_CE.find(function(e){return e.id===eid;}):null;
   document.getElementById('_cmt').textContent=ev?'แก้ไขกิจกรรม':'เพิ่มกิจกรรม';
   document.getElementById('_ceid').value=eid||'';
@@ -5396,26 +5464,50 @@ function _openEvt(ds,eid){
   mo.style.display='flex';
   setTimeout(function(){document.getElementById('_ctit').focus();},100);
 }
-function _pc(el){document.querySelectorAll('#_ccl [data-c]').forEach(function(c){c.style.border='3px solid transparent';});el.style.border='3px solid #0F172A';}
+
 async function _saveEvt(){
-  var tl=(document.getElementById('_ctit').value||'').trim();var dt=document.getElementById('_cdat').value;
+  var tl=(document.getElementById('_ctit').value||'').trim();
+  var dt=document.getElementById('_cdat').value;
   if(!tl||!dt){toast('กรุณากรอกชื่อและวันที่','warn');return;}
   var id=document.getElementById('_ceid').value||(Date.now().toString(36)+Math.random().toString(36).slice(2,5));
-  var color='#2563EB';document.querySelectorAll('#_ccl [data-c]').forEach(function(c){if(c.style.border.indexOf('0F172A')>=0)color=c.dataset.c;});
-  var ev={id:id,date:dt,time:document.getElementById('_ctim').value||null,title:tl,desc:(document.getElementById('_cdsc').value||'').trim()||null,color:color,notifyBefore:0};
-  var i=_CE.findIndex(function(e){return e.id===id;});if(i>=0)_CE[i]=ev;else _CE.push(ev);
-  try{if(typeof USE_SUPABASE!=='undefined'&&USE_SUPABASE&&CURRENT_TEACHER)await SB.from('settings').upsert({key:'cal_'+CURRENT_TEACHER.id,value:_CE},{onConflict:'key'});document.getElementById('_cmo').style.display='none';_CD=dt;_renCal();toast('บันทึกแล้ว ✅');}
-  catch(e){toast('บันทึกไม่สำเร็จ: '+e.message,'err');}
+  var col='#2563EB';
+  document.querySelectorAll('#_ccl [data-c]').forEach(function(c){if(c.style.border.indexOf('0F172A')>=0) col=c.dataset.c;});
+  var ev={id:id,date:dt,time:document.getElementById('_ctim').value||null,title:tl,desc:(document.getElementById('_cdsc').value||'').trim()||null,color:col};
+  var i=_CE.findIndex(function(e){return e.id===id;});
+  if(i>=0) _CE[i]=ev; else _CE.push(ev);
+  try{
+    if(typeof USE_SUPABASE!=='undefined'&&USE_SUPABASE&&CURRENT_TEACHER)
+      await SB.from('settings').upsert({key:'cal_'+CURRENT_TEACHER.id,value:_CE},{onConflict:'key'});
+    document.getElementById('_cmo').style.display='none';
+    _CD=dt; _renCal(); toast('บันทึกแล้ว ✅');
+  }catch(e){toast('บันทึกไม่สำเร็จ: '+e.message,'err');}
 }
+
 async function _delEvt(){
-  var id=document.getElementById('_ceid').value;if(!id)return;var ev=_CE.find(function(e){return e.id===id;});if(!confirm('ลบ "'+(ev?ev.title:'')+'"?'))return;
+  var id=document.getElementById('_ceid').value; if(!id) return;
+  var ev=_CE.find(function(e){return e.id===id;});
+  if(!confirm('ลบ "'+(ev?ev.title:'')+'"?')) return;
   _CE=_CE.filter(function(e){return e.id!==id;});
-  try{if(typeof USE_SUPABASE!=='undefined'&&USE_SUPABASE&&CURRENT_TEACHER)await SB.from('settings').upsert({key:'cal_'+CURRENT_TEACHER.id,value:_CE},{onConflict:'key'});document.getElementById('_cmo').style.display='none';_renCal();if(_CD)_renDay(_CD);toast('ลบแล้ว','warn');}
-  catch(e){toast('ลบไม่สำเร็จ: '+e.message,'err');}
+  try{
+    if(typeof USE_SUPABASE!=='undefined'&&USE_SUPABASE&&CURRENT_TEACHER)
+      await SB.from('settings').upsert({key:'cal_'+CURRENT_TEACHER.id,value:_CE},{onConflict:'key'});
+    document.getElementById('_cmo').style.display='none';
+    _renCal(); if(_CD) _renDay(_CD); toast('ลบแล้ว','warn');
+  }catch(e){toast('ลบไม่สำเร็จ: '+e.message,'err');}
 }
+
 function _chkNotif(){
-  if(typeof Notification==='undefined'||Notification.permission!=='granted')return;var now=new Date();
-  _CE.forEach(function(e){if(!e.date)return;var na=new Date(e.date+'T08:00:00');var k=e.id+'_'+na.toISOString().slice(0,16);var df=na-now;if(df>=-120000&&df<=0&&!_CN.has(k)){_CN.add(k);localStorage.setItem('_cn',JSON.stringify(Array.from(_CN).slice(-100)));new Notification('📅 '+e.title,{body:e.time?'เวลา '+e.time:(e.desc||'มีกิจกรรม'),tag:k});}});
+  if(typeof Notification==='undefined'||Notification.permission!=='granted') return;
+  var now=new Date();
+  _CE.forEach(function(e){
+    if(!e.date) return;
+    var na=new Date(e.date+'T08:00:00');
+    var k=e.id+'_'+na.toISOString().slice(0,16);
+    if(na-now>=-120000&&na-now<=0&&!_CN.has(k)){
+      _CN.add(k); localStorage.setItem('_cn',JSON.stringify(Array.from(_CN).slice(-100)));
+      new Notification('📅 '+e.title,{body:e.time?'เวลา '+e.time:(e.desc||'มีกิจกรรม'),tag:k});
+    }
+  });
 }
 
 window.addEventListener('load', () => {
