@@ -1913,7 +1913,7 @@ function showAP(id,btn){
   if(id==='dash') renderDashboard();
   if(id==='manage') renderManage();
   if(id==='attend') initAttendanceTab();
-  if(id==='calendar') initCalendarTab();
+  if(id==='calendar') _showCalendar();
 }
 
 function ts(){return new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});}
@@ -5079,6 +5079,9 @@ async function deleteSubmission() {
 
 
 // ╔════════════════ SECTION M: CALENDAR ════════════════╗
+let _calYear=new Date().getFullYear(),_calMonth=new Date().getMonth();
+let _calEvents=[],_calSelectedDate=null,_calNotifyTimer=null;
+let _calNotifiedIds=new Set(JSON.parse(localStorage.getItem('cal_notified')||'[]'));
 
 async function loadCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;const{data}=await SB.from('settings').select('value').eq('key','calendar_'+CURRENT_TEACHER.id).maybeSingle();_calEvents=Array.isArray(data?.value)?data.value:[];}
 async function saveCalendarEvents(){if(!USE_SUPABASE||!CURRENT_TEACHER)return;await SB.from('settings').upsert({key:'calendar_'+CURRENT_TEACHER.id,value:_calEvents},{onConflict:'key'});}
@@ -5204,198 +5207,248 @@ function checkCalNotifications(){
 function updateCalNavDot(){const dot=document.getElementById('cal-bnav-dot');if(!dot)return;const has=_calEvents.some(e=>e.date===toCalDateStr(new Date()));dot.style.opacity=has?'1':'0';dot.style.background=has?'var(--red)':'';}
 
 
-// ╔════════════════════════════════════════════════════════╗
-// ║  SECTION M: CALENDAR (overlay-based)                  ║
-// ╚════════════════════════════════════════════════════════╝
-let _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth();
-let _calEvents=[], _calSelectedDate=null, _calNotifyTimer=null;
-let _calNotifiedIds=new Set(JSON.parse(localStorage.getItem('cal_notified')||'[]'));
+// ══════════ CALENDAR OVERLAY ══════════
+let _CY=new Date().getFullYear(), _CM=new Date().getMonth();
+let _CE=[], _CD=null, _CT=null;
+let _CN=new Set(JSON.parse(localStorage.getItem('_cn')||'[]'));
 
-function openCalendarOverlay(){
-  const ov=document.getElementById('cal-overlay');
-  if(!ov)return;
-  ov.style.display='flex';
-  ov.style.flexDirection='column';
-  initCalendarTab();
-  // update bnav
+function _showCalendar(){
+  if(!document.getElementById('_cov')) _buildCalUI();
+  document.getElementById('_cov').style.display='flex';
+  _loadAndRender();
+}
+
+function _buildCalUI(){
+  // CSS
+  const st=document.createElement('style');
+  st.textContent=[
+    '.cday{min-height:52px;border-radius:10px;padding:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center}',
+    '.cday:hover{background:#EFF6FF}',
+    '.cday.ct .cnum{background:#2563EB;color:#fff;border-radius:50%}',
+    '.cday.csel{background:#EDE9FE}',
+    '.cday.cot{opacity:.3}',
+    '.cnum{font-size:13px;font-weight:600;color:#0F172A;width:26px;height:26px;display:flex;align-items:center;justify-content:center}'
+  ].join('');
+  document.head.appendChild(st);
+
+  // Overlay
+  const ov=document.createElement('div');
+  ov.id='_cov';
+  ov.style.cssText='display:none;position:fixed;inset:0;z-index:9999;background:#F1F5F9;flex-direction:column;overflow-y:auto;';
+
+  // Header
+  const hd=document.createElement('div');
+  hd.style.cssText='position:sticky;top:0;z-index:1;background:#fff;border-bottom:1.5px solid #e2e8f0;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;';
+  hd.innerHTML='<button onclick="calMove(-1)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid #e2e8f0;background:#fff;font-size:22px;cursor:pointer;">&#8249;</button>'+
+    '<div style="text-align:center"><div id="_cml" style="font-size:18px;font-weight:800;color:#0F172A">—</div><div id="_cns" style="font-size:11px;color:#94A3B8;cursor:default"></div></div>'+
+    '<button onclick="calMove(1)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid #e2e8f0;background:#fff;font-size:22px;cursor:pointer;">&#8250;</button>';
+  ov.appendChild(hd);
+
+  // DOW row
+  const dow=document.createElement('div');
+  dow.style.cssText='display:grid;grid-template-columns:repeat(7,1fr);background:#fff;padding:4px 8px 0;';
+  ['อา','จ','อ','พ','พฤ','ศ','ส'].forEach(d=>{
+    const c=document.createElement('div');
+    c.style.cssText='text-align:center;font-size:11px;font-weight:700;color:#94A3B8;padding:5px 0;';
+    c.textContent=d;
+    dow.appendChild(c);
+  });
+  ov.appendChild(dow);
+
+  // Grid
+  const gr=document.createElement('div');
+  gr.id='_cgr';
+  gr.style.cssText='display:grid;grid-template-columns:repeat(7,1fr);background:#fff;padding:0 8px 8px;gap:2px;';
+  ov.appendChild(gr);
+
+  // Day label
+  const dl=document.createElement('div');
+  dl.id='_cdl';
+  dl.style.cssText='padding:12px 16px 6px;font-size:14px;font-weight:700;color:#475569;';
+  ov.appendChild(dl);
+
+  // Event list
+  const el=document.createElement('div');
+  el.id='_cev';
+  el.style.cssText='padding:0 14px 130px;';
+  el.innerHTML='<div style="text-align:center;color:#94A3B8;font-size:13px;padding:24px">เลือกวันเพื่อดูกิจกรรม</div>';
+  ov.appendChild(el);
+
+  // Bottom close bar
+  const cb=document.createElement('div');
+  cb.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:10000;background:#fff;border-top:1.5px solid #e2e8f0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));';
+  cb.innerHTML='<button onclick="_hideCalendar()" style="width:100%;padding:13px;background:#F1F5F9;border:none;border-radius:12px;font-size:14px;font-weight:700;color:#475569;cursor:pointer;">&#x2715; ปิดปฏิทิน</button>';
+  ov.appendChild(cb);
+
+  // FAB
+  const fab=document.createElement('button');
+  fab.id='_cfab';
+  fab.innerHTML='&#xFF0B;';
+  fab.setAttribute('onclick','_openEvt(null,null)');
+  fab.style.cssText='position:fixed;bottom:72px;right:18px;width:52px;height:52px;border-radius:50%;background:#2563EB;color:#fff;border:none;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(37,99,235,.4);display:none;align-items:center;justify-content:center;z-index:10001;';
+  ov.appendChild(fab);
+
+  document.body.appendChild(ov);
+
+  // Modal
+  const mo=document.createElement('div');
+  mo.id='_cmo';
+  mo.style.cssText='display:none;position:fixed;inset:0;z-index:10002;background:rgba(0,0,0,.5);align-items:flex-end;justify-content:center;';
+  mo.onclick=function(e){if(e.target===mo)_closeEvt();};
+  const mb=document.createElement('div');
+  mb.style.cssText='background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;padding:22px 18px calc(22px + env(safe-area-inset-bottom));';
+  mb.innerHTML=
+    '<div id="_cmt" style="font-size:16px;font-weight:800;color:#0F172A;margin-bottom:14px">&#xFF0B; เพิ่มกิจกรรม</div>'+
+    '<input type="hidden" id="_ceid">'+
+    '<div style="margin-bottom:10px"><label style="font-size:11px;font-weight:700;color:#64748B;display:block;margin-bottom:3px">ชื่อกิจกรรม</label>'+
+    '<input id="_ctit" type="text" placeholder="เช่น ประชุมผู้ปกครอง" style="width:100%;padding:11px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;box-sizing:border-box"></div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:10px">'+
+    '<div style="flex:1"><label style="font-size:11px;font-weight:700;color:#64748B;display:block;margin-bottom:3px">วันที่</label><input id="_cdat" type="date" style="width:100%;padding:11px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;box-sizing:border-box"></div>'+
+    '<div style="flex:1"><label style="font-size:11px;font-weight:700;color:#64748B;display:block;margin-bottom:3px">เวลา</label><input id="_ctim" type="time" style="width:100%;padding:11px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;box-sizing:border-box"></div></div>'+
+    '<div style="margin-bottom:10px"><label style="font-size:11px;font-weight:700;color:#64748B;display:block;margin-bottom:3px">คำอธิบาย</label>'+
+    '<input id="_cdsc" type="text" placeholder="รายละเอียด" style="width:100%;padding:11px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;box-sizing:border-box"></div>'+
+    '<label style="font-size:11px;font-weight:700;color:#64748B;display:block;margin-bottom:6px">สีกิจกรรม</label>'+
+    '<div id="_ccl" style="display:flex;gap:8px;margin-bottom:12px">'+
+    ['#2563EB','#16A34A','#DC2626','#D97706','#7C3AED'].map(c=>
+      '<div data-c="'+c+'" onclick="_pc(this)" style="width:28px;height:28px;border-radius:50%;background:'+c+';border:3px solid '+(c==='#2563EB'?'#0F172A':'transparent')+';cursor:pointer;"></div>'
+    ).join('')+'</div>'+
+    '<label style="font-size:11px;font-weight:700;color:#64748B;display:block;margin-bottom:6px">แจ้งเตือน</label>'+
+    '<div id="_cnc" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">'+
+    [[-1,'ไม่แจ้ง'],[0,'วันนั้น 8:00'],[30,'30 นาทีก่อน'],[60,'1 ชม.ก่อน'],[1440,'วันก่อน']].map(([v,l])=>
+      '<div data-v="'+v+'" onclick="_pn(this)" style="padding:7px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid '+(v===0?'#2563EB':'#e2e8f0')+';background:'+(v===0?'#2563EB':'#fff')+';color:'+(v===0?'#fff':'#475569')+'">'+l+'</div>'
+    ).join('')+'</div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button onclick="_saveEvt()" style="flex:1;padding:13px;background:#2563EB;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer">&#x1F4BE; บันทึก</button>'+
+    '<button id="_cdel" onclick="_delEvt()" style="display:none;padding:13px 16px;background:#FEE2E2;color:#DC2626;border:1.5px solid #DC2626;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer">&#x1F5D1;</button></div>'+
+    '<button onclick="_closeEvt()" style="width:100%;margin-top:8px;padding:12px;background:#F1F5F9;border:none;border-radius:12px;font-size:14px;color:#64748B;cursor:pointer">ยกเลิก</button>';
+  mo.appendChild(mb);
+  document.body.appendChild(mo);
+}
+
+function _hideCalendar(){
+  const ov=document.getElementById('_cov');if(ov)ov.style.display='none';
+  const f=document.getElementById('_cfab');if(f)f.style.display='none';
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('on'));
-  const btn=document.getElementById('bnav-calendar');
-  if(btn)btn.classList.add('on');
-}
-function closeCalendarOverlay(){
-  const ov=document.getElementById('cal-overlay');
-  if(ov)ov.style.display='none';
-  document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('on'));
-  const fab=document.getElementById('cal-add-fab');
-  if(fab)fab.style.display='none';
 }
 
-async function loadCalendarEvents(){
-  if(!USE_SUPABASE||!CURRENT_TEACHER)return;
-  const{data}=await SB.from('settings').select('value').eq('key','calendar_'+CURRENT_TEACHER.id).maybeSingle();
-  _calEvents=Array.isArray(data?.value)?data.value:[];
-}
-async function saveCalendarEvents(){
-  if(!USE_SUPABASE||!CURRENT_TEACHER)return;
-  await SB.from('settings').upsert({key:'calendar_'+CURRENT_TEACHER.id,value:_calEvents},{onConflict:'key'});
+async function _loadAndRender(){
+  try{if(!_CE.length&&USE_SUPABASE&&CURRENT_TEACHER){const{data}=await SB.from('settings').select('value').eq('key','cal_'+CURRENT_TEACHER.id).maybeSingle();_CE=Array.isArray(data?.value)?data.value:[];}}catch(e){}
+  const n=new Date();_CY=n.getFullYear();_CM=n.getMonth();
+  _renderCal();_reqNotif();
+  if(_CT)clearInterval(_CT);
+  _CT=setInterval(_chkNotif,60000);_chkNotif();
 }
 
-async function initCalendarTab(){
-  try{ if(!_calEvents.length) await loadCalendarEvents(); }catch(e){}
-  const n=new Date(); _calYear=n.getFullYear(); _calMonth=n.getMonth();
-  renderCalendar();
-  requestCalNotifyPermission();
-  scheduleCalNotifyCheck();
-  updateCalNavDot();
+function _ds(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+function _renderCal(){
+  const lb=document.getElementById('_cml');const gr=document.getElementById('_cgr');if(!lb||!gr)return;
+  const TH=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  lb.textContent=TH[_CM]+' '+(_CY+543);
+  const now=new Date();now.setHours(0,0,0,0);const ts=_ds(now);
+  const fd=new Date(_CY,_CM,1).getDay(),dim=new Date(_CY,_CM+1,0).getDate(),pd=new Date(_CY,_CM,0).getDate();
+  gr.innerHTML='';
+  const addCell=(d,ds,other)=>{
+    const ev=_CE.filter(e=>e.date===ds);
+    const cell=document.createElement('div');
+    const cls=['cday',ds===ts?'ct':'',other?'cot':'',_CD===ds?'csel':''].filter(Boolean).join(' ');
+    cell.className=cls;cell.dataset.date=ds;
+    const nm=document.createElement('div');nm.className='cnum';nm.textContent=d;
+    cell.appendChild(nm);
+    if(ev.length){
+      const dots=document.createElement('div');
+      dots.style.cssText='display:flex;flex-wrap:wrap;gap:2px;justify-content:center;max-width:40px;margin-top:2px;';
+      ev.slice(0,4).forEach(e=>{const dot=document.createElement('div');dot.style.cssText='width:6px;height:6px;border-radius:50%;background:'+( e.color||'#2563EB')+';';dots.appendChild(dot);});
+      cell.appendChild(dots);
+    }
+    cell.onclick=()=>calSelectDay(ds);
+    gr.appendChild(cell);
+  };
+  for(let i=fd-1;i>=0;i--)addCell(pd-i,_ds(new Date(_CY,_CM-1,pd-i)),true);
+  for(let d=1;d<=dim;d++)addCell(d,_ds(new Date(_CY,_CM,d)),false);
+  const r=(fd+dim)%7===0?0:7-(fd+dim)%7;
+  for(let d=1;d<=r;d++)addCell(d,_ds(new Date(_CY,_CM+1,d)),true);
+  if(_CD)_renderDay(_CD);
 }
 
-function toCalDateStr(d){
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-
-function renderCalendar(){
-  const label=document.getElementById('cal-month-label');
-  const grid=document.getElementById('cal-grid');
-  if(!label||!grid)return;
-  const thM=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-  label.textContent=thM[_calMonth]+' '+(_calYear+543);
-  const today=new Date(); today.setHours(0,0,0,0);
-  const todayStr=toCalDateStr(today);
-  const firstDay=new Date(_calYear,_calMonth,1).getDay();
-  const dim=new Date(_calYear,_calMonth+1,0).getDate();
-  const prevDim=new Date(_calYear,_calMonth,0).getDate();
-  let cells='';
-  for(let i=firstDay-1;i>=0;i--) cells+=buildCalCell(prevDim-i,toCalDateStr(new Date(_calYear,_calMonth-1,prevDim-i)),true,todayStr);
-  for(let d=1;d<=dim;d++) cells+=buildCalCell(d,toCalDateStr(new Date(_calYear,_calMonth,d)),false,todayStr);
-  const rem=(firstDay+dim)%7===0?0:7-(firstDay+dim)%7;
-  for(let d=1;d<=rem;d++) cells+=buildCalCell(d,toCalDateStr(new Date(_calYear,_calMonth+1,d)),true,todayStr);
-  grid.innerHTML=cells;
-  if(_calSelectedDate){
-    const sel=grid.querySelector('[data-date="'+_calSelectedDate+'"]');
-    if(sel)sel.classList.add('cal-selected');
-    renderCalDayEvents(_calSelectedDate);
-  }
-}
-
-function buildCalCell(d,ds,other,todayStr){
-  const evts=_calEvents.filter(e=>e.date===ds);
-  const dots=evts.slice(0,4).map(e=>'<div style="width:6px;height:6px;border-radius:50%;background:'+(e.color||'#2563EB')+';flex-shrink:0"></div>').join('');
-  const more=evts.length>4?'<span style="font-size:9px;color:#94A3B8;">+'+(evts.length-4)+'</span>':'';
-  const isToday=ds===todayStr;
-  const numStyle=isToday?'background:#2563EB;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;':'width:26px;height:26px;display:flex;align-items:center;justify-content:center;';
-  const cellStyle='min-height:54px;border-radius:10px;padding:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;'+(other?'opacity:.3;':'');
-  return '<div style="'+cellStyle+'" data-date="'+ds+'" id="cal-cell-'+ds+'" onclick="calSelectDay(\''+ds+'\')">'+
-    '<div style="font-size:13px;font-weight:600;color:#0F172A;'+numStyle.replace('border-radius','br').replace(';','') +'">'+
-    '<div style="'+numStyle+'font-size:13px;font-weight:600;">'+d+'</div></div>'+
-    (evts.length?'<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;margin-top:2px;max-width:44px;">'+dots+more+'</div>':'')+
-    '</div>';
-}
-
-function calMove(dir){
-  _calMonth+=dir;
-  if(_calMonth<0){_calMonth=11;_calYear--;}
-  if(_calMonth>11){_calMonth=0;_calYear++;}
-  renderCalendar();
-}
+function calMove(d){_CM+=d;if(_CM<0){_CM=11;_CY--;}if(_CM>11){_CM=0;_CY++;}_renderCal();}
 
 function calSelectDay(ds){
-  _calSelectedDate=ds;
-  document.querySelectorAll('[id^="cal-cell-"]').forEach(el=>el.style.background='');
-  const sel=document.getElementById('cal-cell-'+ds);
-  if(sel)sel.style.background='#EDE9FE';
-  renderCalDayEvents(ds);
-  const fab=document.getElementById('cal-add-fab');
-  if(fab)fab.style.display='flex';
+  _CD=ds;
+  document.querySelectorAll('.cday').forEach(c=>c.classList.remove('csel'));
+  document.querySelectorAll('[data-date="'+ds+'"]').forEach(c=>c.classList.add('csel'));
+  _renderDay(ds);
+  const f=document.getElementById('_cfab');if(f)f.style.display='flex';
 }
 
-function renderCalDayEvents(ds){
-  const label=document.getElementById('cal-day-label');
-  const list=document.getElementById('cal-event-list');
-  if(!label||!list)return;
+function _renderDay(ds){
+  const lb=document.getElementById('_cdl');const li=document.getElementById('_cev');if(!lb||!li)return;
   const d=new Date(ds+'T00:00:00');
-  const thD=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
-  const thMo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  label.textContent='📅 วัน'+thD[d.getDay()]+' '+d.getDate()+' '+thMo[d.getMonth()]+' '+(d.getFullYear()+543);
-  const evts=_calEvents.filter(e=>e.date===ds).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
-  if(!evts.length){list.innerHTML='<div style="text-align:center;color:#94A3B8;font-size:13px;padding:24px;">ไม่มีกิจกรรม<br><span style="font-size:11px;">กด ＋ เพื่อเพิ่ม</span></div>';return;}
-  list.innerHTML=evts.map(e=>
-    '<div onclick="openCalendarEventModal(\''+ds+'\',\''+e.id+'\')" style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#fff;border-radius:12px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.06);border:1.5px solid #E2E8F0;cursor:pointer;">'+
-    '<div style="width:4px;min-height:36px;border-radius:4px;flex-shrink:0;margin-top:2px;background:'+(e.color||'#2563EB')+'"></div>'+
-    '<div style="flex:1;min-width:0;">'+
-    '<div style="font-size:14px;font-weight:700;color:#0F172A;">'+e.title+'</div>'+
-    '<div style="font-size:12px;color:#94A3B8;margin-top:2px;">'+(e.time?'🕐 '+e.time:'📅 ทั้งวัน')+(e.notifyBefore>=0?' · 🔔':'')+'</div>'+
-    (e.desc?'<div style="font-size:12px;color:#475569;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e.desc+'</div>':'')+
-    '</div><div style="font-size:18px;color:#94A3B8;">›</div></div>'
-  ).join('');
-}
-
-function openCalendarEventModal(ds,eid){
-  const modal=document.getElementById('cal-event-modal');if(!modal)return;
-  const evt=eid?_calEvents.find(e=>e.id===eid):null;
-  document.getElementById('cal-modal-title').textContent=evt?'✏️ แก้ไขกิจกรรม':'➕ เพิ่มกิจกรรม';
-  document.getElementById('cal-evt-id').value=eid||'';
-  document.getElementById('cal-evt-title').value=evt?evt.title:'';
-  document.getElementById('cal-evt-date').value=evt?evt.date:(ds||toCalDateStr(new Date()));
-  document.getElementById('cal-evt-time').value=evt?(evt.time||''):'';
-  document.getElementById('cal-evt-desc').value=evt?(evt.desc||''):'';
-  document.getElementById('cal-delete-btn').style.display=evt?'inline-block':'none';
-  const cc=evt?(evt.color||'#2563EB'):'#2563EB';
-  document.querySelectorAll('.color-chip').forEach(c=>{c.style.border=c.dataset.color===cc?'3px solid #0F172A':'3px solid transparent';});
-  const cn=evt?(evt.notifyBefore??0):0;
-  document.querySelectorAll('.notify-chip').forEach(c=>{
-    const isActive=parseInt(c.dataset.val)===cn;
-    c.style.background=isActive?'#2563EB':'#fff';
-    c.style.color=isActive?'#fff':'#475569';
-    c.style.borderColor=isActive?'#2563EB':'#E2E8F0';
+  const DD=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  const MM=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  lb.textContent='📅 วัน'+DD[d.getDay()]+' '+d.getDate()+' '+MM[d.getMonth()]+' '+(d.getFullYear()+543);
+  const ev=_CE.filter(e=>e.date===ds).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
+  if(!ev.length){li.innerHTML='<div style="text-align:center;color:#94A3B8;font-size:13px;padding:24px">ไม่มีกิจกรรม<br><small>กด + เพื่อเพิ่ม</small></div>';return;}
+  li.innerHTML='';
+  ev.forEach(e=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:flex-start;gap:10px;padding:12px;background:#fff;border-radius:12px;margin-bottom:8px;border:1.5px solid #e2e8f0;cursor:pointer;';
+    row.onclick=()=>_openEvt(ds,e.id);
+    row.innerHTML='<div style="width:4px;min-height:32px;border-radius:4px;background:'+(e.color||'#2563EB')+';flex-shrink:0;margin-top:2px"></div>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:#0F172A">'+e.title+'</div>'+
+      '<div style="font-size:12px;color:#94A3B8;margin-top:2px">'+(e.time?'🕐 '+e.time:'📅 ทั้งวัน')+(e.notifyBefore>=0?' 🔔':'')+'</div>'+
+      (e.desc?'<div style="font-size:12px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+e.desc+'</div>':'')+
+      '</div><div style="color:#94A3B8;font-size:18px">›</div>';
+    li.appendChild(row);
   });
-  modal.style.display='flex';
-  setTimeout(()=>document.getElementById('cal-evt-title').focus(),100);
 }
-function closeCalEventModal(){const m=document.getElementById('cal-event-modal');if(m)m.style.display='none';}
-function selectCalColor(el){document.querySelectorAll('.color-chip').forEach(c=>c.style.border='3px solid transparent');el.style.border='3px solid #0F172A';}
-function selectCalNotify(el){document.querySelectorAll('.notify-chip').forEach(c=>{c.style.background='#fff';c.style.color='#475569';c.style.borderColor='#E2E8F0';});el.style.background='#2563EB';el.style.color='#fff';el.style.borderColor='#2563EB';}
 
-async function saveCalendarEvent(){
-  const title=document.getElementById('cal-evt-title').value.trim();
-  const date=document.getElementById('cal-evt-date').value;
-  if(!title){toast('กรุณากรอกชื่อกิจกรรม','warn');return;}
-  if(!date){toast('กรุณาเลือกวันที่','warn');return;}
-  const id=document.getElementById('cal-evt-id').value||(Date.now().toString(36)+Math.random().toString(36).slice(2,5));
-  const color=document.querySelector('.color-chip[style*="solid #0F172A"]')?.dataset.color||'#2563EB';
-  const notifyBefore=parseInt(document.querySelector('.notify-chip[style*="#2563EB"]')?.dataset.val??'0');
-  const evt={id,date,time:document.getElementById('cal-evt-time').value||null,title,desc:document.getElementById('cal-evt-desc').value.trim()||null,color,notifyBefore};
-  const idx=_calEvents.findIndex(e=>e.id===id);
-  if(idx>=0)_calEvents[idx]=evt;else _calEvents.push(evt);
-  try{await saveCalendarEvents();closeCalEventModal();_calSelectedDate=date;renderCalendar();renderCalDayEvents(date);updateCalNavDot();toast('บันทึกกิจกรรมแล้ว ✅');}
+function _openEvt(ds,eid){
+  const mo=document.getElementById('_cmo');if(!mo)return;
+  const ev=eid?_CE.find(e=>e.id===eid):null;
+  document.getElementById('_cmt').textContent=ev?'✏️ แก้ไขกิจกรรม':'➕ เพิ่มกิจกรรม';
+  document.getElementById('_ceid').value=eid||'';
+  document.getElementById('_ctit').value=ev?ev.title:'';
+  document.getElementById('_cdat').value=ev?ev.date:(ds||_ds(new Date()));
+  document.getElementById('_ctim').value=ev?(ev.time||''):'';
+  document.getElementById('_cdsc').value=ev?(ev.desc||''):'';
+  document.getElementById('_cdel').style.display=ev?'inline-block':'none';
+  const cc=ev?(ev.color||'#2563EB'):'#2563EB';
+  document.querySelectorAll('#_ccl [data-c]').forEach(c=>c.style.border='3px solid '+(c.dataset.c===cc?'#0F172A':'transparent'));
+  const cn=ev?(ev.notifyBefore??0):0;
+  document.querySelectorAll('#_cnc [data-v]').forEach(c=>{const a=parseInt(c.dataset.v)===cn;c.style.background=a?'#2563EB':'#fff';c.style.color=a?'#fff':'#475569';c.style.borderColor=a?'#2563EB':'#e2e8f0';});
+  mo.style.display='flex';
+  setTimeout(()=>document.getElementById('_ctit').focus(),100);
+}
+function _closeEvt(){const m=document.getElementById('_cmo');if(m)m.style.display='none';}
+function _pc(el){document.querySelectorAll('#_ccl [data-c]').forEach(c=>c.style.border='3px solid transparent');el.style.border='3px solid #0F172A';}
+function _pn(el){document.querySelectorAll('#_cnc [data-v]').forEach(c=>{c.style.background='#fff';c.style.color='#475569';c.style.borderColor='#e2e8f0';});el.style.background='#2563EB';el.style.color='#fff';el.style.borderColor='#2563EB';}
+
+async function _saveEvt(){
+  const tl=(document.getElementById('_ctit').value||'').trim();const dt=document.getElementById('_cdat').value;
+  if(!tl){toast('กรุณากรอกชื่อ','warn');return;}if(!dt){toast('กรุณาเลือกวัน','warn');return;}
+  const id=document.getElementById('_ceid').value||(Date.now().toString(36)+Math.random().toString(36).slice(2,5));
+  const cc=document.querySelector('#_ccl [style*="solid #0F172A"]');
+  const color=cc?cc.dataset.c:'#2563EB';
+  const nc=document.querySelector('#_cnc [style*="#2563EB"]');
+  const nb=nc?parseInt(nc.dataset.v):0;
+  const ev={id,date:dt,time:document.getElementById('_ctim').value||null,title:tl,desc:(document.getElementById('_cdsc').value||'').trim()||null,color,notifyBefore:nb};
+  const i=_CE.findIndex(e=>e.id===id);if(i>=0)_CE[i]=ev;else _CE.push(ev);
+  try{if(USE_SUPABASE&&CURRENT_TEACHER)await SB.from('settings').upsert({key:'cal_'+CURRENT_TEACHER.id,value:_CE},{onConflict:'key'});
+    _closeEvt();_CD=dt;_renderCal();toast('บันทึกแล้ว ✅');}
   catch(e){toast('บันทึกไม่สำเร็จ: '+e.message,'err');}
 }
-async function deleteCalendarEvent(){
-  const id=document.getElementById('cal-evt-id').value;if(!id)return;
-  const evt=_calEvents.find(e=>e.id===id);
-  if(!confirm('ลบกิจกรรม "'+(evt?.title||'')+'"?'))return;
-  _calEvents=_calEvents.filter(e=>e.id!==id);
-  try{await saveCalendarEvents();closeCalEventModal();renderCalendar();if(_calSelectedDate)renderCalDayEvents(_calSelectedDate);updateCalNavDot();toast('ลบแล้ว','warn');}
+async function _delEvt(){
+  const id=document.getElementById('_ceid').value;if(!id)return;
+  const ev=_CE.find(e=>e.id===id);
+  if(!confirm('ลบ "'+(ev?.title||'')+'"?'))return;
+  _CE=_CE.filter(e=>e.id!==id);
+  try{if(USE_SUPABASE&&CURRENT_TEACHER)await SB.from('settings').upsert({key:'cal_'+CURRENT_TEACHER.id,value:_CE},{onConflict:'key'});
+    _closeEvt();_renderCal();if(_CD)_renderDay(_CD);toast('ลบแล้ว','warn');}
   catch(e){toast('ลบไม่สำเร็จ: '+e.message,'err');}
 }
-function requestCalNotifyPermission(){
-  const s=document.getElementById('cal-notify-status');if(!s)return;
-  if(!('Notification'in window)){s.textContent='⚠️ เบราว์เซอร์ไม่รองรับการแจ้งเตือน';return;}
-  if(Notification.permission==='default'){s.textContent='🔔 แตะที่นี่เพื่อเปิดการแจ้งเตือน';s.style.cursor='pointer';s.onclick=()=>Notification.requestPermission().then(p=>{s.textContent=p==='granted'?'✅ เปิดแล้ว':'❌ ปฏิเสธ';s.style.cursor='';s.onclick=null;});}
-  else if(Notification.permission==='granted')s.textContent='✅ การแจ้งเตือนเปิดอยู่';
-  else s.textContent='❌ การแจ้งเตือนถูกปิด';
-}
-function scheduleCalNotifyCheck(){if(_calNotifyTimer)clearInterval(_calNotifyTimer);checkCalNotifications();_calNotifyTimer=setInterval(checkCalNotifications,60000);}
-function checkCalNotifications(){
-  if(Notification.permission!=='granted')return;const now=new Date();
-  _calEvents.forEach(evt=>{
-    if(evt.notifyBefore<0)return;
-    let notifyAt=evt.time?new Date(new Date(evt.date+'T'+evt.time).getTime()-evt.notifyBefore*60000):evt.notifyBefore===1440?new Date(new Date(evt.date+'T08:00:00').getTime()-86400000):new Date(evt.date+'T08:00:00');
-    const key=evt.id+'_'+notifyAt.toISOString().slice(0,16);
-    const diff=notifyAt-now;
-    if(diff>=-120000&&diff<=0&&!_calNotifiedIds.has(key)){_calNotifiedIds.add(key);localStorage.setItem('cal_notified',JSON.stringify([..._calNotifiedIds].slice(-100)));new Notification('📅 '+evt.title,{body:evt.time?'เวลา '+evt.time:(evt.desc||'วันนี้มีกิจกรรม'),tag:key});}
-  });
-}
-function updateCalNavDot(){const dot=document.getElementById('cal-bnav-dot');if(!dot)return;const has=_calEvents.some(e=>e.date===toCalDateStr(new Date()));dot.style.opacity=has?'1':'0';dot.style.background=has?'var(--red)':'';}
+function _reqNotif(){const s=document.getElementById('_cns');if(!s)return;if(!('Notification'in window)){s.textContent='⚠️ ไม่รองรับ';return;}if(Notification.permission==='default'){s.textContent='🔔 แตะเพื่อเปิดการแจ้งเตือน';s.style.cursor='pointer';s.onclick=()=>Notification.requestPermission().then(p=>{s.textContent=p==='granted'?'✅ เปิดแล้ว':'❌ ปฏิเสธ';s.style.cursor='';s.onclick=null;});}else if(Notification.permission==='granted')s.textContent='✅ การแจ้งเตือนเปิด';}
+function _chkNotif(){if(Notification.permission!=='granted')return;const now=new Date();_CE.forEach(e=>{if(e.notifyBefore<0)return;const na=e.time?new Date(new Date(e.date+'T'+e.time).getTime()-e.notifyBefore*60000):new Date(e.date+'T08:00:00');const k=e.id+'_'+na.toISOString().slice(0,16);const df=na-now;if(df>=-120000&&df<=0&&!_CN.has(k)){_CN.add(k);localStorage.setItem('_cn',JSON.stringify([..._CN].slice(-100)));new Notification('📅 '+e.title,{body:e.time?'เวลา '+e.time:(e.desc||'มีกิจกรรมวันนี้'),tag:k});}});}
 
 window.addEventListener('load', () => {
   checkSetupOnLoad();
