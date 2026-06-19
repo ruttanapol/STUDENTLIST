@@ -1809,7 +1809,7 @@ function renderStudentView(s, stuDB){
   const totalScore=gradedHWs.reduce((sum,h)=>sum+Number(db.submissions[s.id+'_'+h.num].score),0);
   const totalMax=done.reduce((sum,h)=>{
     const sub=db.submissions[s.id+'_'+h.num];
-    return sum+Number(sub.maxScore||h.maxScore||100);
+    return sum+Number(h.maxScore||sub.maxScore||100);
   },0);
   const scorePct=totalMax?Math.round(totalScore/totalMax*100):0;
   const pendingCount=done.length-gradedHWs.length;
