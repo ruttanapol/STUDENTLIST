@@ -2530,7 +2530,6 @@ function openExportModal(type){
     subjSel.value = '';
   }
 
-  exportHWSel=new Set(DB.homeworks.map(h=>h.num));
   _renderExportHWList('');
   document.getElementById('export-progress-bar').classList.remove('on');
   document.getElementById('export-progress-fill').style.width='0%';
@@ -2540,13 +2539,16 @@ function openExportModal(type){
 }
 
 function _renderExportHWList(subjFilter) {
-  const hws = subjFilter
-    ? DB.homeworks.filter(h=>h.subject===subjFilter)
-    : DB.homeworks;
-  exportHWSel = new Set(hws.map(h=>h.num));
+  // กรองตามห้องที่เลือกไว้ (exportRoomSel) เสมอ + กรองวิชาถ้ามีระบุ
+  // ใช้ key "room|num" เพราะงานเลขเดียวกัน (ครั้งที่ X) อาจมีอยู่ได้หลายห้อง
+  const hws = DB.homeworks.filter(h=>
+    exportRoomSel.has(h.room) && (!subjFilter || h.subject===subjFilter)
+  );
+  exportHWSel = new Set(hws.map(h=>h.room+'|'+h.num));
+  const multiRoom = exportRoomSel.size>1;
   const hf=document.getElementById('export-hw-filter');
   hf.innerHTML=`<button class="hw-cb checked" data-hw="all" onclick="toggleAllHW(this)">ทุกชิ้น</button>`
-    +hws.map(h=>`<button class="hw-cb checked" data-hw="${h.num}" onclick="toggleExportHW(this,${h.num})">ชิ้นที่ ${h.num} <span style="font-size:10px;opacity:.7;">/${h.maxScore||100}</span></button>`).join('');
+    +hws.map(h=>`<button class="hw-cb checked" data-hw="${h.room}|${h.num}" onclick="toggleExportHW(this,'${h.room}|${h.num}')">ชิ้นที่ ${h.num}${multiRoom?` <span style="font-size:9px;opacity:.6;">[${h.room}]</span>`:''} <span style="font-size:10px;opacity:.7;">/${h.maxScore||100}</span></button>`).join('');
   updateExportScorePreview();
 }
 
@@ -2563,7 +2565,7 @@ function filterExportBySubject(val) {
 }
 
 function updateExportScorePreview() {
-  const selectedHWs = DB.homeworks.filter(h=>exportHWSel.has(h.num));
+  const selectedHWs = DB.homeworks.filter(h=>exportHWSel.has(h.room+'|'+h.num));
   const totalMax = selectedHWs.reduce((s,h)=>s+(h.maxScore||100),0);
   const maxEl = document.getElementById('export-total-max');
   if(maxEl) maxEl.textContent = totalMax;
@@ -2584,21 +2586,22 @@ function updateExportScorePreview() {
   }
 }
 function closeExportModal(){document.getElementById('export-modal').classList.remove('on');}
-function toggleExportRoom(btn,room){if(exportRoomSel.has(room)){exportRoomSel.delete(room);btn.classList.remove('checked');btn.querySelector('span').textContent='';}else{exportRoomSel.add(room);btn.classList.add('checked');btn.querySelector('span').textContent='✓';}}
-function toggleExportHW(btn,num){if(exportHWSel.has(num)){exportHWSel.delete(num);btn.classList.remove('checked');}else{exportHWSel.add(num);btn.classList.add('checked');}const allBtn=document.querySelector('#export-hw-filter [data-hw="all"]');if(allBtn)allBtn.classList.toggle('checked',exportHWSel.size===DB.homeworks.length);updateExportScorePreview();}
-function toggleAllHW(btn){const allSelected=exportHWSel.size===DB.homeworks.length;document.querySelectorAll('#export-hw-filter [data-hw]:not([data-hw="all"])').forEach(b=>{const n=parseInt(b.dataset.hw);if(allSelected){exportHWSel.delete(n);b.classList.remove('checked');}else{exportHWSel.add(n);b.classList.add('checked');}});btn.classList.toggle('checked',!allSelected);updateExportScorePreview();}
-function exportSelectAll(sel){document.querySelectorAll('#export-room-grid .room-cb').forEach(btn=>{const room=btn.dataset.room;if(sel){exportRoomSel.add(room);btn.classList.add('checked');btn.querySelector('span').textContent='✓';}else{exportRoomSel.delete(room);btn.classList.remove('checked');btn.querySelector('span').textContent='';}}); }
+function toggleExportRoom(btn,room){if(exportRoomSel.has(room)){exportRoomSel.delete(room);btn.classList.remove('checked');btn.querySelector('span').textContent='';}else{exportRoomSel.add(room);btn.classList.add('checked');btn.querySelector('span').textContent='✓';}const subjSel=document.getElementById('export-subj-filter');_renderExportHWList(subjSel?subjSel.value:'');}
+function toggleExportHW(btn,key){if(exportHWSel.has(key)){exportHWSel.delete(key);btn.classList.remove('checked');}else{exportHWSel.add(key);btn.classList.add('checked');}const items=document.querySelectorAll('#export-hw-filter [data-hw]:not([data-hw="all"])');const allBtn=document.querySelector('#export-hw-filter [data-hw="all"]');if(allBtn)allBtn.classList.toggle('checked',exportHWSel.size===items.length);updateExportScorePreview();}
+function toggleAllHW(btn){const items=[...document.querySelectorAll('#export-hw-filter [data-hw]:not([data-hw="all"])')];const allSelected=exportHWSel.size===items.length;items.forEach(b=>{const key=b.dataset.hw;if(allSelected){exportHWSel.delete(key);b.classList.remove('checked');}else{exportHWSel.add(key);b.classList.add('checked');}});btn.classList.toggle('checked',!allSelected);updateExportScorePreview();}
+function exportSelectAll(sel){document.querySelectorAll('#export-room-grid .room-cb').forEach(btn=>{const room=btn.dataset.room;if(sel){exportRoomSel.add(room);btn.classList.add('checked');btn.querySelector('span').textContent='✓';}else{exportRoomSel.delete(room);btn.classList.remove('checked');btn.querySelector('span').textContent='';}});const subjSel=document.getElementById('export-subj-filter');_renderExportHWList(subjSel?subjSel.value:'');}
 function getStudentNum(student, room) {
   const roomStudents = DB.students.filter(s => s.room === room).sort((a,b) => a.id.localeCompare(b.id));
   return roomStudents.findIndex(s => s.id === student.id) + 1;
 }
 function buildExportData(){
   const selectedRooms=[...exportRoomSel].sort();
-  const selectedHWs=DB.homeworks.filter(h=>exportHWSel.has(h.num)).sort((a,b)=>a.num-b.num);
   const collectInp = document.getElementById('export-collect-score');
   const collectScore = collectInp ? (parseFloat(collectInp.value)||0) : 0;
-  const hwTotalMax = selectedHWs.reduce((s,h)=>s+(h.maxScore||100),0);
   return selectedRooms.map(room=>{
+    // เลือกเฉพาะชิ้นงานของห้องนี้จริงๆ (กันเลขชิ้นงานชนกับห้องอื่น)
+    const selectedHWs=DB.homeworks.filter(h=>h.room===room&&exportHWSel.has(h.room+'|'+h.num)).sort((a,b)=>a.num-b.num);
+    const hwTotalMax=selectedHWs.reduce((s,h)=>s+(h.maxScore||100),0);
     const students=DB.students.filter(s=>s.room===room).sort((a,b)=>a.id.localeCompare(b.id));
     const rows=students.map((s,idx)=>{
       const row={เลขที่:idx+1,เลขประจำตัว:s.id,'ชื่อ-นามสกุล':s.name,ห้อง:s.room};
