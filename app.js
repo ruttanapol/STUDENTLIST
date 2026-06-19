@@ -1801,19 +1801,23 @@ function renderStudentView(s, stuDB){
   const miss=roomHWs.filter(h=>!db.submissions[s.id+'_'+h.num]);
   const pct=roomHWs.length?Math.round(done.length/roomHWs.length*100):0;
 
-  // ===== รวมคะแนนทั้งหมดของนักเรียน (เฉพาะชิ้นที่ตรวจให้คะแนนแล้ว) =====
-  const gradedHWs=roomHWs.filter(h=>{
+  // ===== รวมคะแนนทั้งหมดของนักเรียน (นับคะแนนเต็มจากทุกชิ้นที่ส่งแล้ว, คะแนนที่ได้นับเฉพาะชิ้นที่ตรวจแล้ว) =====
+  const gradedHWs=done.filter(h=>{
     const sub=db.submissions[s.id+'_'+h.num];
-    return sub && sub.score!==null && sub.score!==undefined;
+    return sub.score!==null && sub.score!==undefined;
   });
   const totalScore=gradedHWs.reduce((sum,h)=>sum+Number(db.submissions[s.id+'_'+h.num].score),0);
-  const totalMax=gradedHWs.reduce((sum,h)=>sum+Number(db.submissions[s.id+'_'+h.num].maxScore||h.maxScore||100),0);
+  const totalMax=done.reduce((sum,h)=>{
+    const sub=db.submissions[s.id+'_'+h.num];
+    return sum+Number(sub.maxScore||h.maxScore||100);
+  },0);
   const scorePct=totalMax?Math.round(totalScore/totalMax*100):0;
+  const pendingCount=done.length-gradedHWs.length;
 
   let html=`<div class="score-hero">
     <div class="score-hero-lbl">🏆 คะแนนรวมทั้งหมด</div>
     <div class="score-hero-num">${totalScore}<span>/${totalMax}</span></div>
-    <div class="score-hero-sub">${gradedHWs.length?`ได้ ${scorePct}% จากงานที่ตรวจแล้ว ${gradedHWs.length} ชิ้น`:'ยังไม่มีงานที่ตรวจให้คะแนน'}</div>
+    <div class="score-hero-sub">${done.length?`ได้ ${scorePct}% จากงานที่ส่งแล้ว ${done.length} ชิ้น${pendingCount?` (รอตรวจ ${pendingCount} ชิ้น)`:''}`:'ยังไม่มีงานที่ส่ง'}</div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;">
     <div class="scard" style="background:linear-gradient(135deg,#DCFCE7,#BBF7D0);border:1.5px solid #86EFAC;"><div class="snum" style="color:#16A34A;">${done.length}</div><div class="slbl">✅ ส่งแล้ว</div></div>
