@@ -1345,6 +1345,10 @@ ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
           </select>
           <input type="date" id="att-date" onchange="onAttDateChange()"
             style="padding:7px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;font-family:Sarabun,sans-serif;">
+          <label title="คาบคู่นับการมา/ขาดเป็น 2 คาบ" style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;padding:7px 10px;border-radius:8px;border:1.5px solid var(--border);background:#fff;white-space:nowrap;">
+            <input type="checkbox" id="att-double-period" onchange="onAttDoubleChange()" style="width:15px;height:15px;cursor:pointer;accent-color:var(--blue);">
+            🔁 คาบคู่ (×2)
+          </label>
           <button onclick="setAllAttStatus('present')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#DCFCE7;color:#15803D;cursor:pointer;font-family:Sarabun,sans-serif;white-space:nowrap;">✅ มาทุกคน</button>
           <button onclick="setAllAttStatus('absent')"  style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#FEE2E2;color:#B91C1C;cursor:pointer;font-family:Sarabun,sans-serif;white-space:nowrap;">❌ ขาดทุกคน</button>
         </div>

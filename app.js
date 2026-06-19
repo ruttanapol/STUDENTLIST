@@ -6213,6 +6213,7 @@ function closeAnnouncement() {
 
 let _attRecords = {};   // {studentId: status}
 let _attLoaded = false;
+let _attIsDouble = false; // true = คาบคู่ (นับมา/ขาด เป็น 2 คาบ)
 
 const ATT_STATUS = {
   present:  { label:'มา',     icon:'✅', bg:'#DCFCE7', color:'#15803D', border:'#86EFAC' },
@@ -6249,6 +6250,8 @@ function renderAttendanceList() {
   // Load saved records if date+room changed
   _attLoaded = false;
   loadAttendanceForDate(date, room).then(() => {
+    const dblEl = document.getElementById('att-double-period');
+    if(dblEl) dblEl.checked = _attIsDouble;
     _buildStudentList(students);
     updateAttSummary();
   });
@@ -6259,6 +6262,7 @@ async function loadAttendanceForDate(date, room) {
     // default all present
     const students = DB.students.filter(s=>s.room===room);
     _attRecords = {};
+    _attIsDouble = false;
     students.forEach(s => _attRecords[s.id] = 'present');
     return;
   }
@@ -6269,6 +6273,7 @@ async function loadAttendanceForDate(date, room) {
     .eq('key', key + '_' + CURRENT_TEACHER.id).maybeSingle();
 
   _attRecords = {};
+  _attIsDouble = !!data?.value?.isDouble;
   if(data?.value?.records) {
     // migrate old 'leave' → 'sick'
     data.value.records.forEach(r => { _attRecords[r.id] = r.status === 'leave' ? 'sick' : r.status; });
@@ -6333,15 +6338,21 @@ function setAllAttStatus(status) {
 function updateAttSummary() {
   const el = document.getElementById('att-summary');
   if(!el) return;
+  const weight = _attIsDouble ? 2 : 1;
   const counts = { present:0, absent:0, late:0, sick:0, personal:0 };
   Object.values(_attRecords).forEach(s => { if(counts[s]!==undefined) counts[s]++; });
   el.innerHTML = Object.entries(ATT_STATUS).map(([k,cfg]) =>
     `<div style="flex:1;text-align:center;padding:7px 4px;border-radius:8px;background:${cfg.bg};border:1.5px solid ${cfg.border};">
       <div style="font-size:16px;">${cfg.icon}</div>
-      <div style="font-size:18px;font-weight:800;color:${cfg.color};">${counts[k]}</div>
-      <div style="font-size:10px;color:${cfg.color};font-weight:600;">${cfg.label}</div>
+      <div style="font-size:18px;font-weight:800;color:${cfg.color};">${counts[k]*weight}</div>
+      <div style="font-size:10px;color:${cfg.color};font-weight:600;">${cfg.label}${weight>1?' (×2)':''}</div>
     </div>`
   ).join('');
+}
+
+function onAttDoubleChange() {
+  _attIsDouble = !!document.getElementById('att-double-period')?.checked;
+  updateAttSummary();
 }
 
 function onAttDateChange() {
@@ -6363,11 +6374,12 @@ async function saveAttendance() {
   const records = students.map(s => ({ id:s.id, name:s.name, status:_attRecords[s.id]||'present' }));
   const counts = { present:0, absent:0, late:0, sick:0, personal:0 };
   records.forEach(r => { if(counts[r.status]!==undefined) counts[r.status]++; });
+  const weight = _attIsDouble ? 2 : 1;
 
   const dateKey = date.replace(/-/g,'');
   const roomKey = room.replace(/[^a-zA-Z0-9ก-ฮ]/g,'_');
   const key = `att_${dateKey}_${roomKey}`;
-  const value = { date, room, records, counts, savedAt: new Date().toISOString() };
+  const value = { date, room, records, counts, isDouble: _attIsDouble, weight, savedAt: new Date().toISOString() };
 
   const { data: existing } = await SB.from('settings').select('key')
     .eq('key', key + '_' + CURRENT_TEACHER.id).maybeSingle();
@@ -6382,7 +6394,7 @@ async function saveAttendance() {
   }
   const dateDisplay = new Date(date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'});
   if(statusEl) {
-    statusEl.textContent = `✅ บันทึกเช็คชื่อวันที่ ${dateDisplay} · มา ${counts.present} / ขาด ${counts.absent} / สาย ${counts.late} / ลา ${counts.leave}`;
+    statusEl.textContent = `✅ บันทึกเช็คชื่อวันที่ ${dateDisplay}${weight>1?' (คาบคู่ ×2)':''} · มา ${counts.present} / ขาด ${counts.absent} / สาย ${counts.late} / ลา ${counts.leave}`;
     statusEl.style.display='block'; statusEl.style.background='#DCFCE7'; statusEl.style.color='#15803D';
     setTimeout(() => { statusEl.style.display='none'; }, 5000);
   }
@@ -6412,7 +6424,7 @@ async function loadAttendanceHistory() {
       style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:10px;margin-bottom:5px;border:1.5px solid #F1F5F9;cursor:pointer;"
       onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='#F1F5F9'">
       <div style="flex:1;">
-        <div style="font-size:13px;font-weight:700;color:var(--text);">${d} · ${v.room||'-'}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);">${d} · ${v.room||'-'}${v.isDouble?' <span style="font-size:10px;font-weight:800;color:#1D4ED8;background:#DBEAFE;padding:1px 6px;border-radius:6px;">🔁×2</span>':''}</div>
         <div style="font-size:11px;color:var(--text3);margin-top:2px;">
           ✅ ${c.present||0} · ❌ ${c.absent||0} · ⏰ ${c.late||0} · 🏥 ${c.leave||0}
         </div>
@@ -6448,22 +6460,23 @@ function _buildAttExportRows() {
   });
   const counts = {};
   Object.keys(ATT_STATUS).forEach(k => counts[k] = rows.filter(r=>r.ประเภท===ATT_STATUS[k].label).length);
-  return { room, date, dateDisplay, students, rows, counts };
+  const weight = _attIsDouble ? 2 : 1;
+  return { room, date, dateDisplay, students, rows, counts, weight };
 }
 
 function exportAttendanceExcel() {
   if(!checkFeatureGate('export_excel','Export Excel')) return;
   if(!isPremium()) { showUpgradeModal('Export Excel เฉพาะ Premium 🔒'); return; }
   if(typeof XLSX === 'undefined') { toast('กำลังโหลด Excel library...','warn'); return; }
-  const { room, dateDisplay, rows, counts } = _buildAttExportRows();
+  const { room, dateDisplay, rows, counts, weight } = _buildAttExportRows();
   const ws_data = [
-    [`รายงานการเช็คชื่อ — ${room} — ${dateDisplay}`],
+    [`รายงานการเช็คชื่อ — ${room} — ${dateDisplay}${weight>1?' (คาบคู่ ×2)':''}`],
     [],
     ['เลขที่','รหัส','ชื่อ-นามสกุล','ห้อง','สถานะ'],
     ...rows.map(r=>[r.เลขที่, r.รหัส, r.ชื่อ, r.ห้อง, r.สถานะ]),
     [],
-    ['สรุป','','มา','ขาด','สาย','ลาป่วย','ลากิจ'],
-    ['','',counts.present||0, counts.absent||0, counts.late||0, counts.sick||0, counts.personal||0],
+    ['สรุป (นับเป็นคาบ)','','มา','ขาด','สาย','ลาป่วย','ลากิจ'],
+    ['','',(counts.present||0)*weight, (counts.absent||0)*weight, (counts.late||0)*weight, (counts.sick||0)*weight, (counts.personal||0)*weight],
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(ws_data);
@@ -6477,7 +6490,7 @@ function exportAttendanceExcel() {
 function exportAttendancePDF() {
   if(!checkFeatureGate('export_pdf','Export PDF')) return;
   if(!isPremium()) { showUpgradeModal('Export PDF เฉพาะ Premium 🔒'); return; }
-  const { room, dateDisplay, rows, counts } = _buildAttExportRows();
+  const { room, dateDisplay, rows, counts, weight } = _buildAttExportRows();
   const dateFile = (document.getElementById('att-date')?.value||'').replace(/-/g,'');
   const statusColors = {
     present:'#15803D', absent:'#B91C1C', late:'#B45309', sick:'#BE123C', personal:'#6D28D9'
@@ -6503,14 +6516,14 @@ function exportAttendancePDF() {
       @media print{body{padding:8mm 10mm;}}
     </style>
   </head><body>
-    <h1>📋 รายงานเช็คชื่อ — ${room}</h1>
+    <h1>📋 รายงานเช็คชื่อ — ${room}${weight>1?' <span style="font-size:11pt;color:#1D4ED8;">(คาบคู่ ×2)</span>':''}</h1>
     <div class="meta">วันที่: ${dateDisplay} &nbsp;|&nbsp; นักเรียน ${rows.length} คน &nbsp;|&nbsp; พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}</div>
     <div class="summary">
-      <div class="sum-box" style="background:#DCFCE7;color:#15803D;"><b style="font-size:18pt;">${counts.present||0}</b><br>✅ มา</div>
-      <div class="sum-box" style="background:#FEE2E2;color:#B91C1C;"><b style="font-size:18pt;">${counts.absent||0}</b><br>❌ ขาด</div>
-      <div class="sum-box" style="background:#FEF3C7;color:#B45309;"><b style="font-size:18pt;">${counts.late||0}</b><br>⏰ สาย</div>
-      <div class="sum-box" style="background:#FFF1F2;color:#BE123C;"><b style="font-size:18pt;">${counts.sick||0}</b><br>🤒 ลาป่วย</div>
-      <div class="sum-box" style="background:#F5F3FF;color:#6D28D9;"><b style="font-size:18pt;">${counts.personal||0}</b><br>📋 ลากิจ</div>
+      <div class="sum-box" style="background:#DCFCE7;color:#15803D;"><b style="font-size:18pt;">${(counts.present||0)*weight}</b><br>✅ มา</div>
+      <div class="sum-box" style="background:#FEE2E2;color:#B91C1C;"><b style="font-size:18pt;">${(counts.absent||0)*weight}</b><br>❌ ขาด</div>
+      <div class="sum-box" style="background:#FEF3C7;color:#B45309;"><b style="font-size:18pt;">${(counts.late||0)*weight}</b><br>⏰ สาย</div>
+      <div class="sum-box" style="background:#FFF1F2;color:#BE123C;"><b style="font-size:18pt;">${(counts.sick||0)*weight}</b><br>🤒 ลาป่วย</div>
+      <div class="sum-box" style="background:#F5F3FF;color:#6D28D9;"><b style="font-size:18pt;">${(counts.personal||0)*weight}</b><br>📋 ลากิจ</div>
     </div>
     <table><thead><tr><th style="width:40px;">ที่</th><th style="width:90px;">รหัส</th><th>ชื่อ-นามสกุล</th><th style="width:100px;">สถานะ</th></tr></thead>
     <tbody>${rows.map(r=>{
@@ -6721,21 +6734,23 @@ async function loadAttendanceStats() {
   const dates = data.map(r=>r.value?.date).filter(Boolean).sort();
   // Build lookup: date → {sid: status}
   const dayMap = {};
+  const dayWeight = {};
   data.forEach(row => {
     const d = row.value?.date;
     if(!d) return;
     dayMap[d] = {};
+    dayWeight[d] = row.value?.isDouble ? 2 : 1;
     (row.value?.records||[]).forEach(r => { dayMap[d][r.id] = r.status || 'present'; });
   });
 
   // Cache for export
-  _attStatsData = { room, students, dates, dayMap };
+  _attStatsData = { room, students, dates, dayMap, dayWeight };
 
   if(!statsEl) return;
-  statsEl.innerHTML = _buildAttStatsTableHTML(room, students, dates, dayMap, false);
+  statsEl.innerHTML = _buildAttStatsTableHTML(room, students, dates, dayMap, false, dayWeight);
 }
 
-function _buildAttStatsTableHTML(room, students, dates, dayMap, forPrint = false) {
+function _buildAttStatsTableHTML(room, students, dates, dayMap, forPrint = false, dayWeight = {}) {
   // Group dates by month
   const monthGroups = {};
   dates.forEach(d => {
@@ -6754,9 +6769,10 @@ function _buildAttStatsTableHTML(room, students, dates, dayMap, forPrint = false
   const totals = {};
   students.forEach(s => { totals[s.id] = {present:0,absent:0,late:0,sick:0,personal:0}; });
   dates.forEach(d => {
+    const w = dayWeight[d] || 1;
     students.forEach(s => {
       const st = dayMap[d]?.[s.id] ?? 'present';
-      if(totals[s.id][st] !== undefined) totals[s.id][st]++;
+      if(totals[s.id][st] !== undefined) totals[s.id][st] += w;
     });
   });
 
@@ -6774,8 +6790,9 @@ function _buildAttStatsTableHTML(room, students, dates, dayMap, forPrint = false
     mg.dates.forEach(d => {
       const dt = new Date(d);
       const weekOfMonth = Math.ceil(dt.getDate()/7);
+      const isDbl = (dayWeight[d]||1) > 1;
       weekHeader += `<th style="${thS}min-width:22px;">${weekOfMonth}</th>`;
-      dayHeader  += `<th style="${thS}">${dt.getDate()}</th>`;
+      dayHeader  += `<th style="${thS}${isDbl?'background:#DBEAFE;color:#1D4ED8;':''}" title="${isDbl?'คาบคู่ ×2':''}">${dt.getDate()}${isDbl?'²':''}</th>`;
       symbolHeader += `<th style="${thS}font-size:9px;">${['อา','จ','อ','พ','พฤ','ศ','ส'][dt.getDay()]}</th>`;
     });
   });
@@ -6824,7 +6841,7 @@ function _buildAttStatsTableHTML(room, students, dates, dayMap, forPrint = false
   return forPrint ? tableHTML : `
     <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">
       📅 <b>${dates.length} วัน</b> · ห้อง ${room}
-      &nbsp;|&nbsp; ม=มา ส=สาย ป=ลาป่วย ก=ลากิจ ข=ขาด
+      &nbsp;|&nbsp; ม=มา ส=สาย ป=ลาป่วย ก=ลากิจ ข=ขาด &nbsp;|&nbsp; <span style="color:#1D4ED8;">²</span>=คาบคู่ (นับ ×2 ในผลรวม)
     </div>
     <div style="overflow-x:auto;">${tableHTML}</div>`;
 }
@@ -6832,8 +6849,8 @@ function _buildAttStatsTableHTML(room, students, dates, dayMap, forPrint = false
 async function exportAttendanceStatsPDF() {
   if(!isPremium()) { showUpgradeModal('Export PDF เฉพาะ Premium 🔒'); return; }
   if(!_attStatsData) { toast('กรุณากด "โหลดสถิติ" ก่อน', 'warn'); return; }
-  const { room, students, dates, dayMap } = _attStatsData;
-  const tableHTML = _buildAttStatsTableHTML(room, students, dates, dayMap, true);
+  const { room, students, dates, dayMap, dayWeight } = _attStatsData;
+  const tableHTML = _buildAttStatsTableHTML(room, students, dates, dayMap, true, dayWeight);
   const dateStr = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
 
   const html = `<!DOCTYPE html><html><head>
