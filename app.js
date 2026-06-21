@@ -386,7 +386,6 @@ async function loadFromSupabase() {
   const [stuRes, hwRes, subRes, setRes] = await Promise.all([stuQ, hwQ, subQ, SB.from('settings').select('*')]);
 
   DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room}));
-  DB.rooms = [...new Set(DB.students.map(s => s.room))].sort();
   DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||'', fileUrl: r.file_url||'', fileName: r.file_name||'', room: r.room||''}));
 
   const subs = {};
@@ -508,7 +507,11 @@ async function reloadStudents() {
   if(tid) q = q.eq('teacher_id', tid);
   const {data} = await q;
   DB.students = (data||[]).map(r=>({id:r.id,name:r.name,room:r.room}));
-  DB.rooms = [...new Set(DB.students.map(s=>s.room))].sort();
+  // รวมห้องจากนักเรียนเข้ากับห้องที่มีอยู่แล้ว (ไม่ทับของเดิม เพราะห้องที่ยังไม่มีนักเรียนต้องไม่หาย) + กรองค่าว่างออก
+  const studentRooms = DB.students.map(s=>s.room).filter(Boolean);
+  DB.rooms = [...new Set([...(DB.rooms||[]), ...studentRooms])].sort((a,b)=>
+    a.localeCompare(b,'th',{numeric:true,sensitivity:'base'})
+  );
 }
 
 async function reloadHomeworks() {
@@ -6311,7 +6314,7 @@ function initAttendanceTab() {
   // Populate room selector
   const sel = document.getElementById('att-room-sel');
   if(!sel) return;
-  const rooms = DB.rooms || [...new Set(DB.students.map(s=>s.room))].sort();
+  const rooms = DB.rooms || [...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort();
   sel.innerHTML = rooms.map(r=>`<option value="${r}">${r}</option>`).join('');
 
   // Set today's date
