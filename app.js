@@ -2499,9 +2499,18 @@ async function addSubject(){
 }
 
 async function delSubj(n){
+  if(!confirm('ลบวิชา "'+n+'"?')) return;
+  const backup=[...DB.subjects];
+  showActionPopup('กำลังลบวิชา',n,'delete');
   DB.subjects=DB.subjects.filter(s=>s!==n);
-  await sbSaveSettings('subjects',DB.subjects);
-  renderManage();
+  try {
+    await sbSaveSettings('subjects',DB.subjects);
+    actionPopupDone('ลบวิชาแล้ว',n,'delete');
+    renderManage();
+  } catch(e) {
+    DB.subjects=backup; // rollback ถ้าบันทึกไม่สำเร็จ
+    actionPopupError('ลบวิชาไม่สำเร็จ: '+(e.message||e));
+  }
 }
 
 async function addHW(){const num=parseInt(document.getElementById('n-hwnum').value);const title=document.getElementById('n-hwtitle').value.trim();const subject=document.getElementById('n-hwsubj').value;const maxScore=parseInt(document.getElementById('n-hwmaxscore')?.value)||100;const room=_hwRoom;if(!num||!title){toast('กรอกให้ครบ','warn');return;}if(!room){toast('กรุณาเลือกห้องเรียนก่อน','warn');return;}if(DB.homeworks.find(h=>h.num===num&&h.room===room)){toast('งานครั้งที่ '+num+' ของ '+room+' มีแล้ว','warn');return;}const limit=checkPlanLimit('homework');if(!limit.ok){showUpgradeModal(limit.msg);return;}try{await sbAddHomework({num,title,subject,maxScore,room});renderManage();toast('เพิ่มงานครั้งที่ '+num+' ('+room+')');document.getElementById('n-hwnum').value='';document.getElementById('n-hwtitle').value='';}catch(e){toast('เพิ่มไม่สำเร็จ: '+e.message,'err');}}
