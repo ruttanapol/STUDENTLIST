@@ -2586,6 +2586,141 @@ async function clearAllStudents(){
 }
 
 // ╔══════════════════════════════════════════════════════╗
+// ║  SECTION H.5: BACKUP / RESTORE                      ║
+// ╚══════════════════════════════════════════════════════╝
+async function exportBackupData(){
+  if(!USE_SUPABASE || !CURRENT_TEACHER){ toast('ต้องเข้าสู่ระบบก่อน','warn'); return; }
+  const tid = CURRENT_TEACHER.id;
+  showActionPopup('กำลังสร้างไฟล์สำรอง','กรุณารอสักครู่...','add');
+  try{
+    const [stuRes, hwRes, subRes, settingsRes] = await Promise.all([
+      SB.from('students').select('*').eq('teacher_id', tid),
+      SB.from('homeworks').select('*').eq('teacher_id', tid),
+      SB.from('submissions').select('*').eq('teacher_id', tid),
+      SB.from('settings').select('*')
+    ]);
+    if(stuRes.error) throw stuRes.error;
+    if(hwRes.error) throw hwRes.error;
+    if(subRes.error) throw subRes.error;
+    if(settingsRes.error) throw settingsRes.error;
+
+    // คีย์ settings ที่ผูกกับครูคนนี้เท่านั้น (ลงท้ายด้วย uid ของตัวเอง) เช่น rooms_<uid>, subjects_<uid>, calendar_<uid>, cal_<uid>
+    const suffix = '_'+tid;
+    const myScopedSettings = (settingsRes.data||[]).filter(r=>typeof r.key==='string' && r.key.endsWith(suffix));
+
+    const backup = {
+      app: 'TaskGenius',
+      backupVersion: 1,
+      exportedAt: new Date().toISOString(),
+      teacher: {id: tid, email: CURRENT_TEACHER.email||'', display_name: CURRENT_TEACHER.display_name||''},
+      students: stuRes.data||[],
+      homeworks: hwRes.data||[],
+      submissions: subRes.data||[],
+      settings: myScopedSettings
+    };
+
+    const blob = new Blob([JSON.stringify(backup,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0,10);
+    const safeName = (CURRENT_TEACHER.display_name||'teacher').replace(/[^a-zA-Z0-9ก-๙_-]+/g,'_');
+    a.href = url;
+    a.download = `taskgenius_backup_${safeName}_${dateStr}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    actionPopupDone('สร้างไฟล์สำรองแล้ว',
+      `นักเรียน ${backup.students.length} คน · งาน ${backup.homeworks.length} ชิ้น · ส่งงาน ${backup.submissions.length} รายการ`,'add');
+  }catch(e){
+    actionPopupError('สำรองข้อมูลไม่สำเร็จ: '+(e.message||e));
+  }
+}
+
+async function restoreBackupFile(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  if(!USE_SUPABASE || !CURRENT_TEACHER){ toast('ต้องเข้าสู่ระบบก่อน','warn'); ev.target.value=''; return; }
+
+  try{
+    const text = await file.text();
+    let backup;
+    try { backup = JSON.parse(text); } catch(e){ toast('ไฟล์เสีย หรือไม่ใช่ไฟล์ JSON','err'); ev.target.value=''; return; }
+
+    if(!backup || backup.app!=='TaskGenius' || !Array.isArray(backup.students)){
+      toast('ไฟล์นี้ไม่ใช่ไฟล์สำรองของ TaskGenius','err'); ev.target.value=''; return;
+    }
+
+    const stuCount=backup.students.length, hwCount=(backup.homeworks||[]).length, subCount=(backup.submissions||[]).length;
+    const dateLabel = backup.exportedAt ? new Date(backup.exportedAt).toLocaleString('th-TH') : 'ไม่ทราบวันที่';
+    const ok = confirm(
+      `กู้คืนข้อมูลจากไฟล์สำรอง (สำรองไว้เมื่อ ${dateLabel})?\n\n`+
+      `นักเรียน ${stuCount} คน · งาน ${hwCount} ชิ้น · การส่งงาน ${subCount} รายการ\n\n`+
+      `⚠️ ข้อมูลปัจจุบันทั้งหมดของบัญชีนี้ (นักเรียน/งาน/การส่งงาน) จะถูกแทนที่ทั้งหมด\n`+
+      `การกระทำนี้ย้อนกลับไม่ได้ — แนะนำให้สำรองข้อมูลปัจจุบันไว้ก่อนถ้ายังไม่ได้ทำ`
+    );
+    if(!ok){ ev.target.value=''; return; }
+
+    const tid = CURRENT_TEACHER.id;
+    showActionPopup('กำลังกู้คืนข้อมูล','กรุณารอสักครู่ อย่าปิดหน้านี้...','add');
+
+    // 1) ล้างข้อมูลเดิมของครูคนนี้ทั้งหมด (ลำดับ: submissions → homeworks → students)
+    const delSub = await SB.from('submissions').delete().eq('teacher_id', tid);
+    if(delSub.error) throw delSub.error;
+    const delHw = await SB.from('homeworks').delete().eq('teacher_id', tid);
+    if(delHw.error) throw delHw.error;
+    const delStu = await SB.from('students').delete().eq('teacher_id', tid);
+    if(delStu.error) throw delStu.error;
+
+    const CHUNK = 50;
+
+    // 2) นักเรียน (id เป็นรหัสจริง คงไว้เหมือนเดิม)
+    const studentsRows = backup.students.map(s=>({id:s.id, name:s.name, room:s.room, teacher_id: tid}));
+    for(let i=0;i<studentsRows.length;i+=CHUNK){
+      const {error} = await SB.from('students').insert(studentsRows.slice(i,i+CHUNK));
+      if(error) throw error;
+    }
+
+    // 3) งาน (ตัด id เดิมออก ให้ DB สร้าง id ใหม่ เพราะเป็น SERIAL)
+    const hwRows = (backup.homeworks||[]).map(h=>({
+      num:h.num, title:h.title, subject:h.subject||'', max_score:h.max_score||100, teacher_id: tid,
+      deadline:h.deadline||null, file_url:h.file_url||null, file_name:h.file_name||null, room:h.room||''
+    }));
+    for(let i=0;i<hwRows.length;i+=CHUNK){
+      const {error} = await SB.from('homeworks').insert(hwRows.slice(i,i+CHUNK));
+      if(error) throw error;
+    }
+
+    // 4) การส่งงาน (ตัด id เดิมออก ให้ DB สร้าง UUID ใหม่)
+    const subRows = (backup.submissions||[]).map(s=>({
+      student_id:s.student_id, hw_num:s.hw_num, hw_title:s.hw_title||'', room:s.room||'',
+      score:s.score, max_score:s.max_score||100, teacher_id: tid, submitted_at:s.submitted_at||new Date().toISOString()
+    }));
+    for(let i=0;i<subRows.length;i+=CHUNK){
+      const {error} = await SB.from('submissions').insert(subRows.slice(i,i+CHUNK));
+      if(error) throw error;
+    }
+
+    // 5) settings ที่ผูกกับครูคนนี้ — เปลี่ยน uid ท้ายคีย์ให้เป็นของบัญชีปัจจุบัน (เผื่อกู้คืนข้ามบัญชี)
+    for(const row of (backup.settings||[])){
+      if(typeof row.key !== 'string') continue;
+      const newKey = row.key.replace(/_[0-9a-fA-F-]{36}$/, '_'+tid);
+      const {error} = await SB.from('settings').upsert({key:newKey, value:row.value}, {onConflict:'key'});
+      if(error) throw error;
+    }
+
+    actionPopupDone('กู้คืนข้อมูลสำเร็จ','กำลังโหลดข้อมูลใหม่...','add');
+    await loadFromSupabase();
+    if(typeof loadGlobalBypassIds==='function') await loadGlobalBypassIds();
+    renderDashboard();
+    renderManage();
+  }catch(e){
+    actionPopupError('กู้คืนข้อมูลไม่สำเร็จ: '+(e.message||e));
+  } finally {
+    ev.target.value='';
+  }
+}
+
+// ╔══════════════════════════════════════════════════════╗
 // ║  SECTION I: EXPORT (PDF / EXCEL)                   ║
 // ╚══════════════════════════════════════════════════════╝
 // ===== EXPORT =====

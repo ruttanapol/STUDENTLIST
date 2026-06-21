@@ -1384,6 +1384,19 @@ CREATE POLICY "teachers_delete_admin_only" ON teachers FOR DELETE
     </div><!-- end grade-content -->
   </div>
   <div id="mtab-reset" class="mtab-page" style="display:none;">
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-title">💾 สำรอง / กู้คืนข้อมูล</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6;">
+        ดาวน์โหลดข้อมูลทั้งหมด (นักเรียน, งาน, การส่งงาน, ห้อง, วิชา, ปฏิทิน) เป็นไฟล์เก็บไว้ — กู้คืนได้ทุกเมื่อถ้าข้อมูลหายหรือผิดพลาด
+      </p>
+      <button onclick="exportBackupData()" style="width:100%;padding:15px;font-size:15px;font-family:Sarabun,sans-serif;border-radius:12px;border:none;background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#1E40AF;cursor:pointer;font-weight:700;margin-bottom:10px;text-align:left;">
+        ⬇️ ดาวน์โหลดไฟล์สำรองข้อมูล<br><span style="font-size:12px;font-weight:400;opacity:0.8;">บันทึกเป็นไฟล์ .json ไว้ในเครื่อง</span>
+      </button>
+      <label style="display:block;width:100%;padding:15px;font-size:15px;font-family:Sarabun,sans-serif;border-radius:12px;border:1.5px dashed #93C5FD;background:#EFF6FF;color:#1E40AF;cursor:pointer;font-weight:700;text-align:left;box-sizing:border-box;">
+        ⬆️ กู้คืนจากไฟล์สำรอง<br><span style="font-size:12px;font-weight:400;opacity:0.8;">เลือกไฟล์ .json ที่ดาวน์โหลดไว้ — ⚠️ จะแทนที่ข้อมูลปัจจุบันทั้งหมด</span>
+        <input type="file" accept=".json,application/json" onchange="restoreBackupFile(event)" style="display:none;">
+      </label>
+    </div>
     <div class="card">
       <div class="card-title">⚠️ รีเซ็ตข้อมูล</div>
       <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6;">การรีเซ็ตไม่สามารถย้อนกลับได้</p>
