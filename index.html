@@ -98,12 +98,68 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students;
 ALTER PUBLICATION supabase_realtime ADD TABLE homeworks;
 ALTER PUBLICATION supabase_realtime ADD TABLE teachers;
 
--- ปิด RLS (สำหรับใช้ภายในโรงเรียน)
-ALTER TABLE students DISABLE ROW LEVEL SECURITY;
-ALTER TABLE homeworks DISABLE ROW LEVEL SECURITY;
-ALTER TABLE submissions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE settings DISABLE ROW LEVEL SECURITY;
-ALTER TABLE teachers DISABLE ROW LEVEL SECURITY;
+-- ===== Super Admin column =====
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN NOT NULL DEFAULT false;
+
+-- ฟังก์ชันเช็คสิทธิ์ Super Admin (SECURITY DEFINER เพื่อเลี่ยง RLS recursion)
+CREATE OR REPLACE FUNCTION is_super_admin(uid UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS(SELECT 1 FROM teachers WHERE id = uid AND is_super_admin = true);
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- ===== เปิด RLS (สำคัญมาก! ถ้าไม่เปิด ใครก็เรียก API ตรงด้วย anon key แก้/ลบข้อมูลของทุกคนได้) =====
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE homeworks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE teachers ENABLE ROW LEVEL SECURITY;
+
+-- อ่านได้แบบเปิด (จำเป็น เพราะหน้านักเรียนเข้าดูแบบไม่ต้อง login)
+CREATE POLICY "students_select_public" ON students FOR SELECT USING (true);
+CREATE POLICY "homeworks_select_public" ON homeworks FOR SELECT USING (true);
+CREATE POLICY "submissions_select_public" ON submissions FOR SELECT USING (true);
+
+-- เขียน/แก้/ลบ ได้เฉพาะครูเจ้าของข้อมูล หรือ Super Admin
+CREATE POLICY "students_write_own" ON students FOR ALL
+  USING (auth.uid()::text = teacher_id OR is_super_admin(auth.uid()))
+  WITH CHECK (auth.uid()::text = teacher_id OR is_super_admin(auth.uid()));
+CREATE POLICY "homeworks_write_own" ON homeworks FOR ALL
+  USING (auth.uid()::text = teacher_id OR is_super_admin(auth.uid()))
+  WITH CHECK (auth.uid()::text = teacher_id OR is_super_admin(auth.uid()));
+CREATE POLICY "submissions_write_own" ON submissions FOR ALL
+  USING (auth.uid()::text = teacher_id OR is_super_admin(auth.uid()))
+  WITH CHECK (auth.uid()::text = teacher_id OR is_super_admin(auth.uid()));
+
+-- settings: คีย์สาธารณะที่ต้องอ่านได้ก่อน login (โหมดปรับปรุง/แพ็กเกจ/ติดต่อ/ประกาศ)
+CREATE POLICY "settings_select_public_keys" ON settings FOR SELECT
+  USING (key IN ('maintenance_mode','plans','admin_contacts','announcement'));
+-- คนที่ login แล้ว (ครู/ซุปเปอร์แอดมิน) อ่านคีย์อื่นๆที่เหลือได้ (anthropic_key, payment_info ฯลฯ)
+CREATE POLICY "settings_select_authenticated" ON settings FOR SELECT
+  USING (auth.uid() IS NOT NULL);
+-- เขียนได้เฉพาะ Super Admin (คีย์ส่วนกลาง) หรือครูเจ้าของคีย์ที่ลงท้ายด้วย uid ตัวเอง เช่น rooms_&lt;uid&gt;
+CREATE POLICY "settings_write_scoped" ON settings FOR ALL
+  USING (is_super_admin(auth.uid()) OR (auth.uid() IS NOT NULL AND right(key,37) = '_' || auth.uid()::text))
+  WITH CHECK (is_super_admin(auth.uid()) OR (auth.uid() IS NOT NULL AND right(key,37) = '_' || auth.uid()::text));
+
+-- teachers: อ่านได้แบบเปิด (จำเป็นสำหรับเช็ค username/email ซ้ำตอนสมัคร)
+CREATE POLICY "teachers_select_public" ON teachers FOR SELECT USING (true);
+-- สมัครใหม่ insert แถวตัวเองได้เท่านั้น
+CREATE POLICY "teachers_insert_self" ON teachers FOR INSERT WITH CHECK (auth.uid() = id);
+-- แก้ไขแถวตัวเอง หรือ Super Admin แก้ไขใครก็ได้ (อนุมัติ/ตั้งแพลน)
+CREATE POLICY "teachers_update_self_or_admin" ON teachers FOR UPDATE
+  USING (auth.uid() = id OR is_super_admin(auth.uid()))
+  WITH CHECK (auth.uid() = id OR is_super_admin(auth.uid()));
+-- ลบบัญชีได้เฉพาะ Super Admin
+CREATE POLICY "teachers_delete_admin_only" ON teachers FOR DELETE
+  USING (is_super_admin(auth.uid()));
+
+-- ===== สร้างบัญชี Super Admin (ทำหลังรัน SQL ข้างบนเสร็จ) =====
+-- 1) ไปที่ Authentication → Users → Add user → ใส่อีเมล/รหัสผ่านที่ต้องการ (ต้องตรงกับ
+--    ค่า SUPER_ADMIN_EMAIL ในไฟล์ app.js) → คัดลอก User UID ที่ได้
+-- 2) รัน SQL นี้ (แทน &lt;UID-ที่คัดลอกมา&gt; ด้วยของจริง):
+-- INSERT INTO teachers (id, email, display_name, status, is_super_admin)
+-- VALUES ('&lt;UID-ที่คัดลอกมา&gt;', 'อีเมลเดียวกับขั้นที่ 1', 'Super Admin', 'approved', true)
+-- ON CONFLICT (id) DO UPDATE SET is_super_admin = true;
 
 -- (ทางเลือก) Trigger auto-insert teachers เมื่อ signUp ผ่าน Auth
 -- หากต้องการให้ teachers table อัปเดตอัตโนมัติจาก Auth ให้รันด้วย:

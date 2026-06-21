@@ -9,6 +9,12 @@
 const SUPER_ADMIN_PW = null; // ย้ายไป Supabase แล้ว  //
 const ADMIN_PW = 'teacher123';  // เหลือไว้ compatibility (ไม่ใช้แล้ว)
 
+// ⚠️ Super Admin ตอนนี้ login ผ่าน Supabase Auth จริง (ไม่ใช่แค่รหัสผ่านอย่างเดียวแล้ว)
+// ต้องสร้างบัญชีนี้ใน Supabase Dashboard → Authentication → Add user ด้วยอีเมลนี้
+// แล้ว insert แถวใน teachers table ที่มี id ตรงกับ user นี้ และ is_super_admin = true
+// (ดูรายละเอียดใน SQL setup script ของหน้า setup wizard)
+const SUPER_ADMIN_EMAIL = 'superadmin@taskgenius.local'; // ← แก้เป็นอีเมลจริงที่สร้างใน Supabase Auth
+
 // ╔══════════════════════════════════════════════════════╗
 // ║  SECTION B: SUPABASE + LOCAL STORAGE LAYER          ║
 // ╚══════════════════════════════════════════════════════╝
@@ -187,6 +193,14 @@ async function tryRestoreSession(){
       if(tErr && (tErr.code === '42P01' || (tErr.message||'').includes('does not exist'))) return false;
       await SB.auth.signOut(); 
       return false; 
+    }
+    // ===== Super Admin: เด้งเข้าหน้า Super Admin แทน ไม่เช็ค status='approved' =====
+    if(teacher.is_super_admin) {
+      CURRENT_TEACHER = null;
+      showScreen('s-superadmin');
+      loadSuperAdminPanel();
+      if(typeof loadAnthropicKey === 'function') loadAnthropicKey();
+      return true;
     }
     if(teacher.status !== 'approved') { await SB.auth.signOut(); return false; }
     CURRENT_TEACHER={id:uid,display_name:teacher.display_name,email:teacher.email,
@@ -762,22 +776,23 @@ async function loginAdmin(){
 
   try {
     if(USE_SUPABASE && SB) {
-      // ดึงรหัสจาก Supabase
-      const {data, error} = await SB.from('settings')
-        .select('value')
-        .eq('key','superadmin_pw')
-        .maybeSingle();
-
-      if(error || !data) {
-        if(errEl) errEl.textContent='ไม่สามารถตรวจสอบรหัสได้';
+      // ===== Login ผ่าน Supabase Auth จริง (ไม่ใช่แค่เทียบรหัสผ่านอย่างเดียวแล้ว) =====
+      const {data:authData, error:authErr} = await SB.auth.signInWithPassword({
+        email: SUPER_ADMIN_EMAIL, password: pw
+      });
+      if(authErr || !authData?.user) {
+        if(errEl) errEl.textContent = 'รหัสผ่านไม่ถูกต้อง';
+        if(input) input.select();
+        return;
+      }
+      // ตรวจสิทธิ์ super admin จากตาราง teachers (ป้องกันคนอื่นสวมรอย)
+      const {data:tRow, error:tErr} = await SB.from('teachers').select('is_super_admin').eq('id', authData.user.id).maybeSingle();
+      if(tErr || !tRow || !tRow.is_super_admin) {
+        await SB.auth.signOut();
+        if(errEl) errEl.textContent = 'บัญชีนี้ไม่มีสิทธิ์ Super Admin';
         return;
       }
 
-      const correctPw = typeof data.value === 'string'
-        ? data.value
-        : JSON.stringify(data.value).replace(/"/g,'');
-
-      if(pw === correctPw) {
       // ปิด maintenance ตรงๆ โดยไม่ผ่าน toggleMaintenanceMode
       try {
         await SB.from('settings').upsert(
@@ -790,10 +805,6 @@ async function loginAdmin(){
       showScreen('s-superadmin');
       loadSuperAdminPanel();
       loadAnthropicKey();
-      } else {
-        if(errEl) errEl.textContent = 'รหัสผ่านไม่ถูกต้อง';
-        if(input) input.select();
-      }
     } else {
       // Fallback ถ้าไม่ได้เชื่อมต่อ Supabase
       if(errEl) errEl.textContent='ต้องเชื่อมต่อ Supabase ก่อน';
@@ -831,6 +842,14 @@ async function loginTeacher(){
     // ดึงข้อมูลครูจาก teachers table
     const {data:teacher,error:tErr}=await SB.from('teachers').select('*').eq('id',uid).single();
     if(tErr||!teacher){errEl.textContent='ไม่พบข้อมูลครูในระบบ กรุณาติดต่อแอดมิน';await SB.auth.signOut();return;}
+    // ถ้าเป็นบัญชี Super Admin ที่มาเข้าฟอร์มครูผิด → พาไปหน้า Super Admin แทน
+    if(teacher.is_super_admin){
+      CURRENT_TEACHER=null;
+      showScreen('s-superadmin');
+      loadSuperAdminPanel();
+      if(typeof loadAnthropicKey==='function') loadAnthropicKey();
+      return;
+    }
     // rejected → แจ้งให้สมัครใหม่ (ใช้อีเมลเดิมได้)
     if(teacher.status==='rejected'){
       errEl.textContent='บัญชีนี้ถูกปฏิเสธ — คุณสามารถสมัครใหม่ด้วยอีเมลเดิมได้';
@@ -3585,24 +3604,31 @@ async function bypassMaintenance() {
   const pw = document.getElementById('bypass-pw')?.value.trim();
   const errEl = document.getElementById('bypass-err');
   if(!pw) return;
-  
+
   try {
-    const {data} = await SB.from('settings').select('value').eq('key','superadmin_pw').maybeSingle();
-    const correctPw = data ? (typeof data.value === 'string' ? data.value : JSON.stringify(data.value).replace(/"/g,'')) : 'superadmin999';
-    
-    if(pw === correctPw) {
-      // ปิด maintenance แล้วเข้าหน้าแอดมิน
-      try {
-        await SB.from('settings').upsert({key:'maintenance_mode',value:{enabled:false}},{onConflict:'key'});
-      } catch(e2) {}
-      document.getElementById('maintenance-overlay').style.display = 'none';
-      updateMaintenanceBtn(false);
-      CURRENT_TEACHER = null;
-      showScreen('s-superadmin');
-      loadSuperAdminPanel();
-    } else {
+    const {data:authData, error:authErr} = await SB.auth.signInWithPassword({
+      email: SUPER_ADMIN_EMAIL, password: pw
+    });
+    if(authErr || !authData?.user) {
       if(errEl) errEl.textContent = 'รหัสผ่านไม่ถูกต้อง';
+      return;
     }
+    const {data:tRow, error:tErr} = await SB.from('teachers').select('is_super_admin').eq('id', authData.user.id).maybeSingle();
+    if(tErr || !tRow || !tRow.is_super_admin) {
+      await SB.auth.signOut();
+      if(errEl) errEl.textContent = 'บัญชีนี้ไม่มีสิทธิ์ Super Admin';
+      return;
+    }
+
+    // ปิด maintenance แล้วเข้าหน้าแอดมิน
+    try {
+      await SB.from('settings').upsert({key:'maintenance_mode',value:{enabled:false}},{onConflict:'key'});
+    } catch(e2) {}
+    document.getElementById('maintenance-overlay').style.display = 'none';
+    updateMaintenanceBtn(false);
+    CURRENT_TEACHER = null;
+    showScreen('s-superadmin');
+    loadSuperAdminPanel();
   } catch(e) {
     if(errEl) errEl.textContent = 'เกิดข้อผิดพลาด: ' + e.message;
   }
