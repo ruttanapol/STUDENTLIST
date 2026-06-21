@@ -1647,7 +1647,7 @@ function closeSATeacherView(){
 }
 
 function renderSATeacherData(){
-  const rooms=[...new Set(DB.students.map(s=>s.room))].sort();
+  const rooms=[...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort();
   document.getElementById('sa-tv-stats').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
       <div style="background:var(--blue-light);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:700;">${DB.students.length}</div><div style="font-size:12px;color:var(--text2);">นักเรียน</div></div>
@@ -2168,7 +2168,7 @@ function stopScan(){
 
 function renderDashboard(){
   renderPlanBanner();
-  const rooms=[...new Set(DB.students.map(s=>s.room))].sort();
+  const rooms=[...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort();
   const totalSubs=Object.keys(DB.submissions).length;
   document.getElementById('stats-grid').innerHTML=`
     <div class="scard"><div class="snum">${DB.students.length}</div><div class="slbl">👨‍🎓 นักเรียนทั้งหมด</div></div>
@@ -2556,7 +2556,7 @@ function openExportModal(type){
   document.getElementById('export-modal-title').textContent=type==='pdf'?'📄 Export PDF':'📊 Export Excel';
   document.getElementById('export-go-label').textContent=type==='pdf'?'ดาวน์โหลด PDF':'ดาวน์โหลด Excel';
   document.getElementById('export-go-icon').textContent=type==='pdf'?'📄':'📊';
-  const rooms=[...new Set(DB.students.map(s=>s.room))].sort();
+  const rooms=[...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort();
   exportRoomSel=new Set(rooms);
   const rg=document.getElementById('export-room-grid');
   rg.innerHTML=rooms.map(r=>`<button class="room-cb checked" data-room="${r}" onclick="toggleExportRoom(this,'${r}')"><span>✓</span> ${r}</button>`).join('');
