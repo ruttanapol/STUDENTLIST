@@ -2846,6 +2846,12 @@ async function doExport(){
   const btn=document.getElementById('export-go-btn');const pb=document.getElementById('export-progress-bar');const pf=document.getElementById('export-progress-fill');
   btn.disabled=true;pb.classList.add('on');pf.style.width='10%';
   try{
+    // โหลดข้อมูลล่าสุดจาก Supabase ก่อน export เสมอ กันกรณีข้อมูลในเครื่อง (cache) ไม่ตรงกับที่บันทึกไว้จริง
+    // (เช่น เพิ่งตรวจงาน/บันทึกคะแนนมา แต่ realtime sync ยังไม่ทันอัพเดต DB.submissions ในเครื่อง)
+    if(USE_SUPABASE && SB){
+      await Promise.all([reloadStudents(), reloadHomeworks(), reloadSubmissions()]);
+    }
+    pf.style.width='25%';
     const data=buildExportData();pf.style.width='40%';
     if(exportType==='excel'){
       const xlCheck = checkPlanLimit('excel');
