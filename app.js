@@ -2118,7 +2118,78 @@ playScanSuccess();
   document.getElementById('scan-count').textContent=log.querySelectorAll('.log-item').length+' รายการ';
 }
 
-function submitManual(){const v=document.getElementById('manual-id').value.trim();if(v){recordScan(v);document.getElementById('manual-id').value='';}}
+function onManualIdInput(raw){
+  const box=document.getElementById('manual-id-suggestions');
+  if(!box) return;
+  const q=(raw||'').trim().toLowerCase();
+  if(!q){box.style.display='none';box.innerHTML='';return;}
+  const roomFilter=document.getElementById('scan-room-filter')?.value||'';
+  // ถ้าพิมพ์รหัสตรงกับนักเรียนแบบเป๊ะแล้ว ไม่ต้องโชว์ dropdown ให้กด Enter ยืนยันได้เลยเหมือนเดิม
+  const exactId=DB.students.find(s=>s.id.toLowerCase()===q&&(!roomFilter||s.room===roomFilter));
+  if(exactId){box.style.display='none';box.innerHTML='';return;}
+  let matches=DB.students.filter(s=>
+    (!roomFilter||s.room===roomFilter) &&
+    (s.id.toLowerCase().includes(q)||s.name.toLowerCase().includes(q))
+  ).slice(0,8);
+  if(!matches.length){
+    box.innerHTML='<div class="manual-suggest-empty">ไม่พบนักเรียนที่ตรงกับ "'+escapeHtml(raw)+'"</div>';
+    box.style.display='block';
+    return;
+  }
+  box.innerHTML=matches.map(s=>`<div class="manual-suggest-item" onclick="selectManualStudent('${s.id}')">
+    <div><div class="manual-suggest-name">${escapeHtml(s.name)}</div><div style="font-size:11px;color:var(--text3);">🪪 ${escapeHtml(s.id)}</div></div>
+    <div class="manual-suggest-meta">${escapeHtml(s.room||'-')}</div>
+  </div>`).join('');
+  box.style.display='block';
+}
+function hideManualSuggestions(){
+  const box=document.getElementById('manual-id-suggestions');
+  if(box) box.style.display='none';
+}
+function selectManualStudent(sid){
+  const input=document.getElementById('manual-id');
+  const s=DB.students.find(x=>x.id===sid);
+  if(input) input.value=sid;
+  hideManualSuggestions();
+  const scoreInput=document.getElementById('manual-score');
+  if(scoreInput) scoreInput.focus();
+}
+function submitManual(){
+  const input=document.getElementById('manual-id');
+  const v=(input.value||'').trim();
+  if(!v) return;
+  const roomFilter=document.getElementById('scan-room-filter')?.value||'';
+  // 1) ตรงกับรหัสนักเรียนแบบเป๊ะ (ของเดิม)
+  let stu=DB.students.find(s=>s.id===v&&(!roomFilter||s.room===roomFilter));
+  if(!stu){
+    const q=v.toLowerCase();
+    // 2) ตรงกับรหัส หรือ ชื่อ แบบเป๊ะ (ไม่สนตัวพิมพ์เล็ก/ใหญ่)
+    const exact=DB.students.filter(s=>(!roomFilter||s.room===roomFilter)&&(s.id.toLowerCase()===q||s.name.toLowerCase()===q));
+    if(exact.length===1){
+      stu=exact[0];
+    } else if(exact.length===0){
+      // 3) ค้นแบบบางส่วน (พิมพ์ชื่อ/รหัสไม่ครบ)
+      const partial=DB.students.filter(s=>(!roomFilter||s.room===roomFilter)&&(s.id.toLowerCase().includes(q)||s.name.toLowerCase().includes(q)));
+      if(partial.length===1){
+        stu=partial[0];
+      } else if(partial.length>1){
+        toast('พบหลายคนที่ตรงกับ "'+v+'" กรุณาเลือกจากรายการด้านล่าง','warn');
+        onManualIdInput(v);
+        return;
+      } else {
+        toast('ไม่พบนักเรียนที่ตรงกับ "'+v+'"','err');
+        return;
+      }
+    } else {
+      toast('พบหลายคนชื่อ/รหัสตรงกัน กรุณาเลือกจากรายการด้านล่าง','warn');
+      onManualIdInput(v);
+      return;
+    }
+  }
+  recordScan(stu.id);
+  input.value='';
+  hideManualSuggestions();
+}
 
 // ===== MOBILE UX HELPERS =====
 function dismissKeyboard(){

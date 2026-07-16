@@ -339,6 +339,13 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,1
 #reader{width:100%;}
 .manual-row{display:flex;gap:8px;margin-top:12px;}
 .manual-row input{flex:1;margin:0;}
+.manual-suggest-box{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:50;max-height:260px;overflow-y:auto;}
+.manual-suggest-item{padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--bg);}
+.manual-suggest-item:last-child{border-bottom:none;}
+.manual-suggest-item:hover,.manual-suggest-item:active{background:var(--purple-light);}
+.manual-suggest-name{font-size:14px;font-weight:700;color:var(--text);}
+.manual-suggest-meta{font-size:12px;color:var(--text3);white-space:nowrap;}
+.manual-suggest-empty{padding:12px 14px;font-size:13px;color:var(--text3);text-align:center;}
 
 /* ===== MANAGE TABS ===== */
 /* ===== [14] MANAGE TABS ===== */
