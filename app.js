@@ -378,12 +378,16 @@ async function loadFromSupabase() {
   if(!SB) return;
   // filter by teacher_id if logged in as teacher
   const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : null;
-  let stuQ = SB.from('students').select('*');
-  let hwQ = SB.from('homeworks').select('*').order('num');
-  let subQ = SB.from('submissions').select('*');
-  if(tid) { stuQ=stuQ.eq('teacher_id',tid); hwQ=hwQ.eq('teacher_id',tid); subQ=subQ.eq('teacher_id',tid); }
+  const tidFilter = q => tid ? q.eq('teacher_id', tid) : q;
 
-  const [stuRes, hwRes, subRes, setRes] = await Promise.all([stuQ, hwQ, subQ, SB.from('settings').select('*')]);
+  const [stuData, hwData, subData, setData] = await Promise.all([
+    sbFetchAll('students', tidFilter),
+    sbFetchAll('homeworks', tidFilter),
+    sbFetchAll('submissions', tidFilter),
+    sbFetchAll('settings')
+  ]);
+  hwData.sort((a,b)=>(a.num||0)-(b.num||0));
+  const stuRes = {data: stuData}, hwRes = {data: hwData}, subRes = {data: subData}, setRes = {data: setData};
 
   DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room}));
   DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||'', fileUrl: r.file_url||'', fileName: r.file_name||'', room: r.room||''}));
@@ -489,12 +493,33 @@ function showRealtimeDot() {
 function subKey(sid, hwNum, room) {
   return sid + '_' + hwNum + '_' + (room || '');
 }
+
+// Supabase/PostgREST จำกัดจำนวนแถวที่ได้ต่อ 1 คำขอไว้ที่ 1000 แถวเป็นค่า default
+// query ไหนที่ดึงข้อมูลทั้งหมดของครู (เช่น submissions ทุกห้อง) แล้วมีมากกว่า 1000 แถว
+// จะโดนตัดข้อมูลทิ้งแบบเงียบๆ โดยไม่ error — ทำให้ข้อมูลที่เพิ่งบันทึกใหม่หายไปจากหน้าครู
+// (แต่หน้านักเรียนซึ่ง query กรองด้วย student_id เจาะจงจะไม่โดนปัญหานี้ เพราะแถวไม่มีทางถึง 1000)
+// ฟังก์ชันนี้จึงวนดึงข้อมูลทีละหน้า (1000 แถว/หน้า) จนกว่าจะครบทุกแถวจริงๆ
+async function sbFetchAll(table, applyFilters) {
+  const PAGE = 1000;
+  let from = 0;
+  let all = [];
+  while (true) {
+    let q = SB.from(table).select('*');
+    if (applyFilters) q = applyFilters(q);
+    q = q.range(from, from + PAGE - 1);
+    const {data, error} = await q;
+    if (error) throw error;
+    all = all.concat(data || []);
+    if (!data || data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
+
 async function reloadSubmissions() {
   if(!SB) return;
   const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : null;
-  let q = SB.from('submissions').select('*');
-  if(tid) q = q.eq('teacher_id', tid);
-  const {data} = await q;
+  const data = await sbFetchAll('submissions', q => tid ? q.eq('teacher_id', tid) : q);
   const subs = {};
   (data||[]).forEach(r => {
     const key = subKey(r.student_id, r.hw_num, r.room);
@@ -508,9 +533,7 @@ async function reloadSubmissions() {
 async function reloadStudents() {
   if(!SB) return;
   const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : null;
-  let q = SB.from('students').select('*');
-  if(tid) q = q.eq('teacher_id', tid);
-  const {data} = await q;
+  const data = await sbFetchAll('students', q => tid ? q.eq('teacher_id', tid) : q);
   DB.students = (data||[]).map(r=>({id:r.id,name:r.name,room:r.room}));
   // รวมห้องจากนักเรียนเข้ากับห้องที่มีอยู่แล้ว (ไม่ทับของเดิม เพราะห้องที่ยังไม่มีนักเรียนต้องไม่หาย) + กรองค่าว่างออก
   const studentRooms = DB.students.map(s=>s.room).filter(Boolean);
@@ -522,9 +545,8 @@ async function reloadStudents() {
 async function reloadHomeworks() {
   if(!SB) return;
   const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : null;
-  let q = SB.from('homeworks').select('*').order('num');
-  if(tid) q = q.eq('teacher_id', tid);
-  const {data} = await q;
+  const data = await sbFetchAll('homeworks', q => tid ? q.eq('teacher_id', tid) : q);
+  data.sort((a,b)=>(a.num||0)-(b.num||0));
   DB.homeworks = (data||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||'',fileUrl:r.file_url||'',fileName:r.file_name||'',room:r.room||''}));
   // อัพเดต UI ทั้งหมด
   renderManage();
@@ -2601,16 +2623,13 @@ async function exportBackupData(){
   const tid = CURRENT_TEACHER.id;
   showActionPopup('กำลังสร้างไฟล์สำรอง','กรุณารอสักครู่...','add');
   try{
-    const [stuRes, hwRes, subRes, settingsRes] = await Promise.all([
-      SB.from('students').select('*').eq('teacher_id', tid),
-      SB.from('homeworks').select('*').eq('teacher_id', tid),
-      SB.from('submissions').select('*').eq('teacher_id', tid),
-      SB.from('settings').select('*')
+    const [stuData, hwData, subData, settingsData] = await Promise.all([
+      sbFetchAll('students', q => q.eq('teacher_id', tid)),
+      sbFetchAll('homeworks', q => q.eq('teacher_id', tid)),
+      sbFetchAll('submissions', q => q.eq('teacher_id', tid)),
+      sbFetchAll('settings')
     ]);
-    if(stuRes.error) throw stuRes.error;
-    if(hwRes.error) throw hwRes.error;
-    if(subRes.error) throw subRes.error;
-    if(settingsRes.error) throw settingsRes.error;
+    const stuRes = {data: stuData}, hwRes = {data: hwData}, subRes = {data: subData}, settingsRes = {data: settingsData};
 
     // คีย์ settings ที่ผูกกับครูคนนี้เท่านั้น (ลงท้ายด้วย uid ของตัวเอง) เช่น rooms_<uid>, subjects_<uid>, calendar_<uid>, cal_<uid>
     const suffix = '_'+tid;
