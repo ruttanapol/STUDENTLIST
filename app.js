@@ -2929,7 +2929,163 @@ function openEditHW(num){
 }
 
 // ===== RENDER MANAGE EXTENSIONS =====
+function renderStudentsListManage(){
+  const tbody=document.getElementById('sl-manage');
+  if(!tbody)return;
+  const q=(document.getElementById('manage-srch')?.value||'').trim().toLowerCase();
+  const roomFilter=document.getElementById('filter-room-manage')?.value||'';
+  const list=DB.students.filter(s=>
+    (!roomFilter||s.room===roomFilter) &&
+    (!q || s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q))
+  ).sort((a,b)=> (a.room||'').localeCompare(b.room||'','th',{numeric:true,sensitivity:'base'}) || a.id.localeCompare(b.id));
+  const cnt=document.getElementById('manage-stu-count');
+  if(cnt) cnt.textContent = list.length+' คน';
+  if(!list.length){
+    tbody.innerHTML=`<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--text3);font-size:13px;">ไม่พบนักเรียน</td></tr>`;
+    return;
+  }
+  tbody.innerHTML=list.map(s=>{
+    const hws=DB.homeworks.filter(h=>!h.room||h.room===s.room);
+    const doneCount=hws.filter(h=>DB.submissions[s.id+'_'+h.num]).length;
+    return `<tr>
+      <td style="font-size:12px;color:var(--text2);">${escapeHtml(s.id)}</td>
+      <td style="font-size:13px;font-weight:600;">${escapeHtml(s.name)}</td>
+      <td style="font-size:12px;color:var(--text2);">${escapeHtml(s.room||'-')}</td>
+      <td style="white-space:nowrap;">
+        <button onclick="openStudentScoreModal('${s.id}')" title="ค้นหา/แก้ไขคะแนนทุกชิ้นงาน" style="padding:5px 8px;font-size:11px;font-weight:700;border-radius:7px;border:1.5px solid var(--purple);background:var(--purple-light);color:var(--purple);cursor:pointer;">📊 ${doneCount}/${hws.length}</button>
+        <button onclick="openEditStu('${s.id}')" title="แก้ไขข้อมูลนักเรียน" style="padding:5px 8px;font-size:11px;font-weight:700;border-radius:7px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;margin-left:4px;">✏️</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ===== STUDENT SCORES MODAL (ค้นหานักเรียน -> ดู/แก้ไขคะแนนทุกชิ้นงานในที่เดียว) =====
+let _ssmSid=null;
+function openStudentScoreModal(sid){
+  const s=DB.students.find(x=>x.id===sid);
+  if(!s){toast('ไม่พบนักเรียน','err');return;}
+  _ssmSid=sid;
+  const info=document.getElementById('ssm-stu-info');
+  if(info) info.textContent=s.name+' · รหัส '+s.id+' · ห้อง '+(s.room||'-');
+  renderStudentScoreList();
+  document.getElementById('student-scores-modal').classList.add('on');
+}
+function closeStudentScoreModal(){
+  document.getElementById('student-scores-modal').classList.remove('on');
+  _ssmSid=null;
+}
+function renderStudentScoreList(){
+  const list=document.getElementById('ssm-list');
+  const s=DB.students.find(x=>x.id===_ssmSid);
+  if(!list||!s)return;
+  const hws=DB.homeworks.filter(h=>!h.room||h.room===s.room).sort((a,b)=>a.num-b.num);
+  if(!hws.length){
+    list.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:16px;">ห้องนี้ยังไม่มีชิ้นงาน</div>';
+    return;
+  }
+  list.innerHTML=hws.map(h=>{
+    const sub=DB.submissions[s.id+'_'+h.num];
+    const hasSub=!!sub;
+    const scoreVal=hasSub&&sub.score!==null&&sub.score!==undefined?sub.score:'';
+    const statusBadge=hasSub
+      ?'<span style="color:var(--green-dark);font-weight:700;">✅ ส่งแล้ว</span>'
+      :'<span style="color:var(--text3);">⬜ ยังไม่ส่ง</span>';
+    return `<div class="ssm-row" data-num="${h.num}" style="display:flex;align-items:center;gap:8px;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:#fff;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">ครั้งที่ ${h.num}: ${escapeHtml(h.title)}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px;">${escapeHtml(h.subject||'ไม่ระบุวิชา')} · เต็ม ${h.maxScore||100} · ${statusBadge}</div>
+      </div>
+      <input type="number" class="ssm-score-input" data-orig="${scoreVal}" min="0" max="${h.maxScore||100}" placeholder="${hasSub?'✓':'—'}" value="${scoreVal}" oninput="markSSMDirty(this)" style="width:64px;padding:8px 6px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;text-align:center;font-family:Sarabun,sans-serif;flex-shrink:0;">
+      <button onclick="saveOneStudentScore(${h.num})" title="บันทึกคะแนนชิ้นนี้" style="padding:8px 9px;font-size:13px;border-radius:8px;border:none;background:var(--blue-light);color:var(--blue-dark);cursor:pointer;flex-shrink:0;">💾</button>
+      ${hasSub?`<button onclick="clearOneStudentScore(${h.num})" title="ลบการส่ง" style="padding:8px 9px;font-size:13px;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;flex-shrink:0;">🗑️</button>`:''}
+    </div>`;
+  }).join('');
+}
+function markSSMDirty(input){
+  const row=input.closest('.ssm-row');
+  if(row) row.style.borderColor = input.value!==input.dataset.orig ? 'var(--purple)' : 'var(--border)';
+}
+async function saveOneStudentScore(num){
+  const s=DB.students.find(x=>x.id===_ssmSid);
+  if(!s)return;
+  const row=document.querySelector(`.ssm-row[data-num="${num}"]`);
+  const input=row?.querySelector('.ssm-score-input');
+  if(!input)return;
+  const hw=DB.homeworks.find(h=>h.num===num&&(!h.room||h.room===s.room));
+  if(!hw){toast('ไม่พบชิ้นงานนี้','err');return;}
+  const raw=input.value.trim();
+  if(raw!==''){
+    const val=parseFloat(raw);
+    if(isNaN(val)){toast('กรอกตัวเลขคะแนน','warn');return;}
+    if(val<0||val>(hw.maxScore||100)){toast('คะแนนต้องอยู่ระหว่าง 0-'+(hw.maxScore||100),'warn');return;}
+  }
+  const score=raw===''?null:parseFloat(raw);
+  try{
+    await sbRecordSubmission({sid:s.id,hwNum:num,hwTitle:hw.title,room:s.room,score,maxScore:hw.maxScore||100});
+    toast('บันทึกคะแนนแล้ว ✅');
+    renderStudentScoreList();
+    renderStudentsListManage();
+  }catch(e){
+    toast('บันทึกไม่สำเร็จ: '+e.message,'err');
+  }
+}
+async function clearOneStudentScore(num){
+  const s=DB.students.find(x=>x.id===_ssmSid);
+  if(!s)return;
+  if(!confirm('ลบการส่งงานชิ้นนี้ของ '+s.name+'?'))return;
+  try{
+    if(USE_SUPABASE&&SB){
+      const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';
+      const{error}=await SB.from('submissions').delete().eq('student_id',s.id).eq('hw_num',num).eq('teacher_id',tid);
+      if(error)throw error;
+      await reloadSubmissions();
+    }else{
+      delete DB.submissions[s.id+'_'+num];
+      saveDB();
+    }
+    renderDashboard();
+    toast('ลบการส่งแล้ว');
+    renderStudentScoreList();
+    renderStudentsListManage();
+  }catch(e){
+    toast('ลบไม่สำเร็จ: '+e.message,'err');
+  }
+}
+async function saveAllStudentScores(){
+  const s=DB.students.find(x=>x.id===_ssmSid);
+  if(!s)return;
+  const rows=[...document.querySelectorAll('#ssm-list .ssm-row')];
+  const changed=rows.filter(r=>{
+    const input=r.querySelector('.ssm-score-input');
+    return input&&input.value!==input.dataset.orig;
+  });
+  if(!changed.length){toast('ไม่มีรายการที่แก้ไข','warn');return;}
+  showActionPopup('กำลังบันทึกคะแนน',s.name+' · '+changed.length+' รายการ','edit');
+  let ok=0,fail=0;
+  for(const row of changed){
+    const num=parseInt(row.dataset.num);
+    const input=row.querySelector('.ssm-score-input');
+    const hw=DB.homeworks.find(h=>h.num===num&&(!h.room||h.room===s.room));
+    if(!hw){fail++;continue;}
+    const raw=input.value.trim();
+    if(raw!==''){
+      const val=parseFloat(raw);
+      if(isNaN(val)||val<0||val>(hw.maxScore||100)){fail++;continue;}
+    }
+    const score=raw===''?null:parseFloat(raw);
+    try{
+      await sbRecordSubmission({sid:s.id,hwNum:num,hwTitle:hw.title,room:s.room,score,maxScore:hw.maxScore||100});
+      ok++;
+    }catch(e){fail++;}
+  }
+  renderStudentScoreList();
+  renderStudentsListManage();
+  if(fail===0) actionPopupDone('บันทึกคะแนนแล้ว ✅',s.name+' · สำเร็จ '+ok+' รายการ','edit');
+  else actionPopupError('บันทึกสำเร็จ '+ok+' รายการ ผิดพลาด '+fail+' รายการ');
+}
+
 function renderManage(){
+  renderStudentsListManage();
   renderPlanLimitBadges();
   renderSubjectsFull();
   // populate วิชาใน form เพิ่มงาน
