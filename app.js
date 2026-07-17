@@ -2122,8 +2122,19 @@ function onManualIdInput(raw){
   const box=document.getElementById('manual-id-suggestions');
   if(!box) return;
   const q=(raw||'').trim().toLowerCase();
-  if(!q){box.style.display='none';box.innerHTML='';return;}
   const roomFilter=document.getElementById('scan-room-filter')?.value||'';
+  if(!q){
+    // ยังไม่ได้พิมพ์อะไร: ถ้าเลือกห้องไว้แล้ว โชว์รายชื่อทั้งห้องให้เลือกได้เลย (ไม่ต้องพิมพ์)
+    if(!roomFilter){box.style.display='none';box.innerHTML='';return;}
+    const roomList=DB.students.filter(s=>s.room===roomFilter).sort((a,b)=>a.name.localeCompare(b.name,'th'));
+    if(!roomList.length){box.style.display='none';box.innerHTML='';return;}
+    box.innerHTML=roomList.map(s=>`<div class="manual-suggest-item" onclick="selectManualStudent('${s.id}')">
+      <div><div class="manual-suggest-name">${escapeHtml(s.name)}</div><div style="font-size:11px;color:var(--text3);">🪪 ${escapeHtml(s.id)}</div></div>
+      <div class="manual-suggest-meta">${escapeHtml(s.room||'-')}</div>
+    </div>`).join('');
+    box.style.display='block';
+    return;
+  }
   // ถ้าพิมพ์รหัสตรงกับนักเรียนแบบเป๊ะแล้ว ไม่ต้องโชว์ dropdown ให้กด Enter ยืนยันได้เลยเหมือนเดิม
   const exactId=DB.students.find(s=>s.id.toLowerCase()===q&&(!roomFilter||s.room===roomFilter));
   if(exactId){box.style.display='none';box.innerHTML='';return;}

@@ -938,6 +938,7 @@ CREATE POLICY "teachers_delete_admin_only" ON teachers FOR DELETE
         <div style="position:relative;flex:1;">
           <input type="text" id="manual-id" placeholder="รหัส หรือ ชื่อนักเรียน..." autocomplete="off"
             oninput="onManualIdInput(this.value)"
+            onfocus="onManualIdInput(this.value)"
             onkeydown="if(event.key==='Enter'){event.preventDefault();submitManual();}"
             onblur="setTimeout(hideManualSuggestions,150)" style="margin:0;width:100%;box-sizing:border-box;">
           <div id="manual-id-suggestions" class="manual-suggest-box" style="display:none;"></div>
