@@ -493,6 +493,17 @@ function showRealtimeDot() {
 function subKey(sid, hwNum, room) {
   return sid + '_' + hwNum + '_' + (room || '');
 }
+// คะแนนเต็มที่แท้จริงต้องยึดจาก "ชิ้นงานปัจจุบัน" (h.maxScore) เป็นหลักเสมอ
+// ค่า sub.maxScore ที่บันทึกไว้ตอนตรวจอาจเป็นค่าเก่า/ผิดพลาดจากก่อนมีการตรวจสอบ ใช้เป็นแค่ fallback เท่านั้น
+function authMaxScore(h, sub) {
+  return (h && h.maxScore) || (sub && sub.maxScore) || 100;
+}
+// คะแนนที่ "นับ" ของชิ้นงานหนึ่ง: ถ้ายังไม่มีคะแนนเจาะจงถือว่าได้เต็ม, ถ้ามีคะแนนแต่เกินคะแนนเต็ม (ข้อมูลเก่าที่ผิดพลาด) ให้ตัดไม่ให้เกิน
+function clampedItemScore(sub, max) {
+  if (sub.score === null || sub.score === undefined) return max;
+  const sc = Number(sub.score) || 0;
+  return sc > max ? max : sc;
+}
 
 // Supabase/PostgREST จำกัดจำนวนแถวที่ได้ต่อ 1 คำขอไว้ที่ 1000 แถวเป็นค่า default
 // query ไหนที่ดึงข้อมูลทั้งหมดของครู (เช่น submissions ทุกห้อง) แล้วมีมากกว่า 1000 แถว
@@ -1961,7 +1972,7 @@ function renderStudentView(s, stuDB){
           ? `<div class="hw-status-ok">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>
               ${sub.score!==null&&sub.score!==undefined
-                ? sub.score+'/'+(sub.maxScore||h.maxScore||100)+' คะแนน'
+                ? sub.score+'/'+authMaxScore(h,sub)+' คะแนน'
                 : '✓ ส่งแล้ว'}
             </div>`
           : `<div class="hw-status-no">
@@ -2426,7 +2437,7 @@ function renderTable(){
         <div style="text-align:right;font-size:14px;margin-top:2px;">
           <span style="font-weight:700;color:var(--green-dark);font-size:16px;">${done}</span>
           <span style="color:var(--text3);">/${stuHWs.length}</span>
-          ${(()=>{let sc=0,mx=0;stuHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub){const ms=sub.maxScore||h.maxScore||100;sc+=(sub.score!==null&&sub.score!==undefined?sub.score:ms);mx+=ms;}else{mx+=h.maxScore||100;}});return mx>0?`<span style="font-size:12px;color:var(--purple);font-weight:700;margin-left:4px;">${sc}/${mx}</span>`:'';})()}
+          ${(()=>{let sc=0,mx=0;stuHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub){const ms=authMaxScore(h,sub);sc+=clampedItemScore(sub,ms);mx+=ms;}else{mx+=h.maxScore||100;}});return mx>0?`<span style="font-size:12px;color:var(--purple);font-weight:700;margin-left:4px;">${sc}/${mx}</span>`:'';})()}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin:8px 0 4px;">
@@ -2452,7 +2463,7 @@ function showDetail(sid){
       <button onclick="document.getElementById('detail-panel').style.display='none'" style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;color:var(--text2);display:flex;align-items:center;justify-content:center;">✕</button>
     </div>
     <div style="font-size:13px;font-weight:700;color:var(--green-dark);margin-bottom:6px;">✅ ส่งแล้ว (${done.length})</div>
-    ${done.map(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const scoreStr=(sub.score!==null&&sub.score!==undefined)?`<span style="font-size:12px;font-weight:700;color:var(--purple);background:var(--purple-light);padding:2px 8px;border-radius:10px;">${sub.score}/${sub.maxScore||h.maxScore||100}</span>`:'';;return `<div class="ds-row"><span>${escapeHtml(h.title)} ${scoreStr}</span><span style="font-size:12px;color:var(--text3);">${sub.ts}</span></div>`;}).join('')||'<div style="font-size:13px;color:var(--text3);padding:6px 0;">ยังไม่มี</div>'}
+    ${done.map(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const scoreStr=(sub.score!==null&&sub.score!==undefined)?`<span style="font-size:12px;font-weight:700;color:var(--purple);background:var(--purple-light);padding:2px 8px;border-radius:10px;">${sub.score}/${authMaxScore(h,sub)}</span>`:'';;return `<div class="ds-row"><span>${escapeHtml(h.title)} ${scoreStr}</span><span style="font-size:12px;color:var(--text3);">${sub.ts}</span></div>`;}).join('')||'<div style="font-size:13px;color:var(--text3);padding:6px 0;">ยังไม่มี</div>'}
     <div style="font-size:13px;font-weight:700;color:var(--red);margin:12px 0 6px;">❌ ยังไม่ส่ง (${miss.length})</div>
     ${miss.map(h=>`<div class="ds-row"><span>${escapeHtml(h.title)}</span><span style="font-size:12px;color:var(--text2);">${escapeHtml(h.subject)}</span></div>`).join('')||'<div style="font-size:13px;color:var(--green-dark);padding:6px 0;">🎉 ส่งครบทุกชิ้น!</div>'}
   </div>`;
@@ -2990,7 +3001,7 @@ function buildExportData(){
     const rows=students.map((s,idx)=>{
       const row={เลขที่:idx+1,เลขประจำตัว:s.id,'ชื่อ-นามสกุล':s.name,ห้อง:s.room};
       let totalScore=0,totalMax=0,doneCount=0;
-      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const maxScore=sub?.maxScore||h.maxScore||100;if(sub){doneCount++;const sc=(sub.score!==null&&sub.score!==undefined)?sub.score:maxScore;totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:'✓';}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
+      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:'✓';}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
       row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
       row['คะแนนรวม']=totalScore;
       row['คะแนนเต็มรวม']=hwTotalMax;
@@ -5210,7 +5221,7 @@ function renderPrimaryGrade() {
     let hwTotal=0, hwMax=0;
     hws.forEach(h => {
       const sub = DB.submissions[subKey(s.id,h.num,h.room)];
-      if(sub?.score!=null){hwTotal+=parseFloat(sub.score)||0;hwMax+=parseFloat(sub.maxScore||h.maxScore||100);}
+      if(sub?.score!=null){const ms=authMaxScore(h,sub);hwTotal+=Math.min(parseFloat(sub.score)||0,ms);hwMax+=ms;}
       else hwMax+=parseFloat(h.maxScore||100);
     });
     const hwPct = hwMax>0?(hwTotal/hwMax)*100:0;
@@ -5273,7 +5284,7 @@ async function exportPrimaryGradeExcel() {
   const wsData=[['ลำดับ','รหัส','ชื่อ','ห้อง','คะแนนงาน%','คะแนนสอบ','รวม','เกรด','GPA'],
     ...students.map((s,i)=>{
       let hwTotal=0,hwMax=0;
-      hws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){hwTotal+=parseFloat(sub.score)||0;hwMax+=parseFloat(sub.maxScore||h.maxScore||100);}else hwMax+=parseFloat(h.maxScore||100);});
+      hws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);hwTotal+=Math.min(parseFloat(sub.score)||0,ms);hwMax+=ms;}else hwMax+=parseFloat(h.maxScore||100);});
       const hwPct=hwMax>0?(hwTotal/hwMax)*100:0;
       const exam=examMatched[s.id]??null;
       const total=exam!==null?(hwPct*0.5+exam*0.5):hwPct;
@@ -5337,12 +5348,12 @@ function renderSecGrade() {
   const rows=students.map(s=>{
     // คะแนนก่อนกลาง
     let pre=0,preMax=0;
-    preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){pre+=parseFloat(sub.score)||0;preMax+=parseFloat(sub.maxScore||h.maxScore||100);}else preMax+=parseFloat(h.maxScore||100);});
+    preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
     const prePct=preMax>0?(pre/preMax)*100:0;
 
     // คะแนนหลังกลาง
     let post=0,postMax=0;
-    postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){post+=parseFloat(sub.score)||0;postMax+=parseFloat(sub.maxScore||h.maxScore||100);}else postMax+=parseFloat(h.maxScore||100);});
+    postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
     const postPct=postMax>0?(post/postMax)*100:0;
 
     const midScore=midMatched[s.id]??null;
@@ -5417,9 +5428,9 @@ async function exportSecGradeExcel() {
   const wb=XLSX.utils.book_new();
   const wsData=[['ลำดับ','รหัส','ชื่อ','ห้อง','ก่อนกลาง%','กลางภาค','หลังกลาง%','ปลายภาค','รวม','เกรด','GPA'],
     ...students.map((s,i)=>{
-      let pre=0,preMax=0; preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){pre+=parseFloat(sub.score)||0;preMax+=parseFloat(sub.maxScore||h.maxScore||100);}else preMax+=parseFloat(h.maxScore||100);});
+      let pre=0,preMax=0; preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
       const prePct=preMax>0?(pre/preMax)*100:0;
-      let post=0,postMax=0; postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){post+=parseFloat(sub.score)||0;postMax+=parseFloat(sub.maxScore||h.maxScore||100);}else postMax+=parseFloat(h.maxScore||100);});
+      let post=0,postMax=0; postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
       const postPct=postMax>0?(post/postMax)*100:0;
       const mid=midMatched[s.id]??null; const fin=finMatched[s.id]??null;
       let total=prePct*wPre+postPct*wPost+(mid!==null?mid*wMid:0)+(fin!==null?fin*wFin:0);
@@ -5520,7 +5531,7 @@ function renderScanHistory() {
 
   el.innerHTML = subs.map(({sid, hwNum, stu, hw, sub, key}) => {
     const score = sub.score !== null && sub.score !== undefined ? sub.score : null;
-    const maxScore = sub.maxScore || hw?.maxScore || 100;
+    const maxScore = authMaxScore(hw, sub);
     const pct = score !== null ? Math.round(score/maxScore*100) : null;
     const timeStr = sub.submitted_at
       ? new Date(sub.submitted_at).toLocaleString('th-TH', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
@@ -5556,7 +5567,7 @@ function openEditScoreById(sid, hwNum) {
   openEditScore({
     sid, hwNum,
     currentScore: sub.score !== null && sub.score !== undefined ? sub.score : null,
-    maxScore: sub.maxScore || hw?.maxScore || 100,
+    maxScore: authMaxScore(hw, sub),
     stuName: stu.name,
     hwTitle: hw?.title || sub.hwTitle || ''
   });
