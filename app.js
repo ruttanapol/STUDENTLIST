@@ -1850,6 +1850,24 @@ function logout(){
 
 let _currentStuDB = null;   // temp DB for student view
 let _currentStuTeacher = null; // teacher info for student view
+let _stuTotalScore = 0, _stuTotalMax = 0; // คะแนนดิบปัจจุบันของนักเรียน ใช้กับตัวแปลงคะแนน
+function calcGradeConversion(){
+  const input=document.getElementById('grade-conv-input');
+  const result=document.getElementById('grade-conv-result');
+  if(!input||!result) return;
+  const target=parseFloat(input.value);
+  if(input.value===''||isNaN(target)||target<=0){
+    result.innerHTML='';
+    return;
+  }
+  if(!_stuTotalMax){
+    result.innerHTML='';
+    return;
+  }
+  const converted=(_stuTotalScore/_stuTotalMax)*target;
+  const rounded=Math.round(converted*100)/100;
+  result.innerHTML=`ถ้าคะแนนเต็มรวมคือ <b>${target}</b> คุณจะได้ <b style="color:var(--purple);font-size:16px;">${rounded}</b> คะแนน (จาก ${target})`;
+}
 
 function renderStudentView(s, stuDB){
   const db=stuDB||{student:s,homeworks:DB.homeworks,submissions:DB.submissions};
@@ -1862,24 +1880,43 @@ function renderStudentView(s, stuDB){
   const miss=roomHWs.filter(h=>!db.submissions[subKey(s.id,h.num,h.room)]);
   const pct=roomHWs.length?Math.round(done.length/roomHWs.length*100):0;
 
-  // ===== รวมคะแนนทั้งหมดของนักเรียน (นับคะแนนเต็มจากทุกชิ้นที่ส่งแล้ว, คะแนนที่ได้นับเฉพาะชิ้นที่ตรวจแล้ว) =====
+  // ===== รวมคะแนนทั้งหมดของนักเรียน =====
+  // ชิ้นที่ส่งแล้วแต่ยังไม่มีคะแนนตัวเลข (แค่ติ๊กถูกว่าส่งแล้ว) ให้นับเป็นคะแนนเต็มของชิ้นนั้น
+  // (ใช้หลักการเดียวกับหน้าครู/PDF export: ส่งแล้ว = ได้คะแนนเต็ม ถ้ายังไม่ได้ระบุคะแนนเจาะจง)
   const gradedHWs=done.filter(h=>{
     const sub=db.submissions[subKey(s.id,h.num,h.room)];
     return sub.score!==null && sub.score!==undefined;
   });
-  const totalScore=gradedHWs.reduce((sum,h)=>sum+Number(db.submissions[subKey(s.id,h.num,h.room)].score),0);
+  const pendingCount=done.length-gradedHWs.length;
+  const totalScore=done.reduce((sum,h)=>{
+    const sub=db.submissions[subKey(s.id,h.num,h.room)];
+    const ms=Number(h.maxScore||sub.maxScore||100);
+    const sc=(sub.score!==null&&sub.score!==undefined)?Number(sub.score):ms;
+    return sum+sc;
+  },0);
   const totalMax=done.reduce((sum,h)=>{
     const sub=db.submissions[subKey(s.id,h.num,h.room)];
     return sum+Number(h.maxScore||sub.maxScore||100);
   },0);
   const scorePct=totalMax?Math.round(totalScore/totalMax*100):0;
-  const pendingCount=done.length-gradedHWs.length;
+  // เก็บไว้ใช้ในตัวแปลงคะแนน (ทดลองเทียบเป็นคะแนนเต็มอื่น)
+  _stuTotalScore=totalScore; _stuTotalMax=totalMax;
 
   let html=`<div class="score-hero">
     <div class="score-hero-lbl">🏆 คะแนนรวมทั้งหมด</div>
     <div class="score-hero-num">${totalScore}<span>/${totalMax}</span></div>
     <div class="score-hero-sub">${done.length?`ได้ ${scorePct}% จากงานที่ส่งแล้ว ${done.length} ชิ้น${pendingCount?` (รอตรวจ ${pendingCount} ชิ้น)`:''}`:'ยังไม่มีงานที่ส่ง'}</div>
   </div>
+  ${totalMax?`<div class="card" style="margin-bottom:14px;">
+    <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;">🧮 ลองเทียบคะแนน</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">คะแนนดิบตอนนี้ของคุณคือ <b style="color:var(--purple);">${totalScore}/${totalMax}</b> — อยากรู้ว่าถ้าคะแนนเต็มรวมเปลี่ยนเป็นเท่าไหร่ คุณจะได้กี่คะแนน ลองกรอกด้านล่างได้เลย</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <input type="number" id="grade-conv-input" inputmode="decimal" placeholder="เช่น 30" min="0"
+        oninput="calcGradeConversion()" style="flex:1;margin:0;text-align:center;font-weight:700;">
+      <span style="font-size:13px;color:var(--text3);">คะแนน</span>
+    </div>
+    <div id="grade-conv-result" style="margin-top:10px;font-size:14px;color:var(--text2);"></div>
+  </div>`:''}
   <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;">
     <div class="scard" style="background:linear-gradient(135deg,#DCFCE7,#BBF7D0);border:1.5px solid #86EFAC;"><div class="snum" style="color:#16A34A;">${done.length}</div><div class="slbl">✅ ส่งแล้ว</div></div>
     <div class="scard" style="background:linear-gradient(135deg,#FEE2E2,#FECACA);border:1.5px solid #FCA5A5;"><div class="snum" style="color:#B91C1C;">${miss.length}</div><div class="slbl">❌ ยังไม่ส่ง</div></div>
