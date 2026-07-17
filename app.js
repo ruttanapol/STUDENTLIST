@@ -2005,14 +2005,17 @@ function populateScanSelects(){
   const ss=document.getElementById('hw-subj-input');
   if(ss)ss.innerHTML=getSubjectNames().map(n=>`<option>${n}</option>`).join('');
   const saved=lsGet('hw_current');
-  if(saved){
+  // ใช้ค่าที่จำไว้ได้ก็ต่อเมื่อเป็นห้องเดียวกับที่กำลังเลือกอยู่ตอนนี้เท่านั้น
+  // (ป้องกันคะแนนเต็มของห้องอื่นเล็ดลอดมาใช้กับห้องปัจจุบัน เพราะ "เลขที่งาน" ซ้ำกันได้ข้ามห้อง)
+  if(saved && saved.room===_hwRoom){
     if(document.getElementById('hw-num-input'))document.getElementById('hw-num-input').value=saved.num||'';
     if(document.getElementById('hw-title-input'))document.getElementById('hw-title-input').value=saved.title||'';
     if(ss&&saved.subject)ss.value=saved.subject;
     const msEl=document.getElementById('hw-maxscore-input');
     if(msEl&&saved.maxScore)msEl.value=saved.maxScore;
   } else if(DB.homeworks.length){
-    const h=DB.homeworks[0];
+    const roomHWs=DB.homeworks.filter(h=>!_hwRoom||h.room===_hwRoom);
+    const h=roomHWs[0]||DB.homeworks[0];
     if(document.getElementById('hw-num-input'))document.getElementById('hw-num-input').value=h.num;
     if(document.getElementById('hw-title-input'))document.getElementById('hw-title-input').value=h.title;
     if(ss)ss.value=h.subject;
@@ -2036,7 +2039,7 @@ async function onHWFieldChange(){
     const isNewHWAutoSave=!DB.homeworks.find(h=>h.num===num&&h.room===_hwRoom);
     if(isNewHWAutoSave){const autoSaveLimit=checkPlanLimit('homework');if(!autoSaveLimit.ok){toast(autoSaveLimit.msg,'warn');return;}}
     await sbAddHomework({num,title,subject,maxScore,room:_hwRoom});
-    lsSet('hw_current',{num,title,subject,maxScore});
+    lsSet('hw_current',{num,title,subject,maxScore,room:_hwRoom});
     if(badge){badge.style.display='';setTimeout(()=>badge.style.display='none',2000);}
     updateConflictWarn();
   },600);
@@ -2066,7 +2069,7 @@ async function recordScan(sid, scoreOverride){
   if(!checkFeatureGate('barcode_scan','สแกนบาร์โค้ด', false)) return;
   const hwNum=parseInt(document.getElementById('hw-num-input').value)||1;
   const hwTitle=document.getElementById('hw-title-input').value.trim()||'ชิ้นที่ '+hwNum;
-  const maxScore=parseInt(document.getElementById('hw-maxscore-input')?.value)||100;
+  const formMaxScore=parseInt(document.getElementById('hw-maxscore-input')?.value)||100;
   let score=null;
   if(scoreOverride!==undefined&&scoreOverride!==null&&scoreOverride!==''){
     score=parseFloat(scoreOverride);
@@ -2082,6 +2085,10 @@ async function recordScan(sid, scoreOverride){
     }
   }
   const stu=DB.students.find(s=>s.id===sid);
+  // ใช้คะแนนเต็มจากข้อมูลชิ้นงานจริง (ตรงห้อง+เลขที่งาน) เป็นหลักเสมอ ไม่เชื่อค่าที่ค้างอยู่ในฟอร์ม/localStorage
+  // เพราะ "เลขที่งาน" ซ้ำกันได้ข้ามห้อง ค่าเต็มที่ค้างมาจากห้องอื่นอาจไม่ตรงกับชิ้นงานจริงที่กำลังตรวจ
+  const hwRecord = stu ? DB.homeworks.find(h=>h.num===hwNum && h.room===stu.room) : null;
+  const maxScore = hwRecord ? (hwRecord.maxScore||100) : formMaxScore;
   const key=subKey(sid,hwNum,stu?stu.room:'');
   const log=document.getElementById('scan-log');
   const empty=log.querySelector('.empty');
@@ -2093,6 +2100,11 @@ async function recordScan(sid, scoreOverride){
     item.innerHTML=`<div class="log-main"><div>รหัส <b>${sid}</b></div><div class="log-sub">ไม่พบในระบบ</div></div><span class="badge b-err">ไม่พบ</span>`;
     log.prepend(item);
     toast('ไม่พบรหัส '+sid,'err');
+  } else if(score!==null&&!isNaN(score)&&score>maxScore){
+    // กันคะแนนเกินคะแนนเต็ม (เช่น 19/18) ซึ่งเกิดจากพิมพ์ผิดหรือคะแนนเต็มที่ใช้ตอนกรอกไม่ตรงกับชิ้นงานจริง
+    item.innerHTML=`<div class="log-main"><div style="font-weight:700;">${escapeHtml(stu.name)}</div><div class="log-sub">คะแนน ${score} เกินคะแนนเต็ม ${maxScore} ของชิ้นที่ ${hwNum}</div></div><span class="badge b-err">เกินคะแนนเต็ม</span>`;
+    log.prepend(item);
+    toast(`คะแนน ${score} เกินคะแนนเต็ม (${maxScore}) กรุณาตรวจสอบก่อนบันทึก`,'err');
   } else if(DB.submissions[key]&&scoreOverride===undefined){
     item.innerHTML=`<div class="log-main"><div style="font-weight:700;">${escapeHtml(stu.name)}</div><div class="log-sub">งานชิ้นที่ ${hwNum} ส่งซ้ำ</div></div><span class="badge b-dup">ซ้ำ</span>`;
     log.prepend(item);
@@ -4250,7 +4262,7 @@ function selectHWFromDropdown(val){if(!val){document.getElementById('hw-selected
   document.getElementById('hw-detail-max').textContent = scorePerHW;
   document.getElementById('hw-selected-detail').style.display = 'block';
 
-  lsSet('hw_current',{num:hw.num,title:hw.title,subject:hw.subject,maxScore:scorePerHW});
+  lsSet('hw_current',{num:hw.num,title:hw.title,subject:hw.subject,maxScore:scorePerHW,room:hw.room||_hwRoom});
   const badge = document.getElementById('hw-save-badge');
   if(badge){badge.style.display='';setTimeout(()=>badge.style.display='none',1500);}
 }
