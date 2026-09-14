@@ -6180,12 +6180,12 @@ function _gsRender(){
   var rtbl=document.createElement('table');rtbl.style.cssText='border-collapse:collapse;table-layout:fixed;';
   var rhd=document.createElement('thead');var rhr=document.createElement('tr');
   hws.forEach(function(h){
-    var th=document.createElement('th');th.style.cssText='background:#EFF6FF;border:1px solid #BFDBFE;width:'+CELL_W+'px;min-width:'+CELL_W+'px;height:52px;padding:0;position:sticky;top:0;z-index:1;';
+    var th=document.createElement('th');th.style.cssText='background:#EFF6FF;border:1px solid #BFDBFE;width:'+CELL_W+'px;min-width:'+CELL_W+'px;height:52px;padding:0;';
     var fi='gsfi_'+h.num;
     th.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;padding:4px 3px;gap:2px;"><div style="font-size:11px;font-weight:800;color:#1E40AF;">งาน '+h.num+'</div><div style="font-size:9px;color:#64748B;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+h.title+'">'+h.title+'</div><div style="display:flex;gap:3px;align-items:center;"><input id="'+fi+'" type="number" min="0" max="'+(h.maxScore||100)+'" placeholder="'+(h.maxScore||100)+'" style="width:34px;height:20px;border:1.5px solid #BFDBFE;border-radius:5px;text-align:center;font-size:10px;font-family:Sarabun,sans-serif;"><button onclick="_gsColFill('+h.num+','+(h.maxScore||100)+')" style="padding:2px 5px;background:#2563EB;color:#fff;border:none;border-radius:5px;font-size:9px;cursor:pointer;font-family:Sarabun,sans-serif;font-weight:700;">ทั้งหมด</button></div></div>';
     rhr.appendChild(th);
   });
-  var tht=document.createElement('th');tht.style.cssText='background:#FAF5FF;border:1px solid #DDD6FE;width:70px;min-width:70px;height:52px;font-size:11px;color:#7C3AED;font-weight:700;text-align:center;position:sticky;top:0;z-index:1;';
+  var tht=document.createElement('th');tht.style.cssText='background:#FAF5FF;border:1px solid #DDD6FE;width:70px;min-width:70px;height:52px;font-size:11px;color:#7C3AED;font-weight:700;text-align:center;';
   tht.innerHTML='รวม<br><span style="font-weight:400;font-size:10px;">/'+totalMax+'</span>';
   rhr.appendChild(tht);rhd.appendChild(rhr);rtbl.appendChild(rhd);
   var rtbd=document.createElement('tbody');
@@ -6220,28 +6220,29 @@ function _gsRender(){
     tdt.style.cssText='border:1px solid #DDD6FE;width:70px;min-width:70px;height:'+ROW_H+'px;text-align:center;font-weight:700;font-size:13px;color:#7C3AED;background:#FAF5FF;';
     tdt.textContent=rowTotal+'/'+totalMax;tr.appendChild(tdt);rtbd.appendChild(tr);
   });
-  rtbl.appendChild(rtbd);rp.innerHTML='';rp.appendChild(rtbl);
-  // sync หลาย step เผื่อ font/image ยังโหลดไม่เสร็จ
+  rtbl.appendChild(rtbl&&rtbd);rp.innerHTML='';rp.appendChild(rtbl);
   setTimeout(_gsSyncH,80);
-  setTimeout(_gsSyncH,300);
-  setTimeout(_gsSyncH,800);
+  setTimeout(_gsSyncH,350);
 }
 function _gsSyncH(){
-  // reset ก่อน แล้วค่อยอ่าน height จริง
-  var lrows=[].slice.call(document.querySelectorAll('#gs-lp tbody tr'));
-  var rrows=[].slice.call(document.querySelectorAll('#gs-rp tbody tr'));
-  var n=Math.min(lrows.length,rrows.length);
-  for(var i=0;i<n;i++){lrows[i].style.height='';rrows[i].style.height='';}
-  // double rAF — รอให้ browser layout เสร็จ 2 รอบ
-  requestAnimationFrame(function(){requestAnimationFrame(function(){
+  requestAnimationFrame(function(){
+    var lrows=[].slice.call(document.querySelectorAll('#gs-lp tbody tr'));
+    var rrows=[].slice.call(document.querySelectorAll('#gs-rp tbody tr'));
+    var n=Math.min(lrows.length,rrows.length);
     for(var i=0;i<n;i++){
-      var lh=lrows[i].getBoundingClientRect().height;
-      var rh=rrows[i].getBoundingClientRect().height;
+      // อ่านจาก td ซึ่งไม่เคย reset
+      var ltds=[].slice.call(lrows[i].querySelectorAll('td'));
+      var rtds=[].slice.call(rrows[i].querySelectorAll('td'));
+      var lh=ltds.reduce(function(m,t){return Math.max(m,t.scrollHeight);},44);
+      var rh=rtds.reduce(function(m,t){return Math.max(m,t.scrollHeight);},44);
       var h=Math.max(lh,rh,48);
+      // set ทั้ง tr และ td ให้ตรงกัน
       lrows[i].style.height=h+'px';
       rrows[i].style.height=h+'px';
+      ltds.forEach(function(t){t.style.height=h+'px';});
+      rtds.forEach(function(t){t.style.height=h+'px';});
     }
-  });});
+  });
 }
 function _gsFilterRows(q){
   var kw=(q||'').toLowerCase().trim();
