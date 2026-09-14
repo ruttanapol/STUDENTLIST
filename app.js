@@ -676,13 +676,12 @@ async function sbRecordSubmission(sub) {
     if(error) throw error;
 await reloadSubmissions();
 renderDashboard();
-    _gsRefreshIfOpen(); // อัพเดต grade sheet ถ้าเปิดอยู่
   } else {
     const key = subKey(sub.sid, sub.hwNum, sub.room);
     DB.submissions[key] = {...sub, ts: ts()};
     saveDB();
+    // อัพเดต UI ทันที
     renderDashboard();
-    _gsRefreshIfOpen();
   }
 }
 
@@ -6082,13 +6081,203 @@ function _chkNotif(){
 }
 
 
-// Refresh grade sheet overlay ถ้าเปิดอยู่ (เรียกหลัง submission เปลี่ยน)
-function _gsRefreshIfOpen(){
-  var ov=document.getElementById('gs-ov');
-  if(ov && ov.style.display!=='none' && typeof _gsRender==='function'){
-    _gsChanges={}; // clear เพราะ DB อัพเดตแล้ว
-    _gsRender();
+/* ===== STUDENT FILTER ===== */
+var _sfPct = 60, _sfRoom = 'all', _sfMode = 'below';
+
+function openStudentFilter(){
+  if(!document.getElementById('sf-ov')) _sfBuild();
+  var ov=document.getElementById('sf-ov');
+  ov.style.display='flex';
+  // populate room dropdown
+  var dd=document.getElementById('sf-room-dd');
+  if(dd){
+    dd.innerHTML='<option value="all">ทุกห้อง</option>'
+      +DB.rooms.map(function(r){return '<option value="'+r+'">'+r+'</option>';}).join('');
+    dd.value=_sfRoom;
   }
+  _sfRun();
+}
+
+function _sfBuild(){
+  var ov=document.createElement('div'); ov.id='sf-ov';
+
+  // header
+  var hd=document.createElement('div'); hd.id='sf-hd';
+  var cl=document.createElement('button'); cl.id='sf-cl';
+  cl.innerHTML='&#x2715;'; cl.onclick=function(){ov.style.display='none';};
+  var ti=document.createElement('div'); ti.id='sf-hd-title';
+  ti.textContent='🔍 คัดกรองนักเรียนตามคะแนน';
+  hd.appendChild(cl); hd.appendChild(ti); ov.appendChild(hd);
+
+  // controls
+  var ctrl=document.createElement('div'); ctrl.id='sf-ctrl';
+
+  // room
+  var rg=document.createElement('div'); rg.className='sf-ctrl-group';
+  var rl=document.createElement('div'); rl.className='sf-ctrl-label'; rl.textContent='ห้อง';
+  var dd=document.createElement('select'); dd.id='sf-room-dd';
+  dd.onchange=function(){_sfRoom=this.value; _sfRun();};
+  rg.appendChild(rl); rg.appendChild(dd); ctrl.appendChild(rg);
+
+  // mode
+  var mg=document.createElement('div'); mg.className='sf-ctrl-group';
+  var ml=document.createElement('div'); ml.className='sf-ctrl-label'; ml.textContent='แสดงนักเรียน';
+  var mw=document.createElement('div'); mw.style.cssText='display:flex;gap:6px;';
+  [['below','ต่ำกว่า'],['above','สูงกว่า']].forEach(function(pair){
+    var b=document.createElement('button'); b.className='sf-pct-chip'+(_sfMode===pair[0]?' active':'');
+    b.textContent=pair[1]; b.dataset.mode=pair[0];
+    b.onclick=function(){
+      _sfMode=this.dataset.mode;
+      mw.querySelectorAll('.sf-pct-chip').forEach(function(x){x.classList.remove('active');});
+      this.classList.add('active'); _sfRun();
+    };
+    mw.appendChild(b);
+  });
+  mg.appendChild(ml); mg.appendChild(mw); ctrl.appendChild(mg);
+
+  // percent
+  var pg=document.createElement('div'); pg.className='sf-ctrl-group';
+  var pl=document.createElement('div'); pl.className='sf-ctrl-label'; pl.textContent='เปอร์เซ็นต์';
+  var pw=document.createElement('div'); pw.className='sf-pct-wrap';
+  [50,60,70,80,90].forEach(function(p){
+    var b=document.createElement('button'); b.className='sf-pct-chip'+(_sfPct===p?' active':'');
+    b.textContent=p+'%'; b.dataset.pct=p;
+    b.onclick=function(){
+      _sfPct=parseInt(this.dataset.pct);
+      document.querySelectorAll('#sf-ctrl .sf-pct-chip[data-pct]').forEach(function(x){x.classList.remove('active');});
+      this.classList.add('active');
+      document.getElementById('sf-custom-inp').value='';
+      _sfRun();
+    };
+    pw.appendChild(b);
+  });
+  // custom input
+  var cw=document.createElement('div'); cw.id='sf-custom-wrap';
+  var ci=document.createElement('input'); ci.id='sf-custom-inp';
+  ci.type='number'; ci.min='0'; ci.max='100'; ci.placeholder='?';
+  ci.oninput=function(){
+    var v=parseInt(this.value);
+    if(v>=0&&v<=100){
+      _sfPct=v;
+      document.querySelectorAll('#sf-ctrl .sf-pct-chip[data-pct]').forEach(function(x){x.classList.remove('active');});
+      _sfRun();
+    }
+  };
+  var pLabel=document.createElement('span'); pLabel.style.cssText='font-size:13px;color:#475569;font-weight:700;'; pLabel.textContent='%';
+  cw.appendChild(ci); cw.appendChild(pLabel); pw.appendChild(cw);
+  pg.appendChild(pl); pg.appendChild(pw); ctrl.appendChild(pg);
+
+  ov.appendChild(ctrl);
+
+  // summary
+  var sm=document.createElement('div'); sm.id='sf-summary'; ov.appendChild(sm);
+
+  // list
+  var list=document.createElement('div'); list.id='sf-list'; ov.appendChild(list);
+
+  // export btn
+  var ex=document.createElement('button'); ex.className='sf-export-btn';
+  ex.innerHTML='📋 คัดลอกรายชื่อ'; ex.onclick=_sfCopyList;
+  ov.appendChild(ex);
+
+  document.body.appendChild(ov);
+}
+
+function _sfRun(){
+  var room=_sfRoom; var pct=_sfPct; var mode=_sfMode;
+  var results=[];
+
+  DB.students.forEach(function(s){
+    if(room!=='all'&&s.room!==room) return;
+    var hws=DB.homeworks.filter(function(h){return !h.room||h.room===s.room;});
+    if(!hws.length) return;
+    var totalMax=hws.reduce(function(sum,h){return sum+(h.maxScore||100);},0);
+    var totalScore=0; var doneCount=0;
+    hws.forEach(function(h){
+      var sub=DB.submissions[subKey(s.id,h.num,h.room||s.room)];
+      if(sub){
+        doneCount++;
+        totalScore+=(sub.score!==null&&sub.score!==undefined)?Number(sub.score):(h.maxScore||100);
+      }
+    });
+    var scorePct=totalMax>0?Math.round(totalScore/totalMax*100):0;
+    var qualifies=(mode==='below')?(scorePct<pct):(scorePct>=pct);
+    if(qualifies){
+      results.push({
+        s:s, totalScore:totalScore, totalMax:totalMax,
+        scorePct:scorePct, doneCount:doneCount, totalHW:hws.length
+      });
+    }
+  });
+
+  // เรียงตาม % น้อยสุดก่อน (below) หรือมากสุดก่อน (above)
+  results.sort(function(a,b){
+    return mode==='below'? a.scorePct-b.scorePct : b.scorePct-a.scorePct;
+  });
+
+  // summary
+  var sm=document.getElementById('sf-summary');
+  if(sm){
+    if(results.length>0){
+      sm.style.display='block';
+      sm.innerHTML='พบ <b>'+results.length+' คน</b> ที่'
+        +(mode==='below'?'คะแนน<b>ต่ำกว่า '+pct+'%</b>':'คะแนน<b>สูงกว่า '+pct+'%</b>')
+        +'&nbsp;&nbsp;|&nbsp;&nbsp;จากทั้งหมด <b>'+DB.students.filter(function(s){return room==='all'||s.room===room;}).length+' คน</b>';
+    } else {
+      sm.style.display='block';
+      sm.innerHTML='✅ ไม่พบนักเรียน'+(mode==='below'?' ที่คะแนนต่ำกว่า '+pct+'%':' ที่คะแนนสูงกว่า '+pct+'%')+'ในเงื่อนไขนี้';
+    }
+  }
+
+  // render list
+  var list=document.getElementById('sf-list');
+  if(!list) return;
+  if(!results.length){
+    list.innerHTML='<div class="sf-empty">✅ ไม่พบนักเรียนตามเงื่อนไขนี้</div>';
+    return;
+  }
+
+  list.innerHTML='';
+  results.forEach(function(r,i){
+    var cardClass=r.scorePct<50?'sf-danger':r.scorePct<75?'sf-warn':'sf-ok';
+    var barColor=r.scorePct<50?'#EF4444':r.scorePct<75?'#F59E0B':'#22C55E';
+    var badgeColor=r.scorePct<50?'background:#FEE2E2;color:#DC2626':r.scorePct<75?'background:#FEF3C7;color:#D97706':'background:#DCFCE7;color:#16A34A';
+    var rankBg=r.scorePct<50?'background:#FEE2E2;color:#DC2626':r.scorePct<75?'background:#FEF3C7;color:#B45309':'background:#DCFCE7;color:#15803D';
+
+    var card=document.createElement('div');
+    card.className='sf-card '+cardClass;
+    card.innerHTML='<div class="sf-rank" style="'+rankBg+'">'+(i+1)+'</div>'
+      +'<div class="sf-info">'
+        +'<div class="sf-name">'+r.s.name+'</div>'
+        +'<div class="sf-meta">'+r.s.id+' &nbsp;·&nbsp; ห้อง '+r.s.room
+          +' &nbsp;·&nbsp; ส่งงาน '+r.doneCount+'/'+r.totalHW+' ชิ้น</div>'
+        +'<div class="sf-bar-wrap"><div class="sf-bar" style="width:'+r.scorePct+'%;background:'+barColor+'"></div></div>'
+      +'</div>'
+      +'<div class="sf-score-wrap">'
+        +'<div class="sf-score">'+r.totalScore+'</div>'
+        +'<div class="sf-score-max">จาก '+r.totalMax+'</div>'
+        +'<div class="sf-pct-badge" style="'+badgeColor+'">'+r.scorePct+'%</div>'
+      +'</div>';
+
+    list.appendChild(card);
+  });
+}
+
+function _sfCopyList(){
+  var items=document.querySelectorAll('#sf-list .sf-card');
+  if(!items.length){toast('ไม่มีรายชื่อ','warn');return;}
+  var lines=['รายชื่อนักเรียน ('+(_sfMode==='below'?'ต่ำกว่า':'สูงกว่า')+' '+_sfPct+'%)',''];
+  items.forEach(function(card,i){
+    var name=card.querySelector('.sf-name').textContent;
+    var meta=card.querySelector('.sf-meta').textContent.trim();
+    var score=card.querySelector('.sf-score').textContent;
+    var max=card.querySelector('.sf-score-max').textContent.replace('จาก ','');
+    var pct=card.querySelector('.sf-pct-badge').textContent;
+    lines.push((i+1)+'. '+name+' | '+meta+' | คะแนน: '+score+'/'+max+' ('+pct+')');
+  });
+  navigator.clipboard&&navigator.clipboard.writeText(lines.join('\n'))
+    .then(function(){toast('คัดลอกรายชื่อ '+items.length+' คนแล้ว ✅');})
+    .catch(function(){toast('คัดลอกไม่สำเร็จ','err');});
 }
 
 window.addEventListener('load', () => {
