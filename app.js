@@ -1899,16 +1899,15 @@ function renderStudentView(s, stuDB){
     return sub.score!==null && sub.score!==undefined;
   });
   const pendingCount=done.length-gradedHWs.length;
+  // totalScore: คะแนนที่ได้จากงานที่ส่งแล้ว
   const totalScore=done.reduce((sum,h)=>{
     const sub=db.submissions[subKey(s.id,h.num,h.room)];
-    const ms=Number(h.maxScore||sub.maxScore||100);
-    const sc=(sub.score!==null&&sub.score!==undefined)?Number(sub.score):ms;
+    const ms=Number(h.maxScore||sub?.maxScore||100);
+    const sc=(sub?.score!==null&&sub?.score!==undefined)?Number(sub.score):ms;
     return sum+sc;
   },0);
-  const totalMax=done.reduce((sum,h)=>{
-    const sub=db.submissions[subKey(s.id,h.num,h.room)];
-    return sum+Number(h.maxScore||sub.maxScore||100);
-  },0);
+  // totalMax: คะแนนเต็มรวมของงาน *ทั้งหมด* ในห้อง (ไม่ใช่แค่ที่ส่งแล้ว)
+  const totalMax=roomHWs.reduce((sum,h)=>sum+Number(h.maxScore||100),0);
   const scorePct=totalMax?Math.round(totalScore/totalMax*100):0;
   // เก็บไว้ใช้ในตัวแปลงคะแนน (ทดลองเทียบเป็นคะแนนเต็มอื่น)
   _stuTotalScore=totalScore; _stuTotalMax=totalMax;
@@ -1916,7 +1915,7 @@ function renderStudentView(s, stuDB){
   let html=`<div class="score-hero">
     <div class="score-hero-lbl">🏆 คะแนนรวมทั้งหมด</div>
     <div class="score-hero-num">${totalScore}<span>/${totalMax}</span></div>
-    <div class="score-hero-sub">${done.length?`ได้ ${scorePct}% จากงานที่ส่งแล้ว ${done.length} ชิ้น${pendingCount?` (รอตรวจ ${pendingCount} ชิ้น)`:''}`:'ยังไม่มีงานที่ส่ง'}</div>
+    <div class="score-hero-sub">${done.length?`ส่งแล้ว ${done.length}/${roomHWs.length} ชิ้น · ได้ ${scorePct}% จากคะแนนเต็มทั้งหมด`:'ยังไม่มีงานที่ส่ง'}</div>
   </div>
   ${totalMax?`<div class="card" style="margin-bottom:14px;">
     <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;">🧮 ลองเทียบคะแนน</div>
@@ -1971,7 +1970,9 @@ function renderStudentView(s, stuDB){
         ${sub
           ? `<div class="hw-status-ok">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>
-              ${(sub.score!==null&&sub.score!==undefined?sub.score:authMaxScore(h,sub))+'/'+authMaxScore(h,sub)+' คะแนน'}
+              ${sub.score!==null&&sub.score!==undefined
+                ? sub.score+'/'+authMaxScore(h,sub)+' คะแนน'
+                : '✓ ส่งแล้ว'}
             </div>`
           : `<div class="hw-status-no">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
@@ -2157,8 +2158,7 @@ async function recordScan(sid, scoreOverride){
     toast(stu.name+' ส่งงานนี้แล้ว','warn');
   } else {
     const now=ts();
-    // ถ้าไม่ได้กรอกคะแนน → บันทึกเต็ม maxScore อัตโนมัติ (เพื่อใช้คำนวณในหน้านักเรียน)
-    const scoreText=score!==null&&!isNaN(score)?score:maxScore;
+    const scoreText=score!==null&&!isNaN(score)?score:null;
     try {
       await sbRecordSubmission({sid,hwNum,hwTitle,room:stu.room,score:scoreText,maxScore});
       const scoreBadge=scoreText!==null?` · <b style="color:var(--purple);">${scoreText}/${maxScore||100}</b>`:'';
@@ -3000,7 +3000,7 @@ function buildExportData(){
     const rows=students.map((s,idx)=>{
       const row={เลขที่:idx+1,เลขประจำตัว:s.id,'ชื่อ-นามสกุล':s.name,ห้อง:s.room};
       let totalScore=0,totalMax=0,doneCount=0;
-      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:(sub.maxScore||h.maxScore||100);}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
+      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:'✓';}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
       row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
       row['คะแนนรวม']=totalScore;
       row['คะแนนเต็มรวม']=hwTotalMax;
