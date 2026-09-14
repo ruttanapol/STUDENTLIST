@@ -6155,7 +6155,7 @@ function _gsRender(){
   var stus=DB.students.filter(function(s){return s.room===room;}).sort(function(a,b){return a.id.localeCompare(b.id);});
   if(!stus.length||!hws.length){lp.innerHTML='<div style="padding:20px;font-size:13px;color:#94A3B8;">ไม่พบข้อมูล</div>';rp.innerHTML='';return;}
   var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
-  var ROW_H=44,NAME_W=180,CELL_W=76;
+  var ROW_H=56,NAME_W=180,CELL_W=78;
   var ltbl=document.createElement('table');ltbl.style.cssText='border-collapse:collapse;width:'+NAME_W+'px;table-layout:fixed;';
   var lhd=document.createElement('thead');var lhr=document.createElement('tr');
   var lh0=document.createElement('th');lh0.style.cssText='background:#DBEAFE;border:1px solid #BFDBFE;width:34px;height:52px;text-align:center;font-size:10px;color:#64748B;';lh0.textContent='#';
@@ -6164,15 +6164,15 @@ function _gsRender(){
   var ltbd=document.createElement('tbody');
   var stMap={'withdrawn':'⛔','transferred':'🔄','leave':'💤'};
   stus.forEach(function(s,i){
-    var tr=document.createElement('tr');tr.dataset.sid=s.id;
+    var tr=document.createElement('tr');tr.dataset.sid=s.id;tr.style.height=ROW_H+'px';
     var isIn=s.status&&s.status!=='active';
-    var tdN=document.createElement('td');tdN.style.cssText='border:1px solid #E2E8F0;width:34px;height:'+ROW_H+'px;text-align:center;font-size:11px;color:#94A3B8;background:#F8FAFC;';tdN.textContent=i+1;
-    var tdNm=document.createElement('td');tdNm.style.cssText='border:1px solid #E2E8F0;padding:4px 8px;height:'+ROW_H+'px;overflow:hidden;'+(isIn?'opacity:.55;':'');
+    var tdN=document.createElement('td');tdN.style.cssText='border:1px solid #E2E8F0;width:34px;height:'+ROW_H+'px;text-align:center;font-size:11px;color:#94A3B8;background:#F8FAFC;vertical-align:middle;';tdN.textContent=i+1;
+    var tdNm=document.createElement('td');tdNm.style.cssText='border:1px solid #E2E8F0;padding:0 8px;height:'+ROW_H+'px;overflow:hidden;vertical-align:middle;'+(isIn?'opacity:.55;':'');
     var stBtn=document.createElement('button');stBtn.innerHTML='⋮';stBtn.title='สถานะ';
     stBtn.style.cssText='border:none;background:none;cursor:pointer;font-size:14px;color:#94A3B8;float:right;padding:0 2px;line-height:1;';
     var _sid=s.id;stBtn.onclick=function(){openStatusMenu(_sid);};
     tdNm.appendChild(stBtn);
-    var nm=document.createElement('div');nm.style.cssText='font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(isIn?'#94A3B8':'#0F172A')+';'+(isIn?'text-decoration:line-through;':'');nm.textContent=s.name;
+    var nm=document.createElement('div');nm.style.cssText='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(isIn?'#94A3B8':'#0F172A')+';'+(isIn?'text-decoration:line-through;':'')+'line-height:1.3;';nm.textContent=s.name;
     var id2=document.createElement('div');id2.style.cssText='font-size:10px;color:#94A3B8;';id2.textContent=s.id+(isIn?' '+(stMap[s.status]||''):'');
     tdNm.appendChild(nm);tdNm.appendChild(id2);tr.appendChild(tdN);tr.appendChild(tdNm);ltbd.appendChild(tr);
   });
@@ -6190,14 +6190,17 @@ function _gsRender(){
   rhr.appendChild(tht);rhd.appendChild(rhr);rtbl.appendChild(rhd);
   var rtbd=document.createElement('tbody');
   stus.forEach(function(s){
-    var tr=document.createElement('tr');tr.dataset.sid=s.id;var rowTotal=0;
+    var tr=document.createElement('tr');tr.dataset.sid=s.id;tr.style.height=ROW_H+'px';var rowTotal=0;
     hws.forEach(function(h){
-      var key=subKey(s.id,h.num,h.room||room);var sub=DB.submissions[key];var chg=_gsChanges[key];
+      // key ต้องตรงกับตอน store — ใช้ h.room โดยตรง
+      var key=subKey(s.id,h.num,h.room);
+      // fallback: ลองหาด้วย room จริงด้วย (กรณีข้อมูลเก่า)
+      var sub=DB.submissions[key]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];var chg=_gsChanges[key];
       var stored=(sub&&sub.score!==null&&sub.score!==undefined)?Number(sub.score):null;
       var cur=chg!==undefined?chg:stored;
       if(cur!==null) rowTotal+=Number(cur);
       var td=document.createElement('td');
-      td.style.cssText='border:1px solid #E2E8F0;width:'+CELL_W+'px;min-width:'+CELL_W+'px;height:'+ROW_H+'px;overflow:hidden;padding:1px;text-align:center;background:'+(cur!==null?'#F0FDF4':'#fff')+';';
+      td.style.cssText='border:1px solid #E2E8F0;width:'+CELL_W+'px;min-width:'+CELL_W+'px;height:'+ROW_H+'px;max-height:'+ROW_H+'px;overflow:hidden;padding:1px;text-align:center;vertical-align:middle;background:'+(cur!==null?'#F0FDF4':'#fff')+';';
       var inp=document.createElement('input');inp.type='number';inp.min='0';inp.max=String(h.maxScore||100);
       inp.value=cur!==null?String(cur):'';inp.placeholder='-';
       inp.style.cssText='width:100%;height:100%;border:none;text-align:center;font-size:14px;font-weight:700;background:transparent;outline:none;font-family:Sarabun,sans-serif;color:'+(cur!==null?(Number(cur)>=(h.maxScore||100)*0.5?'#16A34A':'#F59E0B'):'#CBD5E1')+';';
@@ -6217,33 +6220,13 @@ function _gsRender(){
       td.appendChild(inp);tr.appendChild(td);
     });
     var tdt=document.createElement('td');tdt.id='gstot_'+s.id;
-    tdt.style.cssText='border:1px solid #DDD6FE;width:70px;min-width:70px;height:'+ROW_H+'px;text-align:center;font-weight:700;font-size:13px;color:#7C3AED;background:#FAF5FF;';
+    tdt.style.cssText='border:1px solid #DDD6FE;width:70px;min-width:70px;height:'+ROW_H+'px;max-height:'+ROW_H+'px;text-align:center;vertical-align:middle;font-weight:700;font-size:13px;color:#7C3AED;background:#FAF5FF;';
     tdt.textContent=rowTotal+'/'+totalMax;tr.appendChild(tdt);rtbd.appendChild(tr);
   });
   rtbl.appendChild(rtbl&&rtbd);rp.innerHTML='';rp.appendChild(rtbl);
-  setTimeout(_gsSyncH,80);
-  setTimeout(_gsSyncH,350);
+
 }
-function _gsSyncH(){
-  requestAnimationFrame(function(){
-    var lrows=[].slice.call(document.querySelectorAll('#gs-lp tbody tr'));
-    var rrows=[].slice.call(document.querySelectorAll('#gs-rp tbody tr'));
-    var n=Math.min(lrows.length,rrows.length);
-    for(var i=0;i<n;i++){
-      // อ่านจาก td ซึ่งไม่เคย reset
-      var ltds=[].slice.call(lrows[i].querySelectorAll('td'));
-      var rtds=[].slice.call(rrows[i].querySelectorAll('td'));
-      var lh=ltds.reduce(function(m,t){return Math.max(m,t.scrollHeight);},44);
-      var rh=rtds.reduce(function(m,t){return Math.max(m,t.scrollHeight);},44);
-      var h=Math.max(lh,rh,48);
-      // set ทั้ง tr และ td ให้ตรงกัน
-      lrows[i].style.height=h+'px';
-      rrows[i].style.height=h+'px';
-      ltds.forEach(function(t){t.style.height=h+'px';});
-      rtds.forEach(function(t){t.style.height=h+'px';});
-    }
-  });
-}
+function _gsSyncH(){} // fixed height — no sync needed
 function _gsFilterRows(q){
   var kw=(q||'').toLowerCase().trim();
   var lr=[].slice.call(document.querySelectorAll('#gs-lp tbody tr'));
@@ -6253,7 +6236,7 @@ function _gsFilterRows(q){
 function _gsUpdateTot(sid){
   var room=_gsRoom;var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;});
   var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);var total=0;
-  hws.forEach(function(h){var inp=document.querySelector('#gs-rp input[data-sid="'+sid+'"][data-hwnum="'+h.num+'"]');if(inp&&inp.value!=='')total+=parseFloat(inp.value)||0;else{var sub=DB.submissions[subKey(sid,h.num,h.room||room)];if(sub&&sub.score!==null&&sub.score!==undefined)total+=Number(sub.score);}});
+  hws.forEach(function(h){var inp=document.querySelector('#gs-rp input[data-sid="'+sid+'"][data-hwnum="'+h.num+'"]');if(inp&&inp.value!=='')total+=parseFloat(inp.value)||0;else{var sub=DB.submissions[subKey(sid,h.num,h.room)]||DB.submissions[subKey(sid,h.num,room)]||DB.submissions[subKey(sid,h.num,'')];if(sub&&sub.score!==null&&sub.score!==undefined)total+=Number(sub.score);}});
   var el=document.getElementById('gstot_'+sid);if(el)el.textContent=total+'/'+totalMax;
 }
 function _gsColFill(hwNum,defMax){
