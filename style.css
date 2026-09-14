@@ -726,3 +726,8 @@ td.gs-tot{text-align:center;font-weight:700;font-size:13px;color:#7C3AED;padding
 .sf-bar-wrap{margin-top:8px;background:#E2E8F0;border-radius:6px;height:6px;overflow:hidden;}
 .sf-bar{height:100%;border-radius:6px;}
 .sf-export-btn{position:fixed;bottom:16px;right:16px;padding:12px 20px;background:#D97706;color:#fff;border:none;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(217,119,6,.4);font-family:Sarabun,sans-serif;z-index:10;}
+
+/* ─── GS SEARCH + STATUS ─── */
+#gs-search::placeholder{color:#CBD5E1;}
+#gs-search:focus{outline:none;}
+.gs-status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;}

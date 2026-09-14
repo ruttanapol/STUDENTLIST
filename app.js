@@ -389,7 +389,7 @@ async function loadFromSupabase() {
   hwData.sort((a,b)=>(a.num||0)-(b.num||0));
   const stuRes = {data: stuData}, hwRes = {data: hwData}, subRes = {data: subData}, setRes = {data: setData};
 
-  DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room}));
+  DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room, status: r.status||'active'}));
   DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||'', fileUrl: r.file_url||'', fileName: r.file_name||'', room: r.room||''}));
 
   const subs = {};
@@ -545,7 +545,7 @@ async function reloadStudents() {
   if(!SB) return;
   const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : null;
   const data = await sbFetchAll('students', q => tid ? q.eq('teacher_id', tid) : q);
-  DB.students = (data||[]).map(r=>({id:r.id,name:r.name,room:r.room}));
+  DB.students = (data||[]).map(r=>({id:r.id,name:r.name,room:r.room,status:r.status||'active'}));
   // รวมห้องจากนักเรียนเข้ากับห้องที่มีอยู่แล้ว (ไม่ทับของเดิม เพราะห้องที่ยังไม่มีนักเรียนต้องไม่หาย) + กรองค่าว่างออก
   const studentRooms = DB.students.map(s=>s.room).filter(Boolean);
   DB.rooms = [...new Set([...(DB.rooms||[]), ...studentRooms])].sort((a,b)=>
@@ -6374,6 +6374,14 @@ function _gsBuild(){
   var ti=document.createElement('div');ti.id='gs-hd-title';ti.textContent='📊 ตารางคะแนน';
   var dd=document.createElement('select');dd.id='gs-room-dd';
   dd.onchange=function(){_gsRoom=this.value;_gsChanges={};_gsRender();};
+  // Search input
+  var srchWrap=document.createElement('div');srchWrap.style.cssText='display:flex;align-items:center;gap:6px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:10px;padding:4px 10px;flex-shrink:0;';
+  var srchIc=document.createElement('span');srchIc.innerHTML='&#x1F50D;';srchIc.style.cssText='font-size:14px;color:#94A3B8;';
+  var srchInp=document.createElement('input');srchInp.id='gs-search';srchInp.type='text';srchInp.placeholder='ค้นหาชื่อ...';
+  srchInp.style.cssText='border:none;background:transparent;font-size:13px;font-family:Sarabun,sans-serif;width:110px;outline:none;color:#0F172A;';
+  srchInp.oninput=function(){_gsFilterRows(this.value);};
+  srchWrap.appendChild(srchIc);srchWrap.appendChild(srchInp);
+  hd.appendChild(srchWrap);
   var st=document.createElement('div');st.id='gs-status';
   var sv=document.createElement('button');sv.id='gs-sv-btn';
   sv.innerHTML='&#x1F4BE; บันทึก';sv.onclick=_gsSaveAll;
@@ -6402,14 +6410,25 @@ function _gsRender(){
   var lth=document.createElement('thead');var lthr=document.createElement('tr');
   var lth0=document.createElement('th');lth0.style.width='34px';lth0.innerHTML='<div class="gs-hcell" style="font-size:10px;color:#94A3B8;">#</div>';
   var lth1=document.createElement('th');lth1.innerHTML='<div class="gs-hcell">ชื่อ-นามสกุล</div>';
-  lthr.appendChild(lth0);lthr.appendChild(lth1);lth.appendChild(lthr);lt.appendChild(lth);
+  var lth2=document.createElement('th');lth2.style.width='24px';lth2.innerHTML='<div style="padding:4px;text-align:center;font-size:9px;color:#94A3B8;">สถานะ</div>';
+  lthr.appendChild(lth0);lthr.appendChild(lth1);lthr.appendChild(lth2);lth.appendChild(lthr);lt.appendChild(lth);
   var ltb=document.createElement('tbody');
   stus.forEach(function(s,i){
     var tr=document.createElement('tr');tr.className='gs-row';tr.dataset.sid=s.id;
     var tn=document.createElement('td');tn.className='gs-num';tn.textContent=i+1;
     var tm=document.createElement('td');tm.className='gs-nm';
-    tm.innerHTML='<div class="gs-nm-main">'+s.name+'</div><div class="gs-nm-sub">'+s.id+'</div>';
-    tr.appendChild(tn);tr.appendChild(tm);ltb.appendChild(tr);
+    var stMap={'active':'','withdrawn':'⛔ ลาออก','transferred':'🔄 ย้ายออก','leave':'💤 ลาพัก'};
+    var stBadge=s.status&&s.status!=='active'?'<div style="font-size:10px;background:#FEE2E2;color:#DC2626;border-radius:6px;padding:1px 6px;display:inline-block;margin-top:2px;">'+( stMap[s.status]||s.status)+'</div>':'';
+    tm.innerHTML='<div class="gs-nm-main" style="'+(s.status&&s.status!=='active'?'color:#94A3B8;text-decoration:line-through;':'')+'">'+s.name+'</div><div class="gs-nm-sub">'+s.id+'</div>'+stBadge;
+    if(s.status&&s.status!=='active') tm.style.opacity='0.6';
+    // ปุ่มเปลี่ยนสถานะ
+    var stBtn=document.createElement('td');stBtn.style.cssText='padding:0 4px;border:1px solid #E2E8F0;';
+    var sb2=document.createElement('button');sb2.title='เปลี่ยนสถานะ';
+    sb2.style.cssText='border:none;background:none;cursor:pointer;font-size:12px;padding:4px;color:#94A3B8;';
+    sb2.innerHTML='&#x22EE;';
+    var _sid=s.id;sb2.onclick=function(){openStatusMenu(_sid);};
+    stBtn.appendChild(sb2);
+    tr.appendChild(tn);tr.appendChild(tm);tr.appendChild(stBtn);ltb.appendChild(tr);
   });
   lt.appendChild(ltb);lp.innerHTML='';lp.appendChild(lt);
   // Right table
@@ -6434,7 +6453,8 @@ function _gsRender(){
     var rowTotal=0;
     hws.forEach(function(h){
       var key=subKey(s.id,h.num,h.room||room);var sub=DB.submissions[key];var chg=_gsChanges[key];
-      var curScore=chg!==undefined?chg:(sub?(sub.score!==null&&sub.score!==undefined?Number(sub.score):(h.maxScore||100)):null);
+      var subScore=(sub&&sub.score!==null&&sub.score!==undefined)?Number(sub.score):null;
+      var curScore=chg!==undefined?chg:subScore; // null = ยังไม่ได้กรอกคะแนน
       if(curScore!==null) rowTotal+=Number(curScore);
       var td=document.createElement('td');td.className='gs-sc '+(curScore!==null?'submitted':'unset');
       var inp=document.createElement('input');inp.type='number';inp.min='0';inp.max=String(h.maxScore||100);
@@ -6458,6 +6478,62 @@ function _gsRender(){
     tr.appendChild(tdt);rtb.appendChild(tr);
   });
   rt.appendChild(rtb);rp.innerHTML='';rp.appendChild(rt);lp.scrollTop=0;rp.scrollTop=0;
+}
+
+
+
+var _stuStatusMap={'active':'ปกติ','withdrawn':'ลาออก','transferred':'ย้ายออก','leave':'ลาพัก'};
+async function updateStudentStatus(sid, newStatus){
+  var stu=DB.students.find(function(s){return s.id===sid;});
+  if(!stu)return;
+  stu.status=newStatus;
+  if(USE_SUPABASE){
+    const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';
+    try{
+      await SB.from('students').update({status:newStatus}).eq('id',sid).eq('teacher_id',tid);
+      toast('อัพเดตสถานะ '+stu.name+' → '+(_stuStatusMap[newStatus]||newStatus)+' ✅');
+    }catch(e){toast('บันทึกไม่สำเร็จ','err');}
+  }
+  _gsRender(); // refresh grade sheet
+}
+
+function openStatusMenu(sid){
+  var existing=document.getElementById('gs-status-menu');
+  if(existing)existing.remove();
+  var stu=DB.students.find(function(s){return s.id===sid;});
+  if(!stu)return;
+  var menu=document.createElement('div');menu.id='gs-status-menu';
+  menu.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:20px;box-shadow:0 8px 40px rgba(0,0,0,.2);z-index:99999;min-width:240px;font-family:Sarabun,sans-serif;';
+  menu.innerHTML='<div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:12px;">สถานะ: '+stu.name+'</div>';
+  [['active','✅ ปกติ','#DCFCE7','#15803D'],['leave','💤 ลาพัก','#FEF3C7','#B45309'],['transferred','🔄 ย้ายออก','#DBEAFE','#1D4ED8'],['withdrawn','⛔ ลาออก','#FEE2E2','#DC2626']].forEach(function(opt){
+    var btn=document.createElement('button');
+    btn.style.cssText='width:100%;padding:10px 14px;margin-bottom:8px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;background:'+opt[2]+';color:'+opt[3]+';text-align:left;'+(stu.status===opt[0]?'outline:2px solid '+opt[3]+';':'');
+    btn.textContent=(stu.status===opt[0]?'● ':'') + opt[1];
+    btn.onclick=function(){updateStudentStatus(sid,opt[0]);menu.remove();overlay.remove();};
+    menu.appendChild(btn);
+  });
+  var cx=document.createElement('button');
+  cx.style.cssText='width:100%;padding:10px;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:Sarabun,sans-serif;background:#F1F5F9;color:#64748B;font-weight:600;';
+  cx.textContent='ยกเลิก'; cx.onclick=function(){menu.remove();overlay.remove();};
+  menu.appendChild(cx);
+  var overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.4);';
+  overlay.onclick=function(){menu.remove();overlay.remove();};
+  document.body.appendChild(overlay);document.body.appendChild(menu);
+}
+
+function _gsFilterRows(q){
+  var kw=(q||'').toLowerCase().trim();
+  // sync left + right rows
+  var lrows=[].slice.call(document.querySelectorAll('#gs-ltbl tbody tr'));
+  var rrows=[].slice.call(document.querySelectorAll('#gs-rtbl tbody tr'));
+  lrows.forEach(function(lr,i){
+    var nm=lr.querySelector('.gs-nm-main');
+    var sid=lr.dataset.sid||'';
+    var match=!kw||(nm&&nm.textContent.toLowerCase().includes(kw))||(sid.toLowerCase().includes(kw));
+    lr.style.display=match?'':'none';
+    if(rrows[i]) rrows[i].style.display=match?'':'none';
+  });
 }
 
 function _gsRefreshRow(sid){
