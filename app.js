@@ -389,7 +389,7 @@ async function loadFromSupabase() {
   hwData.sort((a,b)=>(a.num||0)-(b.num||0));
   const stuRes = {data: stuData}, hwRes = {data: hwData}, subRes = {data: subData}, setRes = {data: setData};
 
-  DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room, status: r.status||'active'}));
+  DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room}));
   DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||'', fileUrl: r.file_url||'', fileName: r.file_name||'', room: r.room||''}));
 
   const subs = {};
@@ -545,7 +545,7 @@ async function reloadStudents() {
   if(!SB) return;
   const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : null;
   const data = await sbFetchAll('students', q => tid ? q.eq('teacher_id', tid) : q);
-  DB.students = (data||[]).map(r=>({id:r.id,name:r.name,room:r.room,status:r.status||'active'}));
+  DB.students = (data||[]).map(r=>({id:r.id,name:r.name,room:r.room}));
   // รวมห้องจากนักเรียนเข้ากับห้องที่มีอยู่แล้ว (ไม่ทับของเดิม เพราะห้องที่ยังไม่มีนักเรียนต้องไม่หาย) + กรองค่าว่างออก
   const studentRooms = DB.students.map(s=>s.room).filter(Boolean);
   DB.rooms = [...new Set([...(DB.rooms||[]), ...studentRooms])].sort((a,b)=>
@@ -1905,10 +1905,7 @@ function renderStudentView(s, stuDB){
     const sc=(sub.score!==null&&sub.score!==undefined)?Number(sub.score):ms;
     return sum+sc;
   },0);
-  const totalMax=done.reduce((sum,h)=>{
-    const sub=db.submissions[subKey(s.id,h.num,h.room)];
-    return sum+Number(h.maxScore||sub.maxScore||100);
-  },0);
+  const totalMax=roomHWs.reduce((sum,h)=>sum+Number(h.maxScore||100),0); // คะแนนเต็มทุกชิ้นในห้อง
   const scorePct=totalMax?Math.round(totalScore/totalMax*100):0;
   // เก็บไว้ใช้ในตัวแปลงคะแนน (ทดลองเทียบเป็นคะแนนเต็มอื่น)
   _stuTotalScore=totalScore; _stuTotalMax=totalMax;
@@ -1971,9 +1968,7 @@ function renderStudentView(s, stuDB){
         ${sub
           ? `<div class="hw-status-ok">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>
-              ${sub.score!==null&&sub.score!==undefined
-                ? sub.score+'/'+authMaxScore(h,sub)+' คะแนน'
-                : '✓ ส่งแล้ว'}
+              ${(sub.score!==null&&sub.score!==undefined?sub.score:authMaxScore(h,sub))+'/'+authMaxScore(h,sub)+' คะแนน'}
             </div>`
           : `<div class="hw-status-no">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
@@ -2159,7 +2154,7 @@ async function recordScan(sid, scoreOverride){
     toast(stu.name+' ส่งงานนี้แล้ว','warn');
   } else {
     const now=ts();
-    const scoreText=score!==null&&!isNaN(score)?score:null;
+    const scoreText=score!==null&&!isNaN(score)?score:maxScore; // ไม่กรอก → เต็ม maxScore
     try {
       await sbRecordSubmission({sid,hwNum,hwTitle,room:stu.room,score:scoreText,maxScore});
       const scoreBadge=scoreText!==null?` · <b style="color:var(--purple);">${scoreText}/${maxScore||100}</b>`:'';
@@ -3001,7 +2996,7 @@ function buildExportData(){
     const rows=students.map((s,idx)=>{
       const row={เลขที่:idx+1,เลขประจำตัว:s.id,'ชื่อ-นามสกุล':s.name,ห้อง:s.room};
       let totalScore=0,totalMax=0,doneCount=0;
-      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:'✓';}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
+      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:(sub.maxScore||h.maxScore||100);}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
       row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
       row['คะแนนรวม']=totalScore;
       row['คะแนนเต็มรวม']=hwTotalMax;
@@ -6078,349 +6073,6 @@ function _chkNotif(){
       new Notification('📅 '+e.title,{body:e.time?'เวลา '+e.time:(e.desc||'มีกิจกรรม'),tag:k});
     }
   });
-}
-
-
-/* ===== GRADE SHEET ===== */
-var _gsRoom='',_gsChanges={},_gsST=null;
-
-function openGradeSheet(){
-  if(!document.getElementById('gs-ov')) _gsMkUI();
-  var ov=document.getElementById('gs-ov');ov.style.display='flex';
-  var dd=document.getElementById('gs-room-dd');
-  if(dd){
-    dd.innerHTML=DB.rooms.map(function(r){return '<option value="'+r+'">'+r+'</option>';}).join('');
-    if(_gsRoom&&DB.rooms.indexOf(_gsRoom)>=0) dd.value=_gsRoom;
-    else _gsRoom=dd.value||DB.rooms[0]||'';
-  }
-  var si=document.getElementById('gs-search');if(si)si.value='';
-  _gsChanges={};_gsRender();
-}
-
-function _gsMkUI(){
-  // ─ overlay
-  var ov=document.createElement('div');ov.id='gs-ov';
-  ov.style.cssText='display:none;position:fixed;inset:0;z-index:9998;background:#F1F5F9;flex-direction:column;font-family:Sarabun,sans-serif;';
-
-  // ─ header bar
-  var hd=document.createElement('div');
-  hd.style.cssText='display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border-bottom:2px solid #E2E8F0;flex-shrink:0;flex-wrap:wrap;';
-  
-  var cl=document.createElement('button');cl.innerHTML='✕';
-  cl.style.cssText='width:34px;height:34px;border-radius:50%;border:1.5px solid #E2E8F0;background:#F8FAFC;cursor:pointer;font-size:16px;flex-shrink:0;';
-  cl.onclick=function(){ov.style.display='none';};
-
-  var ti=document.createElement('span');
-  ti.style.cssText='font-size:15px;font-weight:800;color:#0F172A;flex:1;';ti.textContent='📊 ตารางคะแนน';
-
-  var dd=document.createElement('select');dd.id='gs-room-dd';
-  dd.style.cssText='padding:7px 10px;border:1.5px solid #BFDBFE;border-radius:10px;font-size:13px;background:#EFF6FF;color:#1E40AF;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;';
-  dd.onchange=function(){_gsRoom=this.value;_gsChanges={};_gsRender();};
-
-  // search
-  var sb=document.createElement('div');
-  sb.style.cssText='display:flex;align-items:center;gap:5px;border:1.5px solid #E2E8F0;border-radius:10px;padding:5px 10px;background:#F8FAFC;';
-  sb.innerHTML='<span style="color:#94A3B8;">🔍</span>';
-  var si=document.createElement('input');si.id='gs-search';si.placeholder='ค้นหา...';si.type='text';
-  si.style.cssText='border:none;background:transparent;font-size:13px;width:100px;outline:none;font-family:Sarabun,sans-serif;';
-  si.oninput=function(){_gsFilterRows(this.value);};
-  sb.appendChild(si);
-
-  var sv=document.createElement('button');sv.id='gs-sv-btn';sv.innerHTML='💾 บันทึก';
-  sv.style.cssText='padding:9px 14px;background:#2563EB;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;flex-shrink:0;';
-  sv.onclick=_gsSaveAll;
-
-  var st=document.createElement('span');st.id='gs-status';st.style.cssText='font-size:11px;font-weight:600;';
-
-  hd.appendChild(cl);hd.appendChild(ti);hd.appendChild(dd);hd.appendChild(sb);hd.appendChild(st);hd.appendChild(sv);
-  ov.appendChild(hd);
-
-  // ─ body: left pane + right pane
-  var body=document.createElement('div');
-  body.style.cssText='display:flex;flex:1;overflow:hidden;min-height:0;';
-
-  var lp=document.createElement('div');lp.id='gs-lp';
-  lp.style.cssText='overflow:hidden;flex-shrink:0;border-right:2px solid #BFDBFE;';
-
-  var rp=document.createElement('div');rp.id='gs-rp';
-  rp.style.cssText='overflow:auto;flex:1;-webkit-overflow-scrolling:touch;';
-  rp.onscroll=function(){lp.scrollTop=this.scrollTop;};
-
-  body.appendChild(lp);body.appendChild(rp);ov.appendChild(body);
-  document.body.appendChild(ov);
-}
-
-function _gsRender(){
-  var lp=document.getElementById('gs-lp');
-  var rp=document.getElementById('gs-rp');
-  if(!lp||!rp) return;
-
-  var room=_gsRoom;
-  var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;})
-                      .sort(function(a,b){return a.num-b.num;});
-  var stus=DB.students.filter(function(s){return s.room===room;})
-                      .sort(function(a,b){return a.id.localeCompare(b.id);});
-
-  if(!stus.length||!hws.length){
-    lp.innerHTML='<div style="padding:20px;font-size:13px;color:#94A3B8;">ไม่พบข้อมูล</div>';
-    rp.innerHTML='';return;
-  }
-
-  var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
-  var ROW_H=44; // fixed row height px
-  var NAME_W=170;
-  var CELL_W=76;
-
-  // ─ LEFT TABLE (ชื่อ)
-  var ltbl=document.createElement('table');
-  ltbl.style.cssText='border-collapse:collapse;width:'+NAME_W+'px;table-layout:fixed;';
-
-  // head
-  var lhd=document.createElement('thead');
-  var lhr=document.createElement('tr');
-  var lh0=document.createElement('th');
-  lh0.style.cssText='background:#DBEAFE;border:1px solid #BFDBFE;padding:0;width:34px;height:48px;text-align:center;font-size:10px;color:#64748B;position:sticky;top:0;z-index:1;';
-  lh0.textContent='#';
-  var lh1=document.createElement('th');
-  lh1.style.cssText='background:#DBEAFE;border:1px solid #BFDBFE;padding:6px 10px;height:48px;font-size:12px;color:#1E40AF;text-align:left;position:sticky;top:0;z-index:1;';
-  lh1.textContent='ชื่อ-นามสกุล';
-  lhr.appendChild(lh0);lhr.appendChild(lh1);lhd.appendChild(lhr);ltbl.appendChild(lhd);
-
-  var ltbd=document.createElement('tbody');
-  stus.forEach(function(s,i){
-    var tr=document.createElement('tr');tr.dataset.sid=s.id;
-    var isIn=s.status&&s.status!=='active';
-    var tdN=document.createElement('td');
-    tdN.style.cssText='border:1px solid #E2E8F0;width:34px;height:'+ROW_H+'px;text-align:center;font-size:11px;color:#94A3B8;background:#F8FAFC;';
-    tdN.textContent=i+1;
-    var tdNm=document.createElement('td');
-    tdNm.style.cssText='border:1px solid #E2E8F0;padding:4px 8px;height:'+ROW_H+'px;'+(isIn?'opacity:.55;':'');
-    var stMap={'withdrawn':'⛔','transferred':'🔄','leave':'💤'};
-    tdNm.innerHTML='<div style="font-size:12px;font-weight:700;color:'+(isIn?'#94A3B8':'#0F172A')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+(isIn?'text-decoration:line-through;':'')+'">'+s.name+'</div>'
-      +'<div style="font-size:10px;color:#94A3B8;">'+s.id+(isIn?' '+(stMap[s.status]||''):'')+'</div>';
-    // status button
-    var stBtn=document.createElement('button');stBtn.innerHTML='⋮';stBtn.title='สถานะ';
-    stBtn.style.cssText='border:none;background:none;cursor:pointer;font-size:14px;color:#94A3B8;float:right;padding:0 2px;line-height:1;';
-    var _sid=s.id;stBtn.onclick=function(){openStatusMenu(_sid);};
-    tdNm.insertBefore(stBtn,tdNm.firstChild);
-    tr.appendChild(tdN);tr.appendChild(tdNm);ltbd.appendChild(tr);
-  });
-  ltbl.appendChild(ltbd);
-  lp.innerHTML='';lp.appendChild(ltbl);
-  lp.style.width=NAME_W+'px';
-
-  // ─ RIGHT TABLE (คะแนน)
-  var rtbl=document.createElement('table');
-  rtbl.style.cssText='border-collapse:collapse;table-layout:fixed;';
-
-  var rhd=document.createElement('thead');
-  var rhr=document.createElement('tr');
-  hws.forEach(function(h){
-    var th=document.createElement('th');
-    th.style.cssText='background:#EFF6FF;border:1px solid #BFDBFE;width:'+CELL_W+'px;min-width:'+CELL_W+'px;height:48px;padding:0;position:sticky;top:0;z-index:1;';
-    var fi='gsfi_'+h.num;
-    th.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;padding:4px 3px;gap:2px;">'
-      +'<div style="font-size:11px;font-weight:800;color:#1E40AF;">งาน '+h.num+'</div>'
-      +'<div style="font-size:9px;color:#64748B;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+h.title+'</div>'
-      +'<div style="display:flex;gap:3px;align-items:center;">'
-      +'<input id="'+fi+'" type="number" min="0" max="'+(h.maxScore||100)+'" placeholder="'+(h.maxScore||100)+'" style="width:34px;height:20px;border:1.5px solid #BFDBFE;border-radius:5px;text-align:center;font-size:10px;font-family:Sarabun,sans-serif;">'
-      +'<button onclick="_gsColFill('+h.num+','+(h.maxScore||100)+')" style="padding:2px 5px;background:#2563EB;color:#fff;border:none;border-radius:5px;font-size:9px;cursor:pointer;font-family:Sarabun,sans-serif;font-weight:700;">ทั้งหมด</button>'
-      +'</div></div>';
-    rhr.appendChild(th);
-  });
-  // total header
-  var tht=document.createElement('th');
-  tht.style.cssText='background:#FAF5FF;border:1px solid #DDD6FE;width:70px;min-width:70px;height:48px;font-size:11px;color:#7C3AED;font-weight:700;text-align:center;position:sticky;top:0;z-index:1;';
-  tht.innerHTML='รวม<br><span style="font-weight:400;font-size:10px;">/ '+totalMax+'</span>';
-  rhr.appendChild(tht);
-  rhd.appendChild(rhr);rtbl.appendChild(rhd);
-
-  var rtbd=document.createElement('tbody');
-  stus.forEach(function(s){
-    var tr=document.createElement('tr');tr.dataset.sid=s.id;
-    var rowTotal=0;
-
-    hws.forEach(function(h){
-      var key=subKey(s.id,h.num,h.room||room);
-      var sub=DB.submissions[key];
-      var chg=_gsChanges[key];
-      var stored=(sub&&sub.score!==null&&sub.score!==undefined)?Number(sub.score):null;
-      var cur=chg!==undefined?chg:stored;
-      if(cur!==null) rowTotal+=Number(cur);
-
-      var td=document.createElement('td');
-      td.style.cssText='border:1px solid #E2E8F0;width:'+CELL_W+'px;min-width:'+CELL_W+'px;height:'+ROW_H+'px;padding:1px;text-align:center;background:'+(cur!==null?'#F0FDF4':'#fff')+';';
-      
-      var inp=document.createElement('input');
-      inp.type='number';inp.min='0';inp.max=String(h.maxScore||100);
-      inp.value=cur!==null?String(cur):'';
-      inp.placeholder='-';
-      inp.style.cssText='width:100%;height:100%;border:none;text-align:center;font-size:14px;font-weight:700;background:transparent;outline:none;font-family:Sarabun,sans-serif;color:'+(cur!==null?(Number(cur)>=(h.maxScore||100)*0.5?'#16A34A':'#F59E0B'):'#CBD5E1')+';';
-      inp.inputMode='decimal';
-      inp.dataset.sid=s.id;inp.dataset.hwnum=h.num;
-      inp.dataset.room=h.room||room;inp.dataset.max=h.maxScore||100;
-      inp.dataset.htitle=h.title;
-      inp.setAttribute('enterkeyhint','next');
-
-      inp.oninput=function(){
-        var k=subKey(this.dataset.sid,this.dataset.hwnum,this.dataset.room);
-        var v=this.value===''?null:parseFloat(this.value);
-        _gsChanges[k]={sid:this.dataset.sid,hwNum:parseInt(this.dataset.hwnum),
-          hwTitle:this.dataset.htitle,room:this.dataset.room,
-          score:v,maxScore:parseInt(this.dataset.max)};
-        var max=parseInt(this.dataset.max);
-        this.style.color=v!==null?(v>=max*0.5?'#16A34A':'#F59E0B'):'#CBD5E1';
-        this.parentElement.style.background=v!==null?'#F0FDF4':'#fff';
-        _gsUpdateTot(this.dataset.sid);_gsDirty();
-      };
-      inp.onfocus=function(){this.style.color='#0F172A';this.parentElement.style.boxShadow='inset 0 0 0 2px #2563EB';};
-      inp.onblur=function(){
-        var v=this.value===''?null:parseFloat(this.value);
-        var max=parseInt(this.dataset.max);
-        this.style.color=v!==null?(v>=max*0.5?'#16A34A':'#F59E0B'):'#CBD5E1';
-        this.parentElement.style.boxShadow='';
-      };
-      inp.onkeydown=function(e){
-        if(e.key==='Enter'||e.key==='Tab'){
-          e.preventDefault();
-          var all=[].slice.call(document.querySelectorAll('#gs-rp input[type=number]'));
-          var idx=all.indexOf(this);if(idx>=0&&idx<all.length-1)all[idx+1].focus();
-        }
-      };
-      td.appendChild(inp);tr.appendChild(td);
-    });
-
-    // total cell
-    var tdt=document.createElement('td');
-    tdt.id='gstot_'+s.id;
-    tdt.style.cssText='border:1px solid #DDD6FE;width:70px;min-width:70px;height:'+ROW_H+'px;text-align:center;font-weight:700;font-size:13px;color:#7C3AED;background:#FAF5FF;';
-    tdt.textContent=rowTotal+'/'+totalMax;
-    tr.appendChild(tdt);rtbd.appendChild(tr);
-  });
-  rtbl.appendChild(rtbd);
-  rp.innerHTML='';rp.appendChild(rtbl);
-
-  // ─ Sync row heights after render
-  setTimeout(_gsSyncH,50);
-}
-
-function _gsSyncH(){
-  var lrows=[].slice.call(document.querySelectorAll('#gs-lp tbody tr'));
-  var rrows=[].slice.call(document.querySelectorAll('#gs-rp tbody tr'));
-  var n=Math.min(lrows.length,rrows.length);
-  for(var i=0;i<n;i++){
-    var lh=lrows[i].getBoundingClientRect().height;
-    var rh=rrows[i].getBoundingClientRect().height;
-    var h=Math.max(lh,rh,44);
-    lrows[i].style.height=h+'px';
-    rrows[i].style.height=h+'px';
-  }
-}
-
-function _gsFilterRows(q){
-  var kw=(q||'').toLowerCase().trim();
-  var lrows=[].slice.call(document.querySelectorAll('#gs-lp tbody tr'));
-  var rrows=[].slice.call(document.querySelectorAll('#gs-rp tbody tr'));
-  lrows.forEach(function(lr,i){
-    var txt=(lr.textContent||'').toLowerCase();
-    var show=!kw||txt.includes(kw);
-    lr.style.display=show?'':'none';
-    if(rrows[i])rrows[i].style.display=show?'':'none';
-  });
-}
-
-function _gsUpdateTot(sid){
-  var room=_gsRoom;
-  var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;});
-  var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
-  var total=0;
-  hws.forEach(function(h){
-    var inp=document.querySelector('#gs-rp input[data-sid="'+sid+'"][data-hwnum="'+h.num+'"]');
-    if(inp&&inp.value!=='') total+=parseFloat(inp.value)||0;
-    else{var sub=DB.submissions[subKey(sid,h.num,h.room||room)];if(sub&&sub.score!==null&&sub.score!==undefined)total+=Number(sub.score);}
-  });
-  var el=document.getElementById('gstot_'+sid);if(el)el.textContent=total+'/'+totalMax;
-}
-
-function _gsColFill(hwNum,defMax){
-  var fi=document.getElementById('gsfi_'+hwNum);
-  var v=fi&&fi.value!==''?parseFloat(fi.value):defMax;
-  document.querySelectorAll('#gs-rp input[data-hwnum="'+hwNum+'"]').forEach(function(inp){
-    var tr=inp.closest('tr');if(tr&&tr.style.display==='none')return;
-    inp.value=String(v);
-    var max=parseInt(inp.dataset.max)||100;
-    inp.style.color=v>=max*0.5?'#16A34A':'#F59E0B';
-    inp.parentElement.style.background='#F0FDF4';
-    var k=subKey(inp.dataset.sid,inp.dataset.hwnum,inp.dataset.room);
-    _gsChanges[k]={sid:inp.dataset.sid,hwNum:parseInt(inp.dataset.hwnum),
-      hwTitle:inp.dataset.htitle,room:inp.dataset.room,score:v,maxScore:max};
-    _gsUpdateTot(inp.dataset.sid);
-  });_gsDirty();
-}
-
-function _gsDirty(){
-  clearTimeout(_gsST);
-  var st=document.getElementById('gs-status');
-  if(st){st.textContent='● ยังไม่บันทึก';st.style.color='#F59E0B';}
-  _gsST=setTimeout(_gsSaveAll,3000);
-}
-
-async function _gsSaveAll(){
-  clearTimeout(_gsST);
-  var items=Object.values(_gsChanges).filter(function(c){return c.score!==null&&!isNaN(c.score)&&c.score>=0;});
-  if(!items.length){var st=document.getElementById('gs-status');if(st)st.textContent='';return;}
-  var sv=document.getElementById('gs-sv-btn');if(sv)sv.disabled=true;
-  var st=document.getElementById('gs-status');if(st){st.textContent='กำลังบันทึก...';st.style.color='#64748B';}
-  var ok=0,fail=0;
-  for(var i=0;i<items.length;i++){var c=items[i];
-    try{await sbRecordSubmission({sid:c.sid,hwNum:c.hwNum,hwTitle:c.hwTitle,room:c.room,score:c.score,maxScore:c.maxScore});ok++;}
-    catch(e){fail++;}}
-  _gsChanges={};if(sv)sv.disabled=false;
-  if(!fail){
-    if(st){st.textContent='✅ บันทึก '+ok+' รายการ';st.style.color='#22C55E';
-      setTimeout(function(){if(st)st.textContent='';},3000);}
-    renderDashboard();_gsRefreshIfOpen&&_gsRefreshIfOpen();
-  } else {
-    if(st){st.textContent='⚠️ สำเร็จ '+ok+' ล้มเหลว '+fail;st.style.color='#EF4444';}
-  }
-}
-
-function _gsRefreshIfOpen(){
-  var ov=document.getElementById('gs-ov');
-  if(ov&&ov.style.display!=='none'){_gsChanges={};_gsRender();}
-}
-
-
-var _stuStatusMap={'active':'✅ ปกติ','withdrawn':'⛔ ลาออก','transferred':'🔄 ย้ายออก','leave':'💤 ลาพัก'};
-async function updateStudentStatus(sid,newStatus){
-  var stu=DB.students.find(function(s){return s.id===sid;});if(!stu)return;
-  stu.status=newStatus;
-  if(USE_SUPABASE){const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';
-    try{await SB.from('students').update({status:newStatus}).eq('id',sid).eq('teacher_id',tid);
-      toast('อัพเดต '+stu.name+' → '+(_stuStatusMap[newStatus]||newStatus)+' ✅');}
-    catch(e){toast('บันทึกไม่สำเร็จ','err');}}
-  _gsRender();
-}
-function openStatusMenu(sid){
-  var ex=document.getElementById('_smenu');if(ex)ex.remove();
-  var stu=DB.students.find(function(s){return s.id===sid;});if(!stu)return;
-  var ov2=document.createElement('div');ov2.style.cssText='position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.45);';
-  var box=document.createElement('div');
-  box.id='_smenu';
-  box.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:18px;padding:20px;min-width:240px;max-width:300px;box-shadow:0 8px 40px rgba(0,0,0,.2);z-index:99999;font-family:Sarabun,sans-serif;';
-  box.innerHTML='<div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:12px;">สถานะ: '+stu.name+'</div>';
-  [['active','✅ ปกติ','#DCFCE7','#15803D'],['leave','💤 ลาพัก','#FEF3C7','#B45309'],['transferred','🔄 ย้ายออก','#DBEAFE','#1D4ED8'],['withdrawn','⛔ ลาออก','#FEE2E2','#DC2626']].forEach(function(opt){
-    var btn=document.createElement('button');
-    btn.style.cssText='width:100%;padding:10px 14px;margin-bottom:8px;border:'+(stu.status===opt[0]?'2.5px solid '+opt[3]:'1.5px solid transparent')+';border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;background:'+opt[2]+';color:'+opt[3]+';text-align:left;';
-    btn.textContent=opt[1];
-    btn.onclick=function(){updateStudentStatus(sid,opt[0]);ov2.remove();};
-    box.appendChild(btn);
-  });
-  var cx=document.createElement('button');
-  cx.style.cssText='width:100%;padding:10px;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:Sarabun,sans-serif;background:#F1F5F9;color:#64748B;font-weight:600;';
-  cx.textContent='ยกเลิก';cx.onclick=function(){ov2.remove();};
-  box.appendChild(cx);ov2.appendChild(box);ov2.onclick=function(e){if(e.target===ov2)ov2.remove();};
-  document.body.appendChild(ov2);
 }
 
 window.addEventListener('load', () => {
