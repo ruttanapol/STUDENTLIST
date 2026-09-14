@@ -1971,9 +1971,7 @@ function renderStudentView(s, stuDB){
         ${sub
           ? `<div class="hw-status-ok">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>
-              ${sub.score!==null&&sub.score!==undefined
-                ? sub.score+'/'+authMaxScore(h,sub)+' คะแนน'
-                : '✓ ส่งแล้ว'}
+              ${(sub.score!==null&&sub.score!==undefined?sub.score:authMaxScore(h,sub))+'/'+authMaxScore(h,sub)+' คะแนน'}
             </div>`
           : `<div class="hw-status-no">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
@@ -2159,7 +2157,8 @@ async function recordScan(sid, scoreOverride){
     toast(stu.name+' ส่งงานนี้แล้ว','warn');
   } else {
     const now=ts();
-    const scoreText=score!==null&&!isNaN(score)?score:null;
+    // ถ้าไม่ได้กรอกคะแนน → บันทึกเต็ม maxScore อัตโนมัติ (เพื่อใช้คำนวณในหน้านักเรียน)
+    const scoreText=score!==null&&!isNaN(score)?score:maxScore;
     try {
       await sbRecordSubmission({sid,hwNum,hwTitle,room:stu.room,score:scoreText,maxScore});
       const scoreBadge=scoreText!==null?` · <b style="color:var(--purple);">${scoreText}/${maxScore||100}</b>`:'';
@@ -3001,7 +3000,7 @@ function buildExportData(){
     const rows=students.map((s,idx)=>{
       const row={เลขที่:idx+1,เลขประจำตัว:s.id,'ชื่อ-นามสกุล':s.name,ห้อง:s.room};
       let totalScore=0,totalMax=0,doneCount=0;
-      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:'✓';}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
+      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:(sub.maxScore||h.maxScore||100);}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
       row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
       row['คะแนนรวม']=totalScore;
       row['คะแนนเต็มรวม']=hwTotalMax;
