@@ -6081,242 +6081,251 @@ function _chkNotif(){
 }
 
 
-/* ===== GRADE SHEET (Excel Mode) ===== */
-var _gsRoom = '', _gsPendingChanges = {}, _gsSaveTimer = null;
+/* ===== GRADE SHEET ===== */
+var _gsRoom='', _gsChanges={}, _gsST=null;
 
 function openGradeSheet(){
-  if(!document.getElementById('gs-overlay')) _buildGradeSheetUI();
-  var ov = document.getElementById('gs-overlay');
-  ov.style.display = 'flex';
-  // เลือกห้องปัจจุบัน
-  var sel = document.getElementById('gs-room-sel');
-  if(sel && DB.rooms.length){
-    sel.innerHTML = DB.rooms.map(function(r){
-      return '<option value="'+r+'">'+r+'</option>';
-    }).join('');
-    _gsRoom = sel.value || DB.rooms[0];
+  if(!document.getElementById('gs-ov')) _gsBuild();
+  var ov=document.getElementById('gs-ov');
+  ov.style.display='flex';
+  var dd=document.getElementById('gs-room-dd');
+  if(dd){
+    dd.innerHTML=DB.rooms.map(function(r){return '<option value="'+r+'">'+r+'</option>';}).join('');
+    if(_gsRoom&&DB.rooms.includes(_gsRoom)) dd.value=_gsRoom;
+    else _gsRoom=dd.value||DB.rooms[0]||'';
   }
-  _gsPendingChanges = {};
-  _renderGradeSheet();
+  _gsChanges={};
+  _gsRender();
 }
 
-function _buildGradeSheetUI(){
-  var ov = document.createElement('div'); ov.id = 'gs-overlay';
+function _gsBuild(){
+  // overlay
+  var ov=document.createElement('div'); ov.id='gs-ov';
 
-  // Header
-  var hd = document.createElement('div'); hd.id = 'gs-header';
-
-  var cl = document.createElement('button'); cl.id = 'gs-close-btn';
-  cl.innerHTML = '&#x2715;'; cl.onclick = _closeGradeSheet;
-  var ti = document.createElement('div'); ti.id = 'gs-title';
-  ti.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-3px;margin-right:6px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>ตารางคะแนน';
-
-  var sel = document.createElement('select'); sel.id = 'gs-room-sel';
-  sel.onchange = function(){ _gsRoom = this.value; _gsPendingChanges={}; _renderGradeSheet(); };
-
-  var st = document.createElement('span'); st.id = 'gs-status';
-
-  var sv = document.createElement('button'); sv.id = 'gs-save-btn';
-  sv.innerHTML = '&#x1F4BE; บันทึกทั้งหมด'; sv.onclick = _saveAllGradeSheet;
-
-  hd.appendChild(cl); hd.appendChild(ti); hd.appendChild(sel);
+  // header
+  var hd=document.createElement('div'); hd.id='gs-hd';
+  var cl=document.createElement('button'); cl.id='gs-cl-btn';
+  cl.innerHTML='&#x2715;'; cl.onclick=_gsClose;
+  var ti=document.createElement('div'); ti.id='gs-hd-title';
+  ti.textContent='📊 ตารางคะแนน';
+  var dd=document.createElement('select'); dd.id='gs-room-dd';
+  dd.onchange=function(){_gsRoom=this.value;_gsChanges={};_gsRender();};
+  var st=document.createElement('div'); st.id='gs-status';
+  var sv=document.createElement('button'); sv.id='gs-sv-btn';
+  sv.innerHTML='&#x1F4BE; บันทึก'; sv.onclick=_gsSaveAll;
+  hd.appendChild(cl); hd.appendChild(ti); hd.appendChild(dd);
   hd.appendChild(st); hd.appendChild(sv);
   ov.appendChild(hd);
 
-  // Table wrap
-  var wp = document.createElement('div'); wp.id = 'gs-wrap';
-  var tbl = document.createElement('table'); tbl.id = 'gs-table';
-  wp.appendChild(tbl); ov.appendChild(wp);
+  // body panes
+  var body=document.createElement('div'); body.id='gs-body';
+  var lp=document.createElement('div'); lp.id='gs-left';
+  var rp=document.createElement('div'); rp.id='gs-right';
+  body.appendChild(lp); body.appendChild(rp);
+  ov.appendChild(body);
   document.body.appendChild(ov);
+
+  // sync scroll Y
+  lp.addEventListener('scroll',function(){rp.scrollTop=lp.scrollTop;},{passive:true});
+  rp.addEventListener('scroll',function(){lp.scrollTop=rp.scrollTop;},{passive:true});
 }
 
-function _closeGradeSheet(){
-  var ov = document.getElementById('gs-overlay');
-  if(ov) ov.style.display = 'none';
+function _gsClose(){
+  var ov=document.getElementById('gs-ov');
+  if(ov) ov.style.display='none';
 }
 
-function _renderGradeSheet(){
-  var tbl = document.getElementById('gs-table');
-  if(!tbl) return;
+function _gsRender(){
+  var lp=document.getElementById('gs-left');
+  var rp=document.getElementById('gs-right');
+  if(!lp||!rp) return;
 
-  var room = _gsRoom;
-  var hws = DB.homeworks.filter(function(h){ return !h.room || h.room === room; })
-                        .sort(function(a,b){ return a.num - b.num; });
-  var stus = DB.students.filter(function(s){ return s.room === room; })
-                        .sort(function(a,b){ return a.id.localeCompare(b.id); });
+  var room=_gsRoom;
+  var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;})
+                      .sort(function(a,b){return a.num-b.num;});
+  var stus=DB.students.filter(function(s){return s.room===room;})
+                      .sort(function(a,b){return a.id.localeCompare(b.id);});
 
-  if(!stus.length || !hws.length){
-    tbl.innerHTML = '<tr><td colspan="10" style="padding:40px;text-align:center;color:#94A3B8;font-size:14px;">ไม่พบนักเรียนหรือชิ้นงานในห้อง '+room+'</td></tr>';
+  if(!stus.length||!hws.length){
+    lp.innerHTML=''; rp.innerHTML='';
+    rp.innerHTML='<div style="padding:40px;text-align:center;color:#94A3B8;font-size:14px;">ไม่พบข้อมูลในห้อง '+room+'</div>';
     return;
   }
 
-  // ── HEAD ──
-  var thead = document.createElement('thead');
-  var trh = document.createElement('tr');
+  var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
 
-  // sticky cols
-  var th0 = document.createElement('th'); th0.className='gs-sticky';
-  th0.style.cssText='left:0;min-width:36px;text-align:center;padding:8px 4px;'; th0.textContent='#';
-  var th1 = document.createElement('th'); th1.className='gs-sticky';
-  th1.style.cssText='left:36px;padding:8px 10px;border-right:2px solid #BFDBFE;'; th1.textContent='ชื่อ-นามสกุล';
-  trh.appendChild(th0); trh.appendChild(th1);
-
-  hws.forEach(function(h){
-    var th = document.createElement('th');
-    var fillId = 'gsfill_'+h.num;
-    var div = document.createElement('div'); div.className='gs-hw-head';
-    div.innerHTML = '<div class="gs-hw-num">งาน '+h.num+'</div>'
-      + '<div class="gs-hw-max">'+h.title.substring(0,10)+(h.title.length>10?'..':'')+' /'+( h.maxScore||100)+'</div>'
-      + '<div class="gs-fill-row">'
-      + '<input class="gs-fill-inp" id="'+fillId+'" type="number" min="0" max="'+(h.maxScore||100)+'" placeholder="'+(h.maxScore||100)+'" title="ใส่คะแนนทุกคน">'
-      + '<button class="gs-fill-btn" onclick="_gsColFill('+h.num+','+( h.maxScore||100)+')">ทุกคน</button>'
-      + '</div>';
-    th.appendChild(div);
-    trh.appendChild(th);
+  // ── LEFT TABLE (ชื่อ) ──────────────────────────────
+  var lt=document.createElement('table'); lt.className='gs-tbl'; lt.id='gs-ltbl';
+  // head
+  var lth=document.createElement('thead');
+  var lthr=document.createElement('tr');
+  var th0=document.createElement('th'); th0.style.width='34px';
+  th0.innerHTML='<div class="gs-hcell" style="font-size:10px;color:#94A3B8;">#</div>';
+  var th1=document.createElement('th');
+  th1.innerHTML='<div class="gs-hcell">ชื่อ-นามสกุล</div>';
+  lthr.appendChild(th0); lthr.appendChild(th1); lth.appendChild(lthr); lt.appendChild(lth);
+  // body
+  var ltb=document.createElement('tbody');
+  stus.forEach(function(s,i){
+    var tr=document.createElement('tr'); tr.className='gs-row'; tr.dataset.sid=s.id;
+    var tn=document.createElement('td'); tn.className='gs-num'; tn.textContent=i+1;
+    var tm=document.createElement('td'); tm.className='gs-nm';
+    tm.innerHTML='<div class="gs-nm-main">'+s.name+'</div><div class="gs-nm-sub">'+s.id+'</div>';
+    tr.appendChild(tn); tr.appendChild(tm); ltb.appendChild(tr);
   });
+  lt.appendChild(ltb); lp.innerHTML=''; lp.appendChild(lt);
 
-  var thT = document.createElement('th');
-  thT.style.cssText='padding:8px 10px;min-width:60px;'; thT.textContent='รวม';
-  trh.appendChild(thT);
-  thead.appendChild(trh);
+  // ── RIGHT TABLE (คะแนน) ───────────────────────────
+  var rt=document.createElement('table'); rt.className='gs-tbl'; rt.id='gs-rtbl';
+  // head
+  var rth=document.createElement('thead'); var rthr=document.createElement('tr');
+  hws.forEach(function(h){
+    var th=document.createElement('th'); th.className='gs-hw-th';
+    var fi='gsfi_'+h.num;
+    var d=document.createElement('div'); d.className='gs-hw-hcell';
+    d.innerHTML='<div class="gs-hw-n">งาน '+h.num+'</div>'
+      +'<div class="gs-hw-t">'+h.title+'</div>'
+      +'<div class="gs-fill-row">'
+      +'<input class="gs-fi" id="'+fi+'" type="number" min="0" max="'+(h.maxScore||100)+'" placeholder="'+(h.maxScore||100)+'">'
+      +'<button class="gs-fb" onclick="_gsColFill('+h.num+','+( h.maxScore||100)+')">ทั้งหมด</button>'
+      +'</div>';
+    th.appendChild(d); rthr.appendChild(th);
+  });
+  var tht=document.createElement('th'); tht.className='gs-total-th';
+  tht.innerHTML='<div style="padding:8px 6px;text-align:center;font-size:12px;">รวม<br><span style="font-size:10px;font-weight:400;color:#A78BFA;">/ '+totalMax+'</span></div>';
+  rthr.appendChild(tht); rth.appendChild(rthr); rt.appendChild(rth);
 
-  // ── BODY ──
-  var tbody = document.createElement('tbody');
-  stus.forEach(function(s, idx){
-    var tr = document.createElement('tr');
-
-    var tdN = document.createElement('td'); tdN.className='gs-num';
-    tdN.textContent=idx+1; tr.appendChild(tdN);
-
-    var tdNm = document.createElement('td'); tdNm.className='gs-name';
-    tdNm.innerHTML='<div style="font-size:13px;">'+s.name+'</div>'
-      +'<div style="font-size:11px;color:#94A3B8;">'+s.id+'</div>';
-    tr.appendChild(tdNm);
-
-    var rowTotal = 0;
+  // body
+  var rtb=document.createElement('tbody');
+  stus.forEach(function(s){
+    var tr=document.createElement('tr'); tr.className='gs-row'; tr.dataset.sid=s.id;
+    var rowTotal=0;
     hws.forEach(function(h){
-      var key = subKey(s.id, h.num, h.room||room);
-      var sub = DB.submissions[key];
-      var curScore = sub ? (sub.score!==null&&sub.score!==undefined ? sub.score : (h.maxScore||100)) : null;
-      if(curScore!==null) rowTotal += Number(curScore);
+      var key=subKey(s.id,h.num,h.room||room);
+      var sub=DB.submissions[key];
+      var chg=_gsChanges[key];
+      var curScore=chg!==undefined ? chg :
+                   (sub ? (sub.score!==null&&sub.score!==undefined ? Number(sub.score) : (h.maxScore||100)) : null);
+      if(curScore!==null) rowTotal+=Number(curScore);
 
-      var td = document.createElement('td');
-      td.style.cssText='text-align:center;';
-      var inp = document.createElement('input');
+      var td=document.createElement('td');
+      td.className='gs-sc '+(curScore!==null?'submitted':'unset');
+      var inp=document.createElement('input');
       inp.type='number'; inp.min='0'; inp.max=String(h.maxScore||100);
-      inp.className='gs-score-inp ' + (curScore!==null?'gs-filled':'gs-empty');
-      inp.value = curScore!==null ? curScore : '';
-      inp.placeholder = sub ? String(h.maxScore||100) : '—';
+      inp.className='gs-inp '+(curScore!==null?(curScore>=(h.maxScore||100)*0.5?'ok':'partial'):'empty');
+      inp.value=curScore!==null?String(curScore):'';
+      inp.placeholder=curScore!==null?'':String(h.maxScore||100);
+      inp.inputMode='decimal';
       inp.dataset.sid=s.id; inp.dataset.hwnum=h.num;
       inp.dataset.room=h.room||room; inp.dataset.max=h.maxScore||100;
       inp.dataset.htitle=h.title;
+      inp.setAttribute('enterkeyhint','next');
 
-      inp.oninput = function(){
-        var k = subKey(this.dataset.sid, this.dataset.hwnum, this.dataset.room);
-        _gsPendingChanges[k] = {
-          sid:this.dataset.sid, hwNum:parseInt(this.dataset.hwnum),
-          hwTitle:this.dataset.htitle, room:this.dataset.room,
-          score:this.value===''?null:parseFloat(this.value),
-          maxScore:parseInt(this.dataset.max)
-        };
-        this.className='gs-score-inp '+(this.value!==''?'gs-filled':'gs-empty');
-        _gsUpdateRowTotal(this.dataset.sid, hws, room);
-        _gsMarkDirty();
+      inp.oninput=function(){
+        var k=subKey(this.dataset.sid,this.dataset.hwnum,this.dataset.room);
+        var v=this.value===''?null:parseFloat(this.value);
+        _gsChanges[k]={sid:this.dataset.sid,hwNum:parseInt(this.dataset.hwnum),
+          hwTitle:this.dataset.htitle,room:this.dataset.room,
+          score:v,maxScore:parseInt(this.dataset.max)};
+        var max=parseInt(this.dataset.max);
+        this.className='gs-inp '+(this.value!==''?(parseFloat(this.value)>=max*0.5?'ok':'partial'):'empty');
+        this.closest('td').className='gs-sc '+(this.value!==''?'submitted':'unset');
+        _gsRefreshRow(this.dataset.sid);
+        _gsDirty();
       };
-      inp.onblur = function(){
-        // auto-save after 2s idle
-        clearTimeout(_gsSaveTimer);
-        _gsSaveTimer = setTimeout(_saveAllGradeSheet, 2000);
+      inp.onkeydown=function(e){
+        // Tab / Enter → move to next cell
+        if(e.key==='Enter'||e.key==='Tab'){
+          e.preventDefault();
+          var all=[].slice.call(document.querySelectorAll('#gs-rtbl .gs-inp'));
+          var idx=all.indexOf(this);
+          if(idx>=0&&idx<all.length-1) all[idx+1].focus();
+        }
       };
+
       td.appendChild(inp); tr.appendChild(td);
     });
 
-    var tdT = document.createElement('td'); tdT.className='gs-total';
-    tdT.id='gstotal_'+s.id;
-    var totalMax = hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
-    tdT.textContent = rowTotal+'/'+totalMax;
-    tr.appendChild(tdT);
-    tbody.appendChild(tr);
+    var tdt=document.createElement('td'); tdt.className='gs-tot'; tdt.id='gstot_'+s.id;
+    tdt.textContent=rowTotal+'/'+totalMax;
+    tr.appendChild(tdt); rtb.appendChild(tr);
   });
-
-  tbl.innerHTML=''; tbl.appendChild(thead); tbl.appendChild(tbody);
+  rt.appendChild(rtb); rp.innerHTML=''; rp.appendChild(rt);
+  // reset scroll sync
+  lp.scrollTop=0; rp.scrollTop=0;
 }
 
-function _gsColFill(hwNum, defaultMax){
-  var fillEl = document.getElementById('gsfill_'+hwNum);
-  var fillScore = fillEl && fillEl.value!=='' ? parseFloat(fillEl.value) : defaultMax;
-  // ใส่คะแนนให้ทุกคนในคอลัมน์นี้
-  document.querySelectorAll('#gs-table input[data-hwnum="'+hwNum+'"]').forEach(function(inp){
-    inp.value = fillScore;
-    inp.className = 'gs-score-inp gs-filled';
-    var k = subKey(inp.dataset.sid, inp.dataset.hwnum, inp.dataset.room);
-    _gsPendingChanges[k] = {
-      sid:inp.dataset.sid, hwNum:parseInt(inp.dataset.hwnum),
-      hwTitle:inp.dataset.htitle, room:inp.dataset.room,
-      score:fillScore, maxScore:parseInt(inp.dataset.max)
-    };
-  });
-  // อัพเดต row totals
-  var room = _gsRoom;
-  var hws = DB.homeworks.filter(function(h){ return !h.room||h.room===room; });
-  DB.students.filter(function(s){return s.room===room;}).forEach(function(s){
-    _gsUpdateRowTotal(s.id, hws, room);
-  });
-  _gsMarkDirty();
-}
-
-function _gsUpdateRowTotal(sid, hws, room){
-  var totalEl = document.getElementById('gstotal_'+sid);
-  if(!totalEl) return;
-  var total = 0;
+function _gsRefreshRow(sid){
+  var room=_gsRoom;
+  var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;});
+  var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
+  var total=0;
   hws.forEach(function(h){
-    var inp = document.querySelector('#gs-table input[data-sid="'+sid+'"][data-hwnum="'+h.num+'"]');
-    if(inp && inp.value!=='') total += parseFloat(inp.value)||0;
+    var inp=document.querySelector('#gs-rtbl input[data-sid="'+sid+'"][data-hwnum="'+h.num+'"]');
+    if(inp&&inp.value!=='') total+=parseFloat(inp.value)||0;
     else {
-      var sub = DB.submissions[subKey(sid, h.num, h.room||room)];
-      if(sub){total += (sub.score!==null&&sub.score!==undefined)?Number(sub.score):(h.maxScore||100);}
+      var k=subKey(sid,h.num,h.room||room);
+      var sub=DB.submissions[k];
+      if(sub) total+=( sub.score!==null&&sub.score!==undefined)?Number(sub.score):(h.maxScore||100);
     }
   });
-  var totalMax = hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
-  totalEl.textContent = total+'/'+totalMax;
+  var el=document.getElementById('gstot_'+sid);
+  if(el) el.textContent=total+'/'+totalMax;
 }
 
-function _gsMarkDirty(){
-  var st = document.getElementById('gs-status');
-  if(st){ st.textContent='● มีการแก้ไข'; st.style.color='#F59E0B'; }
+function _gsColFill(hwNum,defMax){
+  var fi=document.getElementById('gsfi_'+hwNum);
+  var v=fi&&fi.value!==''?parseFloat(fi.value):defMax;
+  document.querySelectorAll('#gs-rtbl input[data-hwnum="'+hwNum+'"]').forEach(function(inp){
+    inp.value=String(v);
+    inp.className='gs-inp '+(v>=(parseInt(inp.dataset.max)||100)*0.5?'ok':'partial');
+    inp.closest('td').className='gs-sc submitted';
+    var k=subKey(inp.dataset.sid,inp.dataset.hwnum,inp.dataset.room);
+    _gsChanges[k]={sid:inp.dataset.sid,hwNum:parseInt(inp.dataset.hwnum),
+      hwTitle:inp.dataset.htitle,room:inp.dataset.room,
+      score:v,maxScore:parseInt(inp.dataset.max)};
+    _gsRefreshRow(inp.dataset.sid);
+  });
+  _gsDirty();
 }
 
-async function _saveAllGradeSheet(){
-  var changes = Object.values(_gsPendingChanges);
-  if(!changes.length){
+function _gsDirty(){
+  clearTimeout(_gsST);
+  var st=document.getElementById('gs-status');
+  if(st){st.textContent='● มีการแก้ไขที่ยังไม่บันทึก';st.style.color='#F59E0B';}
+  _gsST=setTimeout(_gsSaveAll,3000);
+}
+
+async function _gsSaveAll(){
+  clearTimeout(_gsST);
+  var items=Object.values(_gsChanges).filter(function(c){
+    return c.score!==null&&!isNaN(c.score)&&c.score>=0;
+  });
+  if(!items.length){
     var st=document.getElementById('gs-status');
-    if(st){st.textContent='✓ ไม่มีการเปลี่ยนแปลง';st.style.color='#94A3B8';}
-    return;
+    if(st){st.textContent='';} return;
   }
-  var btn = document.getElementById('gs-save-btn');
-  if(btn) btn.disabled = true;
-  var st = document.getElementById('gs-status');
-  if(st){st.textContent='กำลังบันทึก...';st.style.color='#F59E0B';}
-  var ok=0, fail=0;
-  for(var i=0; i<changes.length; i++){
-    var c = changes[i];
+  var sv=document.getElementById('gs-sv-btn');
+  if(sv) sv.disabled=true;
+  var st=document.getElementById('gs-status');
+  if(st){st.textContent='กำลังบันทึก '+items.length+' รายการ...';st.style.color='#94A3B8';}
+  var ok=0,fail=0;
+  for(var i=0;i<items.length;i++){
+    var c=items[i];
     try{
-      await sbRecordSubmission({
-        sid:c.sid, hwNum:c.hwNum, hwTitle:c.hwTitle,
-        room:c.room, score:c.score, maxScore:c.maxScore
-      });
+      await sbRecordSubmission({sid:c.sid,hwNum:c.hwNum,hwTitle:c.hwTitle,
+        room:c.room,score:c.score,maxScore:c.maxScore});
       ok++;
-    }catch(e){ fail++; }
+    }catch(e){fail++;}
   }
-  _gsPendingChanges = {};
-  if(btn) btn.disabled = false;
+  _gsChanges={};
+  if(sv) sv.disabled=false;
   if(fail===0){
-    if(st){st.textContent='✅ บันทึก '+ok+' รายการ';st.style.color='#22C55E';}
-    toast('บันทึกคะแนนแล้ว '+ok+' รายการ ✅');
+    if(st){st.textContent='✅ บันทึก '+ok+' รายการ';st.style.color='#22C55E';
+      setTimeout(function(){if(st)st.textContent='';},3000);}
     renderDashboard();
   } else {
-    if(st){st.textContent='⚠️ บันทึกสำเร็จ '+ok+' รายการ ล้มเหลว '+fail+' รายการ';st.style.color='#EF4444';}
-    toast('บันทึกบางรายการไม่สำเร็จ','err');
+    if(st){st.textContent='⚠️ สำเร็จ '+ok+' ล้มเหลว '+fail;st.style.color='#EF4444';}
   }
 }
 
