@@ -6082,7 +6082,7 @@ function _chkNotif(){
 
 
 /* ===== STUDENT FILTER ===== */
-var _sfPct = 60, _sfRoom = 'all', _sfMode = 'below';
+var _sfPct = 60, _sfScore = 0, _sfRoom = 'all', _sfMode = 'below', _sfType = 'pct'; // pct = เปอร์เซ็นต์, score = คะแนน
 
 function openStudentFilter(){
   if(!document.getElementById('sf-ov')) _sfBuild();
@@ -6135,8 +6135,27 @@ function _sfBuild(){
   });
   mg.appendChild(ml); mg.appendChild(mw); ctrl.appendChild(mg);
 
-  // percent
-  var pg=document.createElement('div'); pg.className='sf-ctrl-group';
+  // type toggle (pct vs score)
+  var tg=document.createElement('div'); tg.className='sf-ctrl-group';
+  var tl=document.createElement('div'); tl.className='sf-ctrl-label'; tl.textContent='เงื่อนไข';
+  var tw=document.createElement('div'); tw.style.cssText='display:flex;gap:6px;';
+  [['pct','เปอร์เซ็นต์'],['score','คะแนน']].forEach(function(pair){
+    var b=document.createElement('button'); b.className='sf-pct-chip'+(_sfType===pair[0]?' active':'');
+    b.textContent=pair[1]; b.dataset.type=pair[0];
+    b.onclick=function(){
+      _sfType=this.dataset.type;
+      tw.querySelectorAll('.sf-pct-chip').forEach(function(x){x.classList.remove('active');});
+      this.classList.add('active');
+      document.getElementById('sf-pct-panel').style.display=_sfType==='pct'?'':'none';
+      document.getElementById('sf-score-panel').style.display=_sfType==='score'?'':'none';
+      _sfRun();
+    };
+    tw.appendChild(b);
+  });
+  tg.appendChild(tl); tg.appendChild(tw); ctrl.appendChild(tg);
+
+  // percent panel
+  var pg=document.createElement('div'); pg.className='sf-ctrl-group'; pg.id='sf-pct-panel';
   var pl=document.createElement('div'); pl.className='sf-ctrl-label'; pl.textContent='เปอร์เซ็นต์';
   var pw=document.createElement('div'); pw.className='sf-pct-wrap';
   [50,60,70,80,90].forEach(function(p){
@@ -6166,6 +6185,40 @@ function _sfBuild(){
   var pLabel=document.createElement('span'); pLabel.style.cssText='font-size:13px;color:#475569;font-weight:700;'; pLabel.textContent='%';
   cw.appendChild(ci); cw.appendChild(pLabel); pw.appendChild(cw);
   pg.appendChild(pl); pg.appendChild(pw); ctrl.appendChild(pg);
+
+  // score panel
+  var sg=document.createElement('div'); sg.className='sf-ctrl-group'; sg.id='sf-score-panel';
+  sg.style.display='none';
+  var sl=document.createElement('div'); sl.className='sf-ctrl-label'; sl.textContent='คะแนน (ต่ำกว่า/สูงกว่า)';
+  var sw=document.createElement('div'); sw.style.cssText='display:flex;align-items:center;gap:6px;flex-wrap:wrap;';
+  // score presets
+  [20,40,60,80].forEach(function(sc){
+    var b=document.createElement('button'); b.className='sf-pct-chip'+(_sfScore===sc?' active':'');
+    b.textContent=sc+' คะแนน'; b.dataset.sc=sc;
+    b.onclick=function(){
+      _sfScore=parseInt(this.dataset.sc);
+      sw.querySelectorAll('.sf-pct-chip[data-sc]').forEach(function(x){x.classList.remove('active');});
+      this.classList.add('active');
+      document.getElementById('sf-score-inp').value='';
+      _sfRun();
+    };
+    sw.appendChild(b);
+  });
+  var sciWrap=document.createElement('div'); sciWrap.style.cssText='display:flex;align-items:center;gap:4px;';
+  var sci=document.createElement('input'); sci.id='sf-score-inp';
+  sci.type='number'; sci.min='0'; sci.placeholder='กรอก';
+  sci.style.cssText='width:64px;padding:7px 8px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;text-align:center;font-family:Sarabun,sans-serif;';
+  sci.oninput=function(){
+    var v=parseFloat(this.value);
+    if(!isNaN(v)&&v>=0){
+      _sfScore=v;
+      sw.querySelectorAll('.sf-pct-chip[data-sc]').forEach(function(x){x.classList.remove('active');});
+      _sfRun();
+    }
+  };
+  var scLbl=document.createElement('span'); scLbl.style.cssText='font-size:13px;color:#475569;font-weight:700;'; scLbl.textContent='คะแนน';
+  sciWrap.appendChild(sci); sciWrap.appendChild(scLbl); sw.appendChild(sciWrap);
+  sg.appendChild(sl); sg.appendChild(sw); ctrl.appendChild(sg);
 
   ov.appendChild(ctrl);
 
@@ -6201,7 +6254,12 @@ function _sfRun(){
       }
     });
     var scorePct=totalMax>0?Math.round(totalScore/totalMax*100):0;
-    var qualifies=(mode==='below')?(scorePct<pct):(scorePct>=pct);
+    var qualifies;
+    if(_sfType==='score'){
+      qualifies=(mode==='below')?(totalScore<_sfScore):(totalScore>=_sfScore);
+    } else {
+      qualifies=(mode==='below')?(scorePct<pct):(scorePct>=pct);
+    }
     if(qualifies){
       results.push({
         s:s, totalScore:totalScore, totalMax:totalMax,
@@ -6220,12 +6278,17 @@ function _sfRun(){
   if(sm){
     if(results.length>0){
       sm.style.display='block';
-      sm.innerHTML='พบ <b>'+results.length+' คน</b> ที่'
-        +(mode==='below'?'คะแนน<b>ต่ำกว่า '+pct+'%</b>':'คะแนน<b>สูงกว่า '+pct+'%</b>')
+      var condText=_sfType==='score'
+        ?(mode==='below'?'คะแนน<b>ต่ำกว่า '+_sfScore+' คะแนน</b>':'คะแนน<b>สูงกว่า '+_sfScore+' คะแนน</b>')
+        :(mode==='below'?'คะแนน<b>ต่ำกว่า '+pct+'%</b>':'คะแนน<b>สูงกว่า '+pct+'%</b>');
+      sm.innerHTML='พบ <b>'+results.length+' คน</b> ที่'+condText
         +'&nbsp;&nbsp;|&nbsp;&nbsp;จากทั้งหมด <b>'+DB.students.filter(function(s){return room==='all'||s.room===room;}).length+' คน</b>';
     } else {
       sm.style.display='block';
-      sm.innerHTML='✅ ไม่พบนักเรียน'+(mode==='below'?' ที่คะแนนต่ำกว่า '+pct+'%':' ที่คะแนนสูงกว่า '+pct+'%')+'ในเงื่อนไขนี้';
+      var noText=_sfType==='score'
+        ?(mode==='below'?' คะแนนต่ำกว่า '+_sfScore+' คะแนน':' คะแนนสูงกว่า '+_sfScore+' คะแนน')
+        :(mode==='below'?' คะแนนต่ำกว่า '+pct+'%':' คะแนนสูงกว่า '+pct+'%');
+      sm.innerHTML='✅ ไม่พบนักเรียน'+noText+'ในเงื่อนไขนี้';
     }
   }
 
@@ -6266,7 +6329,10 @@ function _sfRun(){
 function _sfCopyList(){
   var items=document.querySelectorAll('#sf-list .sf-card');
   if(!items.length){toast('ไม่มีรายชื่อ','warn');return;}
-  var lines=['รายชื่อนักเรียน ('+(_sfMode==='below'?'ต่ำกว่า':'สูงกว่า')+' '+_sfPct+'%)',''];
+  var condLabel=_sfType==='score'
+    ?(_sfMode==='below'?'ต่ำกว่า':'สูงกว่า')+' '+_sfScore+' คะแนน'
+    :(_sfMode==='below'?'ต่ำกว่า':'สูงกว่า')+' '+_sfPct+'%';
+  var lines=['รายชื่อนักเรียน ('+condLabel+')',''];
   items.forEach(function(card,i){
     var name=card.querySelector('.sf-name').textContent;
     var meta=card.querySelector('.sf-meta').textContent.trim();
