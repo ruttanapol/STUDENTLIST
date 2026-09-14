@@ -1899,15 +1899,16 @@ function renderStudentView(s, stuDB){
     return sub.score!==null && sub.score!==undefined;
   });
   const pendingCount=done.length-gradedHWs.length;
-  // totalScore: คะแนนที่ได้จากงานที่ส่งแล้ว
   const totalScore=done.reduce((sum,h)=>{
     const sub=db.submissions[subKey(s.id,h.num,h.room)];
-    const ms=Number(h.maxScore||sub?.maxScore||100);
-    const sc=(sub?.score!==null&&sub?.score!==undefined)?Number(sub.score):ms;
+    const ms=Number(h.maxScore||sub.maxScore||100);
+    const sc=(sub.score!==null&&sub.score!==undefined)?Number(sub.score):ms;
     return sum+sc;
   },0);
-  // totalMax: คะแนนเต็มรวมของงาน *ทั้งหมด* ในห้อง (ไม่ใช่แค่ที่ส่งแล้ว)
-  const totalMax=roomHWs.reduce((sum,h)=>sum+Number(h.maxScore||100),0);
+  const totalMax=done.reduce((sum,h)=>{
+    const sub=db.submissions[subKey(s.id,h.num,h.room)];
+    return sum+Number(h.maxScore||sub.maxScore||100);
+  },0);
   const scorePct=totalMax?Math.round(totalScore/totalMax*100):0;
   // เก็บไว้ใช้ในตัวแปลงคะแนน (ทดลองเทียบเป็นคะแนนเต็มอื่น)
   _stuTotalScore=totalScore; _stuTotalMax=totalMax;
@@ -1915,7 +1916,7 @@ function renderStudentView(s, stuDB){
   let html=`<div class="score-hero">
     <div class="score-hero-lbl">🏆 คะแนนรวมทั้งหมด</div>
     <div class="score-hero-num">${totalScore}<span>/${totalMax}</span></div>
-    <div class="score-hero-sub">${done.length?`ส่งแล้ว ${done.length}/${roomHWs.length} ชิ้น · ได้ ${scorePct}% จากคะแนนเต็มทั้งหมด`:'ยังไม่มีงานที่ส่ง'}</div>
+    <div class="score-hero-sub">${done.length?`ได้ ${scorePct}% จากงานที่ส่งแล้ว ${done.length} ชิ้น${pendingCount?` (รอตรวจ ${pendingCount} ชิ้น)`:''}`:'ยังไม่มีงานที่ส่ง'}</div>
   </div>
   ${totalMax?`<div class="card" style="margin-bottom:14px;">
     <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;">🧮 ลองเทียบคะแนน</div>
@@ -6077,6 +6078,246 @@ function _chkNotif(){
       new Notification('📅 '+e.title,{body:e.time?'เวลา '+e.time:(e.desc||'มีกิจกรรม'),tag:k});
     }
   });
+}
+
+
+/* ===== GRADE SHEET (Excel Mode) ===== */
+var _gsRoom = '', _gsPendingChanges = {}, _gsSaveTimer = null;
+
+function openGradeSheet(){
+  if(!document.getElementById('gs-overlay')) _buildGradeSheetUI();
+  var ov = document.getElementById('gs-overlay');
+  ov.style.display = 'flex';
+  // เลือกห้องปัจจุบัน
+  var sel = document.getElementById('gs-room-sel');
+  if(sel && DB.rooms.length){
+    sel.innerHTML = DB.rooms.map(function(r){
+      return '<option value="'+r+'">'+r+'</option>';
+    }).join('');
+    _gsRoom = sel.value || DB.rooms[0];
+  }
+  _gsPendingChanges = {};
+  _renderGradeSheet();
+}
+
+function _buildGradeSheetUI(){
+  var ov = document.createElement('div'); ov.id = 'gs-overlay';
+
+  // Header
+  var hd = document.createElement('div'); hd.id = 'gs-header';
+
+  var cl = document.createElement('button'); cl.id = 'gs-close-btn';
+  cl.innerHTML = '&#x2715;'; cl.onclick = _closeGradeSheet;
+  var ti = document.createElement('div'); ti.id = 'gs-title';
+  ti.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-3px;margin-right:6px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>ตารางคะแนน';
+
+  var sel = document.createElement('select'); sel.id = 'gs-room-sel';
+  sel.onchange = function(){ _gsRoom = this.value; _gsPendingChanges={}; _renderGradeSheet(); };
+
+  var st = document.createElement('span'); st.id = 'gs-status';
+
+  var sv = document.createElement('button'); sv.id = 'gs-save-btn';
+  sv.innerHTML = '&#x1F4BE; บันทึกทั้งหมด'; sv.onclick = _saveAllGradeSheet;
+
+  hd.appendChild(cl); hd.appendChild(ti); hd.appendChild(sel);
+  hd.appendChild(st); hd.appendChild(sv);
+  ov.appendChild(hd);
+
+  // Table wrap
+  var wp = document.createElement('div'); wp.id = 'gs-wrap';
+  var tbl = document.createElement('table'); tbl.id = 'gs-table';
+  wp.appendChild(tbl); ov.appendChild(wp);
+  document.body.appendChild(ov);
+}
+
+function _closeGradeSheet(){
+  var ov = document.getElementById('gs-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function _renderGradeSheet(){
+  var tbl = document.getElementById('gs-table');
+  if(!tbl) return;
+
+  var room = _gsRoom;
+  var hws = DB.homeworks.filter(function(h){ return !h.room || h.room === room; })
+                        .sort(function(a,b){ return a.num - b.num; });
+  var stus = DB.students.filter(function(s){ return s.room === room; })
+                        .sort(function(a,b){ return a.id.localeCompare(b.id); });
+
+  if(!stus.length || !hws.length){
+    tbl.innerHTML = '<tr><td colspan="10" style="padding:40px;text-align:center;color:#94A3B8;font-size:14px;">ไม่พบนักเรียนหรือชิ้นงานในห้อง '+room+'</td></tr>';
+    return;
+  }
+
+  // ── HEAD ──
+  var thead = document.createElement('thead');
+  var trh = document.createElement('tr');
+
+  // sticky cols
+  var th0 = document.createElement('th'); th0.className='gs-sticky';
+  th0.style.cssText='left:0;min-width:36px;text-align:center;padding:8px 4px;'; th0.textContent='#';
+  var th1 = document.createElement('th'); th1.className='gs-sticky';
+  th1.style.cssText='left:36px;padding:8px 10px;border-right:2px solid #BFDBFE;'; th1.textContent='ชื่อ-นามสกุล';
+  trh.appendChild(th0); trh.appendChild(th1);
+
+  hws.forEach(function(h){
+    var th = document.createElement('th');
+    var fillId = 'gsfill_'+h.num;
+    var div = document.createElement('div'); div.className='gs-hw-head';
+    div.innerHTML = '<div class="gs-hw-num">งาน '+h.num+'</div>'
+      + '<div class="gs-hw-max">'+h.title.substring(0,10)+(h.title.length>10?'..':'')+' /'+( h.maxScore||100)+'</div>'
+      + '<div class="gs-fill-row">'
+      + '<input class="gs-fill-inp" id="'+fillId+'" type="number" min="0" max="'+(h.maxScore||100)+'" placeholder="'+(h.maxScore||100)+'" title="ใส่คะแนนทุกคน">'
+      + '<button class="gs-fill-btn" onclick="_gsColFill('+h.num+','+( h.maxScore||100)+')">ทุกคน</button>'
+      + '</div>';
+    th.appendChild(div);
+    trh.appendChild(th);
+  });
+
+  var thT = document.createElement('th');
+  thT.style.cssText='padding:8px 10px;min-width:60px;'; thT.textContent='รวม';
+  trh.appendChild(thT);
+  thead.appendChild(trh);
+
+  // ── BODY ──
+  var tbody = document.createElement('tbody');
+  stus.forEach(function(s, idx){
+    var tr = document.createElement('tr');
+
+    var tdN = document.createElement('td'); tdN.className='gs-num';
+    tdN.textContent=idx+1; tr.appendChild(tdN);
+
+    var tdNm = document.createElement('td'); tdNm.className='gs-name';
+    tdNm.innerHTML='<div style="font-size:13px;">'+s.name+'</div>'
+      +'<div style="font-size:11px;color:#94A3B8;">'+s.id+'</div>';
+    tr.appendChild(tdNm);
+
+    var rowTotal = 0;
+    hws.forEach(function(h){
+      var key = subKey(s.id, h.num, h.room||room);
+      var sub = DB.submissions[key];
+      var curScore = sub ? (sub.score!==null&&sub.score!==undefined ? sub.score : (h.maxScore||100)) : null;
+      if(curScore!==null) rowTotal += Number(curScore);
+
+      var td = document.createElement('td');
+      td.style.cssText='text-align:center;';
+      var inp = document.createElement('input');
+      inp.type='number'; inp.min='0'; inp.max=String(h.maxScore||100);
+      inp.className='gs-score-inp ' + (curScore!==null?'gs-filled':'gs-empty');
+      inp.value = curScore!==null ? curScore : '';
+      inp.placeholder = sub ? String(h.maxScore||100) : '—';
+      inp.dataset.sid=s.id; inp.dataset.hwnum=h.num;
+      inp.dataset.room=h.room||room; inp.dataset.max=h.maxScore||100;
+      inp.dataset.htitle=h.title;
+
+      inp.oninput = function(){
+        var k = subKey(this.dataset.sid, this.dataset.hwnum, this.dataset.room);
+        _gsPendingChanges[k] = {
+          sid:this.dataset.sid, hwNum:parseInt(this.dataset.hwnum),
+          hwTitle:this.dataset.htitle, room:this.dataset.room,
+          score:this.value===''?null:parseFloat(this.value),
+          maxScore:parseInt(this.dataset.max)
+        };
+        this.className='gs-score-inp '+(this.value!==''?'gs-filled':'gs-empty');
+        _gsUpdateRowTotal(this.dataset.sid, hws, room);
+        _gsMarkDirty();
+      };
+      inp.onblur = function(){
+        // auto-save after 2s idle
+        clearTimeout(_gsSaveTimer);
+        _gsSaveTimer = setTimeout(_saveAllGradeSheet, 2000);
+      };
+      td.appendChild(inp); tr.appendChild(td);
+    });
+
+    var tdT = document.createElement('td'); tdT.className='gs-total';
+    tdT.id='gstotal_'+s.id;
+    var totalMax = hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
+    tdT.textContent = rowTotal+'/'+totalMax;
+    tr.appendChild(tdT);
+    tbody.appendChild(tr);
+  });
+
+  tbl.innerHTML=''; tbl.appendChild(thead); tbl.appendChild(tbody);
+}
+
+function _gsColFill(hwNum, defaultMax){
+  var fillEl = document.getElementById('gsfill_'+hwNum);
+  var fillScore = fillEl && fillEl.value!=='' ? parseFloat(fillEl.value) : defaultMax;
+  // ใส่คะแนนให้ทุกคนในคอลัมน์นี้
+  document.querySelectorAll('#gs-table input[data-hwnum="'+hwNum+'"]').forEach(function(inp){
+    inp.value = fillScore;
+    inp.className = 'gs-score-inp gs-filled';
+    var k = subKey(inp.dataset.sid, inp.dataset.hwnum, inp.dataset.room);
+    _gsPendingChanges[k] = {
+      sid:inp.dataset.sid, hwNum:parseInt(inp.dataset.hwnum),
+      hwTitle:inp.dataset.htitle, room:inp.dataset.room,
+      score:fillScore, maxScore:parseInt(inp.dataset.max)
+    };
+  });
+  // อัพเดต row totals
+  var room = _gsRoom;
+  var hws = DB.homeworks.filter(function(h){ return !h.room||h.room===room; });
+  DB.students.filter(function(s){return s.room===room;}).forEach(function(s){
+    _gsUpdateRowTotal(s.id, hws, room);
+  });
+  _gsMarkDirty();
+}
+
+function _gsUpdateRowTotal(sid, hws, room){
+  var totalEl = document.getElementById('gstotal_'+sid);
+  if(!totalEl) return;
+  var total = 0;
+  hws.forEach(function(h){
+    var inp = document.querySelector('#gs-table input[data-sid="'+sid+'"][data-hwnum="'+h.num+'"]');
+    if(inp && inp.value!=='') total += parseFloat(inp.value)||0;
+    else {
+      var sub = DB.submissions[subKey(sid, h.num, h.room||room)];
+      if(sub){total += (sub.score!==null&&sub.score!==undefined)?Number(sub.score):(h.maxScore||100);}
+    }
+  });
+  var totalMax = hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
+  totalEl.textContent = total+'/'+totalMax;
+}
+
+function _gsMarkDirty(){
+  var st = document.getElementById('gs-status');
+  if(st){ st.textContent='● มีการแก้ไข'; st.style.color='#F59E0B'; }
+}
+
+async function _saveAllGradeSheet(){
+  var changes = Object.values(_gsPendingChanges);
+  if(!changes.length){
+    var st=document.getElementById('gs-status');
+    if(st){st.textContent='✓ ไม่มีการเปลี่ยนแปลง';st.style.color='#94A3B8';}
+    return;
+  }
+  var btn = document.getElementById('gs-save-btn');
+  if(btn) btn.disabled = true;
+  var st = document.getElementById('gs-status');
+  if(st){st.textContent='กำลังบันทึก...';st.style.color='#F59E0B';}
+  var ok=0, fail=0;
+  for(var i=0; i<changes.length; i++){
+    var c = changes[i];
+    try{
+      await sbRecordSubmission({
+        sid:c.sid, hwNum:c.hwNum, hwTitle:c.hwTitle,
+        room:c.room, score:c.score, maxScore:c.maxScore
+      });
+      ok++;
+    }catch(e){ fail++; }
+  }
+  _gsPendingChanges = {};
+  if(btn) btn.disabled = false;
+  if(fail===0){
+    if(st){st.textContent='✅ บันทึก '+ok+' รายการ';st.style.color='#22C55E';}
+    toast('บันทึกคะแนนแล้ว '+ok+' รายการ ✅');
+    renderDashboard();
+  } else {
+    if(st){st.textContent='⚠️ บันทึกสำเร็จ '+ok+' รายการ ล้มเหลว '+fail+' รายการ';st.style.color='#EF4444';}
+    toast('บันทึกบางรายการไม่สำเร็จ','err');
+  }
 }
 
 window.addEventListener('load', () => {
