@@ -2932,7 +2932,7 @@ function _renderExportHWList(subjFilter) {
   // กรองตามห้องที่เลือกไว้ (exportRoomSel) เสมอ + กรองวิชาถ้ามีระบุ
   // ใช้ key "room|num" เพราะงานเลขเดียวกัน (ครั้งที่ X) อาจมีอยู่ได้หลายห้อง
   const hws = DB.homeworks.filter(h=>
-    exportRoomSel.has(h.room) && (!subjFilter || h.subject===subjFilter)
+    (exportRoomSel.has(h.room)||!h.room) && (!subjFilter || h.subject===subjFilter)
   );
   exportHWSel = new Set(hws.map(h=>h.room+'|'+h.num));
   const multiRoom = exportRoomSel.size>1;
@@ -2955,7 +2955,7 @@ function filterExportBySubject(val) {
 }
 
 function updateExportScorePreview() {
-  const selectedHWs = DB.homeworks.filter(h=>exportHWSel.has(h.num));
+  const selectedHWs = DB.homeworks.filter(h=>exportHWSel.has(h.room+'|'+h.num));
   const totalMax = selectedHWs.reduce((s,h)=>s+(h.maxScore||100),0);
   const maxEl = document.getElementById('export-total-max');
   if(maxEl) maxEl.textContent = totalMax;
@@ -6119,65 +6119,66 @@ function _gsMkUI(){
   body.appendChild(lp);body.appendChild(rp);ov.appendChild(body);document.body.appendChild(ov);
 }
 function _gsRender(){
-  var lp=document.getElementById('gs-lp');var rp=document.getElementById('gs-rp');if(!lp||!rp)return;
+  var tbl=document.getElementById('gs-tbl');if(!tbl)return;
   var room=_gsRoom;
   var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;}).sort(function(a,b){return a.num-b.num;});
   var stus=DB.students.filter(function(s){return s.room===room;}).sort(function(a,b){return a.id.localeCompare(b.id);});
-  if(!stus.length||!hws.length){lp.innerHTML='<div style="padding:20px;font-size:13px;color:#94A3B8;">ไม่พบข้อมูล</div>';rp.innerHTML='';return;}
+  if(!stus.length||!hws.length){tbl.innerHTML='<tr><td colspan="20" style="padding:40px;text-align:center;color:#94A3B8;font-size:14px;">ไม่พบข้อมูล</td></tr>';return;}
   var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
-  var ROW_H=56,NAME_W=180,CELL_W=78;
-  // LEFT TABLE
-  var ltbl=document.createElement('table');ltbl.style.cssText='border-collapse:collapse;width:'+NAME_W+'px;table-layout:fixed;';
-  var lhd=document.createElement('thead');var lhr=document.createElement('tr');lhr.style.height='52px';
-  var lh0=document.createElement('th');lh0.style.cssText='background:#DBEAFE;border:1px solid #BFDBFE;width:34px;height:52px;text-align:center;font-size:10px;color:#64748B;';lh0.textContent='#';
-  var lh1=document.createElement('th');lh1.style.cssText='background:#DBEAFE;border:1px solid #BFDBFE;padding:6px 10px;height:52px;font-size:12px;color:#1E40AF;text-align:left;';lh1.textContent='ชื่อ-นามสกุล';
-  lhr.appendChild(lh0);lhr.appendChild(lh1);lhd.appendChild(lhr);ltbl.appendChild(lhd);
-  var ltbd=document.createElement('tbody');
+  var NW=34,NW2=160,CW=78;
+  var thead=document.createElement('thead');var thr=document.createElement('tr');
+  var th0=document.createElement('th');
+  th0.style.cssText='position:sticky;left:0;z-index:3;background:#DBEAFE;border-bottom:2px solid #BFDBFE;border-right:1px solid #BFDBFE;width:'+NW+'px;min-width:'+NW+'px;text-align:center;font-size:10px;color:#64748B;padding:6px 2px;';
+  th0.textContent='#';
+  var th1=document.createElement('th');
+  th1.style.cssText='position:sticky;left:'+NW+'px;z-index:3;background:#DBEAFE;border-bottom:2px solid #BFDBFE;border-right:2px solid #BFDBFE;width:'+NW2+'px;min-width:'+NW2+'px;padding:6px 10px;font-size:12px;color:#1E40AF;text-align:left;';
+  th1.textContent='ชื่อ-นามสกุล';
+  thr.appendChild(th0);thr.appendChild(th1);
+  hws.forEach(function(h){
+    var th=document.createElement('th');
+    th.style.cssText='background:#EFF6FF;border-bottom:2px solid #BFDBFE;border-right:1px solid #BFDBFE;width:'+CW+'px;min-width:'+CW+'px;padding:0;';
+    var fi='gsfi_'+h.num;
+    th.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;padding:5px 3px;gap:2px;"><div style="font-size:11px;font-weight:800;color:#1E40AF;">งาน '+h.num+'</div><div style="font-size:9px;color:#64748B;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+h.title+'</div><div style="display:flex;gap:3px;align-items:center;"><input id="'+fi+'" type="number" min="0" max="'+(h.maxScore||100)+'" placeholder="'+(h.maxScore||100)+'" style="width:34px;height:20px;border:1.5px solid #BFDBFE;border-radius:5px;text-align:center;font-size:10px;font-family:Sarabun,sans-serif;"><button onclick="_gsColFill('+h.num+','+(h.maxScore||100)+')" style="padding:2px 5px;background:#2563EB;color:#fff;border:none;border-radius:5px;font-size:9px;cursor:pointer;font-family:Sarabun,sans-serif;font-weight:700;">ทั้งหมด</button></div></div>';
+    thr.appendChild(th);
+  });
+  var tht=document.createElement('th');
+  tht.style.cssText='background:#FAF5FF;border-bottom:2px solid #DDD6FE;width:72px;min-width:72px;text-align:center;font-size:11px;color:#7C3AED;font-weight:700;padding:6px 4px;';
+  tht.innerHTML='รวม<br><span style="font-weight:400;font-size:10px;">/'+totalMax+'</span>';
+  thr.appendChild(tht);thead.appendChild(thr);
+  var tbody=document.createElement('tbody');
   var stMap={'withdrawn':'⛔','transferred':'🔄','leave':'💤'};
   stus.forEach(function(s,i){
-    var tr=document.createElement('tr');tr.dataset.sid=s.id;tr.style.height=ROW_H+'px';
+    var tr=document.createElement('tr');tr.dataset.sid=s.id;
     var isIn=s.status&&s.status!=='active';
-    var tdN=document.createElement('td');tdN.style.cssText='border:1px solid #E2E8F0;width:34px;height:'+ROW_H+'px;text-align:center;font-size:11px;color:#94A3B8;background:#F8FAFC;vertical-align:middle;';tdN.textContent=i+1;
-    var tdNm=document.createElement('td');tdNm.style.cssText='border:1px solid #E2E8F0;padding:0 8px;height:'+ROW_H+'px;overflow:hidden;vertical-align:middle;'+(isIn?'opacity:.55;':'');
+    var tdN=document.createElement('td');
+    tdN.style.cssText='position:sticky;left:0;z-index:2;background:#F8FAFC;border-bottom:1px solid #E2E8F0;border-right:1px solid #E2E8F0;width:'+NW+'px;min-width:'+NW+'px;text-align:center;font-size:11px;color:#94A3B8;padding:6px 2px;vertical-align:middle;';
+    tdN.textContent=i+1;
+    var tdNm=document.createElement('td');
+    tdNm.style.cssText='position:sticky;left:'+NW+'px;z-index:2;background:'+(isIn?'#FAFAFA':'#fff')+';border-bottom:1px solid #E2E8F0;border-right:2px solid #BFDBFE;width:'+NW2+'px;min-width:'+NW2+'px;padding:4px 8px;vertical-align:middle;'+(isIn?'opacity:.6;':'');
     var stBtn=document.createElement('button');stBtn.innerHTML='⋮';stBtn.title='สถานะ';
-    stBtn.style.cssText='border:none;background:none;cursor:pointer;font-size:14px;color:#94A3B8;float:right;padding:0 2px;line-height:1;';
-    var _sid=s.id;stBtn.onclick=function(){openStatusMenu(_sid);};tdNm.appendChild(stBtn);
-    var nm=document.createElement('div');nm.style.cssText='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(isIn?'#94A3B8':'#0F172A')+';'+(isIn?'text-decoration:line-through;':'')+';line-height:1.3;';nm.textContent=s.name;
+    stBtn.style.cssText='border:none;background:none;cursor:pointer;font-size:13px;color:#94A3B8;float:right;padding:0 2px;';
+    var _sid=s.id;stBtn.onclick=function(){openStatusMenu(_sid);};
+    var nm=document.createElement('div');nm.style.cssText='font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(isIn?'#94A3B8':'#0F172A')+';'+(isIn?'text-decoration:line-through;':'');nm.textContent=s.name;
     var id2=document.createElement('div');id2.style.cssText='font-size:10px;color:#94A3B8;';id2.textContent=s.id+(isIn?' '+(stMap[s.status]||''):'');
-    tdNm.appendChild(nm);tdNm.appendChild(id2);tr.appendChild(tdN);tr.appendChild(tdNm);ltbd.appendChild(tr);
-  });
-  ltbl.appendChild(ltbd);lp.innerHTML='';lp.appendChild(ltbl);lp.style.width=NAME_W+'px';
-  // RIGHT TABLE
-  var rtbl=document.createElement('table');rtbl.style.cssText='border-collapse:collapse;table-layout:fixed;';
-  var rhd=document.createElement('thead');var rhr=document.createElement('tr');rhr.style.height='52px';
-  hws.forEach(function(h){
-    var th=document.createElement('th');th.style.cssText='background:#EFF6FF;border:1px solid #BFDBFE;width:'+CELL_W+'px;min-width:'+CELL_W+'px;height:52px;padding:0;';
-    var fi='gsfi_'+h.num;
-    th.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;padding:4px 3px;gap:2px;"><div style="font-size:11px;font-weight:800;color:#1E40AF;">งาน '+h.num+'</div><div style="font-size:9px;color:#64748B;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+h.title+'">'+h.title+'</div><div style="display:flex;gap:3px;align-items:center;"><input id="'+fi+'" type="number" min="0" max="'+(h.maxScore||100)+'" placeholder="'+(h.maxScore||100)+'" style="width:34px;height:20px;border:1.5px solid #BFDBFE;border-radius:5px;text-align:center;font-size:10px;font-family:Sarabun,sans-serif;"><button onclick="_gsColFill('+h.num+','+(h.maxScore||100)+')" style="padding:2px 5px;background:#2563EB;color:#fff;border:none;border-radius:5px;font-size:9px;cursor:pointer;font-family:Sarabun,sans-serif;font-weight:700;">ทั้งหมด</button></div></div>';
-    rhr.appendChild(th);
-  });
-  var tht=document.createElement('th');tht.style.cssText='background:#FAF5FF;border:1px solid #DDD6FE;width:70px;min-width:70px;height:52px;font-size:11px;color:#7C3AED;font-weight:700;text-align:center;';
-  tht.innerHTML='รวม<br><span style="font-weight:400;font-size:10px;">/'+totalMax+'</span>';
-  rhr.appendChild(tht);rhd.appendChild(rhr);rtbl.appendChild(rhd);
-  var rtbd=document.createElement('tbody');
-  stus.forEach(function(s){
-    var tr=document.createElement('tr');tr.dataset.sid=s.id;tr.style.height=ROW_H+'px';var rowTotal=0;
+    tdNm.appendChild(stBtn);tdNm.appendChild(nm);tdNm.appendChild(id2);
+    tr.appendChild(tdN);tr.appendChild(tdNm);
+    var rowTotal=0;
     hws.forEach(function(h){
-      // lookup ด้วย h.room ตรงๆ + fallback
       var key=subKey(s.id,h.num,h.room);
-      var sub=DB.submissions[key]
-             ||DB.submissions[subKey(s.id,h.num,room)]
-             ||DB.submissions[subKey(s.id,h.num,'')];
+      var sub=DB.submissions[key]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];
       var chg=_gsChanges[key];
-      var stored=(sub&&sub.score!==null&&sub.score!==undefined)?Number(sub.score):null;
+      var stored=sub?(sub.score!==null&&sub.score!==undefined?Number(sub.score):(h.maxScore||100)):null;
       var cur=chg!==undefined?chg:stored;
       if(cur!==null)rowTotal+=Number(cur);
       var td=document.createElement('td');
-      td.style.cssText='border:1px solid #E2E8F0;width:'+CELL_W+'px;min-width:'+CELL_W+'px;height:'+ROW_H+'px;max-height:'+ROW_H+'px;overflow:hidden;padding:1px;text-align:center;vertical-align:middle;background:'+(cur!==null?'#F0FDF4':'#fff')+';';
-      var inp=document.createElement('input');inp.type='number';inp.min='0';inp.max=String(h.maxScore||100);
+      td.style.cssText='border-bottom:1px solid #E2E8F0;border-right:1px solid #E2E8F0;width:'+CW+'px;min-width:'+CW+'px;padding:1px;text-align:center;vertical-align:middle;background:'+(cur!==null?'#F0FDF4':'#fff')+';';
+      var inp=document.createElement('input');
+      inp.type='number';inp.min='0';inp.max=String(h.maxScore||100);
       inp.value=cur!==null?String(cur):'';inp.placeholder='-';
-      inp.style.cssText='width:100%;height:100%;border:none;text-align:center;font-size:14px;font-weight:700;background:transparent;outline:none;font-family:Sarabun,sans-serif;color:'+(cur!==null?(Number(cur)>=(h.maxScore||100)*0.5?'#16A34A':'#F59E0B'):'#CBD5E1')+';';
-      inp.inputMode='decimal';inp.dataset.sid=s.id;inp.dataset.hwnum=h.num;inp.dataset.room=h.room||room;inp.dataset.max=h.maxScore||100;inp.dataset.htitle=h.title;inp.setAttribute('enterkeyhint','next');
+      inp.style.cssText='width:100%;height:42px;border:none;text-align:center;font-size:14px;font-weight:700;background:transparent;outline:none;font-family:Sarabun,sans-serif;color:'+(cur!==null?(Number(cur)>=(h.maxScore||100)*0.5?'#16A34A':'#F59E0B'):'#CBD5E1')+';';
+      inp.inputMode='decimal';
+      inp.dataset.sid=s.id;inp.dataset.hwnum=h.num;inp.dataset.room=h.room||room;inp.dataset.max=h.maxScore||100;inp.dataset.htitle=h.title;
+      inp.setAttribute('enterkeyhint','next');
       inp.oninput=function(){
         var k=subKey(this.dataset.sid,this.dataset.hwnum,this.dataset.room);
         var v=this.value===''?null:parseFloat(this.value);
@@ -6189,18 +6190,22 @@ function _gsRender(){
       };
       inp.onfocus=function(){this.style.color='#0F172A';this.parentElement.style.boxShadow='inset 0 0 0 2px #2563EB';};
       inp.onblur=function(){var v=this.value===''?null:parseFloat(this.value);var max=parseInt(this.dataset.max);this.style.color=v!==null?(v>=max*0.5?'#16A34A':'#F59E0B'):'#CBD5E1';this.parentElement.style.boxShadow='';};
-      inp.onkeydown=function(e){if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();var all=[].slice.call(document.querySelectorAll('#gs-tbl input[type=number]'));var idx=all.indexOf(this);if(idx>=0&&idx<all.length-1)all[idx+1].focus();}};
+      inp.onkeydown=function(e){if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();var all=[].slice.call(document.querySelectorAll('#gs-tbl .gs-score-inp'));var idx=all.indexOf(this);if(idx>=0&&idx<all.length-1)all[idx+1].focus();}};
+      inp.className='gs-score-inp';
       td.appendChild(inp);tr.appendChild(td);
     });
     var tdt=document.createElement('td');tdt.id='gstot_'+s.id;
-    tdt.style.cssText='border:1px solid #DDD6FE;width:70px;min-width:70px;height:'+ROW_H+'px;max-height:'+ROW_H+'px;text-align:center;vertical-align:middle;font-weight:700;font-size:13px;color:#7C3AED;background:#FAF5FF;';
-    tdt.textContent=rowTotal+'/'+totalMax;tr.appendChild(tdt);rtbd.appendChild(tr);
+    tdt.style.cssText='border-bottom:1px solid #DDD6FE;width:72px;min-width:72px;text-align:center;font-weight:700;font-size:13px;color:#7C3AED;background:#FAF5FF;vertical-align:middle;padding:4px;';
+    tdt.textContent=rowTotal+'/'+totalMax;
+    tr.appendChild(tdt);tbody.appendChild(tr);
   });
-  rtbl.appendChild(rtbd);rp.innerHTML='';rp.appendChild(rtbl);
+  tbl.innerHTML='';tbl.appendChild(thead);tbl.appendChild(tbody);
+  _gsFilterRows(document.getElementById('gs-search')?document.getElementById('gs-search').value:'');
 }
+
 function _gsFilterRows(q){
   var kw=(q||'').toLowerCase().trim();
-  var lr=[].slice.call(document.querySelectorAll('#gs-lp tbody tr'));
+  var lr=[].slice.call(document.querySelectorAll('#gs-tbl tbody tr'));
   var rr=[].slice.call(document.querySelectorAll('#gs-tbl tbody tr'));
   lr.forEach(function(tr,i){var show=!kw||(tr.textContent||'').toLowerCase().includes(kw);tr.style.display=show?'':'none';if(rr[i])rr[i].style.display=show?'':'none';});
 }
