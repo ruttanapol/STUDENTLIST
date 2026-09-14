@@ -2432,7 +2432,7 @@ function renderTable(){
         <div style="text-align:right;font-size:14px;margin-top:2px;">
           <span style="font-weight:700;color:var(--green-dark);font-size:16px;">${done}</span>
           <span style="color:var(--text3);">/${stuHWs.length}</span>
-          ${(()=>{let sc=0,mx=0;stuHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub){const ms=authMaxScore(h,sub);sc+=clampedItemScore(sub,ms);mx+=ms;}else{mx+=h.maxScore||100;}});return mx>0?`<span style="font-size:12px;color:var(--purple);font-weight:700;margin-left:4px;">${sc}/${mx}</span>`:'';})()}
+          ${(()=>{let sc=0,mx=0;stuHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub){const ms=authMaxScore(h,sub);sc+=clampedItemScore(sub,ms);mx+=ms;}else{mx+=h.maxScore||100;}});return mx>0?`<span style="font-size:12px;color:var(--purple);font-weight:700;margin-left:4px;">${sc}/${mx}</span>`:'';})()}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin:8px 0 4px;">
@@ -2458,7 +2458,7 @@ function showDetail(sid){
       <button onclick="document.getElementById('detail-panel').style.display='none'" style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;color:var(--text2);display:flex;align-items:center;justify-content:center;">✕</button>
     </div>
     <div style="font-size:13px;font-weight:700;color:var(--green-dark);margin-bottom:6px;">✅ ส่งแล้ว (${done.length})</div>
-    ${done.map(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const scoreStr=(sub.score!==null&&sub.score!==undefined)?`<span style="font-size:12px;font-weight:700;color:var(--purple);background:var(--purple-light);padding:2px 8px;border-radius:10px;">${sub.score}/${authMaxScore(h,sub)}</span>`:'';;return `<div class="ds-row"><span>${escapeHtml(h.title)} ${scoreStr}</span><span style="font-size:12px;color:var(--text3);">${sub.ts}</span></div>`;}).join('')||'<div style="font-size:13px;color:var(--text3);padding:6px 0;">ยังไม่มี</div>'}
+    ${done.map(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];const scoreStr=(sub.score!==null&&sub.score!==undefined)?`<span style="font-size:12px;font-weight:700;color:var(--purple);background:var(--purple-light);padding:2px 8px;border-radius:10px;">${sub.score}/${authMaxScore(h,sub)}</span>`:'';;return `<div class="ds-row"><span>${escapeHtml(h.title)} ${scoreStr}</span><span style="font-size:12px;color:var(--text3);">${sub.ts}</span></div>`;}).join('')||'<div style="font-size:13px;color:var(--text3);padding:6px 0;">ยังไม่มี</div>'}
     <div style="font-size:13px;font-weight:700;color:var(--red);margin:12px 0 6px;">❌ ยังไม่ส่ง (${miss.length})</div>
     ${miss.map(h=>`<div class="ds-row"><span>${escapeHtml(h.title)}</span><span style="font-size:12px;color:var(--text2);">${escapeHtml(h.subject)}</span></div>`).join('')||'<div style="font-size:13px;color:var(--green-dark);padding:6px 0;">🎉 ส่งครบทุกชิ้น!</div>'}
   </div>`;
@@ -2990,13 +2990,13 @@ function buildExportData(){
   const collectScore = collectInp ? (parseFloat(collectInp.value)||0) : 0;
   return selectedRooms.map(room=>{
     // เลือกเฉพาะชิ้นงานของห้องนี้จริงๆ (กันเลขชิ้นงานชนกับห้องอื่น)
-    const selectedHWs=DB.homeworks.filter(h=>h.room===room&&exportHWSel.has(h.num)).sort((a,b)=>a.num-b.num);
+    const selectedHWs=DB.homeworks.filter(h=>(h.room===room||!h.room)&&exportHWSel.has(h.num)).sort((a,b)=>a.num-b.num);
     const hwTotalMax=selectedHWs.reduce((s,h)=>s+(h.maxScore||100),0);
     const students=DB.students.filter(s=>s.room===room).sort((a,b)=>a.id.localeCompare(b.id));
     const rows=students.map((s,idx)=>{
       const row={เลขที่:idx+1,เลขประจำตัว:s.id,'ชื่อ-นามสกุล':s.name,ห้อง:s.room};
       let totalScore=0,totalMax=0,doneCount=0;
-      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:(sub.maxScore||h.maxScore||100);}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
+      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:(sub.maxScore||h.maxScore||100);}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
       row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
       row['คะแนนรวม']=totalScore;
       row['คะแนนเต็มรวม']=hwTotalMax;
@@ -3159,7 +3159,7 @@ function renderStudentScoreList(){
     return;
   }
   list.innerHTML=hws.map(h=>{
-    const sub=DB.submissions[subKey(s.id,h.num,h.room)];
+    const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];
     const hasSub=!!sub;
     const scoreVal=hasSub&&sub.score!==null&&sub.score!==undefined?sub.score:'';
     const statusBadge=hasSub
@@ -5279,7 +5279,7 @@ async function exportPrimaryGradeExcel() {
   const wsData=[['ลำดับ','รหัส','ชื่อ','ห้อง','คะแนนงาน%','คะแนนสอบ','รวม','เกรด','GPA'],
     ...students.map((s,i)=>{
       let hwTotal=0,hwMax=0;
-      hws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);hwTotal+=Math.min(parseFloat(sub.score)||0,ms);hwMax+=ms;}else hwMax+=parseFloat(h.maxScore||100);});
+      hws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);hwTotal+=Math.min(parseFloat(sub.score)||0,ms);hwMax+=ms;}else hwMax+=parseFloat(h.maxScore||100);});
       const hwPct=hwMax>0?(hwTotal/hwMax)*100:0;
       const exam=examMatched[s.id]??null;
       const total=exam!==null?(hwPct*0.5+exam*0.5):hwPct;
@@ -5343,12 +5343,12 @@ function renderSecGrade() {
   const rows=students.map(s=>{
     // คะแนนก่อนกลาง
     let pre=0,preMax=0;
-    preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
+    preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
     const prePct=preMax>0?(pre/preMax)*100:0;
 
     // คะแนนหลังกลาง
     let post=0,postMax=0;
-    postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
+    postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
     const postPct=postMax>0?(post/postMax)*100:0;
 
     const midScore=midMatched[s.id]??null;
@@ -5423,9 +5423,9 @@ async function exportSecGradeExcel() {
   const wb=XLSX.utils.book_new();
   const wsData=[['ลำดับ','รหัส','ชื่อ','ห้อง','ก่อนกลาง%','กลางภาค','หลังกลาง%','ปลายภาค','รวม','เกรด','GPA'],
     ...students.map((s,i)=>{
-      let pre=0,preMax=0; preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
+      let pre=0,preMax=0; preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
       const prePct=preMax>0?(pre/preMax)*100:0;
-      let post=0,postMax=0; postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
+      let post=0,postMax=0; postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
       const postPct=postMax>0?(post/postMax)*100:0;
       const mid=midMatched[s.id]??null; const fin=finMatched[s.id]??null;
       let total=prePct*wPre+postPct*wPost+(mid!==null?mid*wMid:0)+(fin!==null?fin*wFin:0);
@@ -6128,7 +6128,7 @@ function _gsRender(){
   var ROW_H=56,NAME_W=180,CELL_W=78;
   // LEFT TABLE
   var ltbl=document.createElement('table');ltbl.style.cssText='border-collapse:collapse;width:'+NAME_W+'px;table-layout:fixed;';
-  var lhd=document.createElement('thead');var lhr=document.createElement('tr');lhr.style.height='52px';
+  var lhd=document.createElement('thead');var lhr=document.createElement('tr');lhr.style.height='52px';lhr.style.maxHeight='52px';
   var lh0=document.createElement('th');lh0.style.cssText='background:#DBEAFE;border:1px solid #BFDBFE;width:34px;height:52px;text-align:center;font-size:10px;color:#64748B;';lh0.textContent='#';
   var lh1=document.createElement('th');lh1.style.cssText='background:#DBEAFE;border:1px solid #BFDBFE;padding:6px 10px;height:52px;font-size:12px;color:#1E40AF;text-align:left;';lh1.textContent='ชื่อ-นามสกุล';
   lhr.appendChild(lh0);lhr.appendChild(lh1);lhd.appendChild(lhr);ltbl.appendChild(lhd);
@@ -6149,9 +6149,9 @@ function _gsRender(){
   ltbl.appendChild(ltbd);lp.innerHTML='';lp.appendChild(ltbl);lp.style.width=NAME_W+'px';
   // RIGHT TABLE
   var rtbl=document.createElement('table');rtbl.style.cssText='border-collapse:collapse;table-layout:fixed;';
-  var rhd=document.createElement('thead');var rhr=document.createElement('tr');rhr.style.height='52px';
+  var rhd=document.createElement('thead');var rhr=document.createElement('tr');rhr.style.height='52px';rhr.style.maxHeight='52px';
   hws.forEach(function(h){
-    var th=document.createElement('th');th.style.cssText='background:#EFF6FF;border:1px solid #BFDBFE;width:'+CELL_W+'px;min-width:'+CELL_W+'px;height:52px;padding:0;';
+    var th=document.createElement('th');th.style.cssText='background:#EFF6FF;border:1px solid #BFDBFE;width:'+CELL_W+'px;min-width:'+CELL_W+'px;height:52px;max-height:52px;overflow:hidden;padding:0;';
     var fi='gsfi_'+h.num;
     th.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;padding:4px 3px;gap:2px;"><div style="font-size:11px;font-weight:800;color:#1E40AF;">งาน '+h.num+'</div><div style="font-size:9px;color:#64748B;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+h.title+'">'+h.title+'</div><div style="display:flex;gap:3px;align-items:center;"><input id="'+fi+'" type="number" min="0" max="'+(h.maxScore||100)+'" placeholder="'+(h.maxScore||100)+'" style="width:34px;height:20px;border:1.5px solid #BFDBFE;border-radius:5px;text-align:center;font-size:10px;font-family:Sarabun,sans-serif;"><button onclick="_gsColFill('+h.num+','+(h.maxScore||100)+')" style="padding:2px 5px;background:#2563EB;color:#fff;border:none;border-radius:5px;font-size:9px;cursor:pointer;font-family:Sarabun,sans-serif;font-weight:700;">ทั้งหมด</button></div></div>';
     rhr.appendChild(th);
@@ -6169,7 +6169,8 @@ function _gsRender(){
              ||DB.submissions[subKey(s.id,h.num,room)]
              ||DB.submissions[subKey(s.id,h.num,'')];
       var chg=_gsChanges[key];
-      var stored=(sub&&sub.score!==null&&sub.score!==undefined)?Number(sub.score):null;
+      // ถ้า sub มีแต่ score=null (ส่งแล้วยังไม่กรอก) → ใช้ maxScore
+      var stored=sub?(sub.score!==null&&sub.score!==undefined?Number(sub.score):(h.maxScore||100)):null;
       var cur=chg!==undefined?chg:stored;
       if(cur!==null)rowTotal+=Number(cur);
       var td=document.createElement('td');
