@@ -1914,6 +1914,10 @@ function renderStudentView(s, stuDB){
     <div class="score-hero-lbl">🏆 คะแนนรวมทั้งหมด</div>
     <div class="score-hero-num">${totalScore}<span>/${totalMax}</span></div>
     <div class="score-hero-sub">${done.length?`ได้ ${scorePct}% จากงานที่ส่งแล้ว ${done.length} ชิ้น${pendingCount?` (รอตรวจ ${pendingCount} ชิ้น)`:''}`:'ยังไม่มีงานที่ส่ง'}</div>
+    ${done.length?`<div style="margin-top:10px;display:inline-flex;align-items:center;gap:8px;">
+      <span style="font-size:12px;color:var(--text3);">เกรด</span>
+      <span style="font-size:22px;font-weight:900;color:${gradeColor(calcGrade(scorePct))};background:${gradeBg(calcGrade(scorePct))};padding:2px 16px;border-radius:20px;">${calcGrade(scorePct)}</span>
+    </div>`:''}
   </div>
   ${totalMax?`<div class="card" style="margin-bottom:14px;">
     <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;">🧮 ลองเทียบคะแนน</div>
@@ -2986,7 +2990,9 @@ function buildExportData(){
       row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
       row['คะแนนรวม']=totalScore;
       row['คะแนนเต็มรวม']=hwTotalMax;
-      row['%คะแนน']=totalMax>0?Math.round(totalScore/totalMax*100)+'%':'0%';
+      const _pctGrade=hwTotalMax>0?Math.round(totalScore/hwTotalMax*100):0;
+      row['%คะแนน']=_pctGrade+'%';
+      row['เกรด']=totalScore>0||doneCount>0?calcGrade(_pctGrade):'-';
       if(collectScore>0 && hwTotalMax>0) {
         row['คะแนนเก็บ']=collectScore;
         row['คะแนนที่ได้']=Math.round(totalScore/hwTotalMax*collectScore*100)/100;
@@ -6123,7 +6129,10 @@ function _gsRender(){
     thr.appendChild(th);
   });
   var tht=document.createElement('th');tht.style.cssText='background:#FAF5FF;border-bottom:2px solid #DDD6FE;width:72px;min-width:72px;text-align:center;font-size:11px;color:#7C3AED;font-weight:700;padding:6px 4px;';tht.innerHTML='รวม<br><span style="font-weight:400;font-size:10px;">/'+totalMax+'</span>';
-  thr.appendChild(tht);thead.appendChild(thr);
+  var thg=document.createElement('th');
+  thg.style.cssText='background:#FAF5FF;border-bottom:2px solid #DDD6FE;width:56px;min-width:56px;text-align:center;font-size:11px;color:#7C3AED;font-weight:700;padding:6px 4px;';
+  thg.textContent='เกรด';
+  thr.appendChild(tht);thr.appendChild(thg);thead.appendChild(thr);
   var tbody=document.createElement('tbody');
   var stMap={'withdrawn':'⛔','transferred':'🔄','leave':'💤'};
   stus.forEach(function(s,i){
@@ -6154,7 +6163,9 @@ function _gsRender(){
       td.appendChild(inp);tr.appendChild(td);
     });
     var tdt=document.createElement('td');tdt.id='gstot_'+s.id;tdt.style.cssText='border-bottom:1px solid #DDD6FE;width:72px;min-width:72px;text-align:center;font-weight:700;font-size:13px;color:#7C3AED;background:#FAF5FF;vertical-align:middle;padding:4px;';tdt.textContent=rowTotal+'/'+totalMax;
-    tr.appendChild(tdt);tbody.appendChild(tr);
+    var _gp=totalMax>0?Math.round(rowTotal/totalMax*100):0;var _gv=calcGrade(_gp);
+    var _tg=document.createElement('td');_tg.style.cssText='border-bottom:1px solid #DDD6FE;width:56px;min-width:56px;text-align:center;font-weight:800;font-size:14px;color:'+gradeColor(_gv)+';background:'+gradeBg(_gv)+';vertical-align:middle;padding:4px;';
+    _tg.textContent=_gv;tr.appendChild(tdt);tr.appendChild(_tg);tbody.appendChild(tr);
   });
   tbl.innerHTML='';tbl.appendChild(thead);tbl.appendChild(tbody);
   var q=document.getElementById('gs-search');_gsFilterRows(q?q.value:'');
@@ -6263,7 +6274,7 @@ function _sfRun(){
   if(!results.length){list.innerHTML='<div style="text-align:center;padding:40px;color:#94A3B8;font-size:14px;">✅ ไม่พบนักเรียนตามเงื่อนไขนี้</div>';return;}
   results.forEach(function(r,i){var bc=r.pct<50?'#FFF5F5':r.pct<75?'#FFFBEB':'#F0FDF4';var bc2=r.pct<50?'#FCA5A5':r.pct<75?'#FCD34D':'#86EFAC';var pc=r.pct<50?'#DC2626':r.pct<75?'#D97706':'#16A34A';var rbc=r.pct<50?'#FEE2E2;color:#DC2626':r.pct<75?'#FEF3C7;color:#B45309':'#DCFCE7;color:#15803D';
     var card=document.createElement('div');card.style.cssText='background:'+bc+';border:1.5px solid '+bc2+';border-radius:14px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;';
-    card.innerHTML='<div style="width:28px;height:28px;border-radius:50%;background:'+rbc+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">'+(i+1)+'</div><div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.s.name+'</div><div style="font-size:12px;color:#64748B;margin-top:2px;">'+r.s.id+' · ห้อง '+r.s.room+' · ส่ง '+r.done+'/'+r.total+' ชิ้น</div><div style="margin-top:6px;background:#E2E8F0;border-radius:6px;height:6px;overflow:hidden;"><div style="width:'+r.pct+'%;height:100%;border-radius:6px;background:'+pc+';"></div></div></div><div style="text-align:right;flex-shrink:0;"><div style="font-size:18px;font-weight:800;color:#0F172A;">'+r.totalScore+'</div><div style="font-size:11px;color:#94A3B8;">จาก '+r.totalMax+'</div><div style="padding:3px 10px;border-radius:20px;font-size:13px;font-weight:800;background:'+rbc+';">'+r.pct+'%</div></div>';
+    card.innerHTML='<div style="width:28px;height:28px;border-radius:50%;background:'+rbc+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">'+(i+1)+'</div><div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.s.name+'</div><div style="font-size:12px;color:#64748B;margin-top:2px;">'+r.s.id+' · ห้อง '+r.s.room+' · ส่ง '+r.done+'/'+r.total+' ชิ้น</div><div style="margin-top:6px;background:#E2E8F0;border-radius:6px;height:6px;overflow:hidden;"><div style="width:'+r.pct+'%;height:100%;border-radius:6px;background:'+pc+';"></div></div></div><div style="text-align:right;flex-shrink:0;"><div style="font-size:18px;font-weight:800;color:#0F172A;">'+r.totalScore+'</div><div style="font-size:11px;color:#94A3B8;">จาก '+r.totalMax+'</div><div style="padding:3px 10px;border-radius:20px;font-size:13px;font-weight:800;background:'+rbc+';">'+r.pct+'%</div><div style="margin-top:4px;padding:2px 10px;border-radius:20px;font-size:15px;font-weight:900;color:'+gradeColor(calcGrade(r.pct))+';background:'+gradeBg(calcGrade(r.pct))+';">เกรด '+calcGrade(r.pct)+'</div></div>';
     list.appendChild(card);
   });
 }
