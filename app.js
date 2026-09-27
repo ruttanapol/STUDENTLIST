@@ -3032,10 +3032,10 @@ async function doExport(){
   btn.disabled=false;
 }
 function exportExcel(data,pf){return new Promise(resolve=>{const wb=XLSX.utils.book_new();data.forEach((roomData,i)=>{const{room,rows,homeworks,collectScore,hwTotalMax}=roomData;const sheetName=room.replace(/[\\\/\?\*\[\]]/g,'').substring(0,31);const wsData=[];wsData.push([`รายงานการส่งงาน - ${room}`]);wsData.push([`งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' '+h.title).join(', ')}`]);wsData.push([`วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}`]);wsData.push([]);const header=['เลขที่','เลขประจำตัว','ชื่อ-นามสกุล'];homeworks.forEach(h=>header.push('งานครั้งที่ '+h.num+'\n'+h.title.substring(0,15)+'\n(เต็ม '+(h.maxScore||100)+')'));const hasCollect = collectScore>0;
-      header.push('ส่งแล้ว','คะแนนรวม',`คะแนนเต็ม(/${hwTotalMax})`,'%คะแนน');
+      header.push('ส่งแล้ว','คะแนนรวม',`คะแนนเต็ม(/${hwTotalMax})`,'%คะแนน','เกรด');
       if(hasCollect) header.push(`คะแนนที่ได้(/${collectScore})`);
-      wsData.push(header);rows.forEach(r=>{const row=[r['เลขที่'],r['เลขประจำตัว'],r['ชื่อ-นามสกุล']];homeworks.forEach(h=>row.push(r['งานครั้งที่ '+h.num]));row.push(r['ส่งแล้ว'],r['คะแนนรวม'],r['คะแนนเต็มรวม'],r['%คะแนน']);if(hasCollect)row.push(r['คะแนนที่ได้']??'');wsData.push(row);});const ws=XLSX.utils.aoa_to_sheet(wsData);ws['!cols']=[{wch:6},{wch:14},{wch:26},...homeworks.map(()=>({wch:14})),{wch:10},{wch:10},{wch:10},{wch:8},...(hasCollect?[{wch:14}]:[])];const totalCols=3+homeworks.length+(hasCollect?5:4)-1;ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:totalCols}},{s:{r:1,c:0},e:{r:1,c:totalCols}},{s:{r:2,c:0},e:{r:2,c:totalCols}}];XLSX.utils.book_append_sheet(wb,ws,sheetName);pf.style.width=(40+(i+1)/data.length*50)+'%';});const date=new Date().toISOString().slice(0,10);XLSX.writeFile(wb,`รายงานส่งงาน_${date}.xlsx`);resolve();});}
-async function exportPDF(data,pf){const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});let html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"><style>*{font-family:Sarabun,sans-serif;box-sizing:border-box;margin:0;padding:0;}body{font-size:11pt;color:#1E293B;}.page{padding:12mm 15mm;page-break-after:always;}.page:last-child{page-break-after:avoid;}.page-title{font-size:16pt;font-weight:700;color:#2563EB;margin-bottom:4px;}.page-meta{font-size:9pt;color:#64748B;margin-bottom:12px;border-bottom:2px solid #E2E8F0;padding-bottom:8px;}table{width:100%;border-collapse:collapse;font-size:10pt;}th{background:linear-gradient(135deg,#EBF2FF,#DBEAFE);color:#1E40AF;font-weight:700;padding:7px 6px;border:1px solid #BFDBFE;font-size:9pt;text-align:center;}td{padding:6px;border:1px solid #E2E8F0;vertical-align:middle;}tr:nth-child(even) td{background:#F8FAFF;}.num{text-align:center;color:#64748B;}.ok{text-align:center;color:#16A34A;font-weight:700;background:#DCFCE7!important;font-size:9pt;}.no{text-align:center;color:#94A3B8;font-size:9pt;}.pct-col{text-align:center;font-weight:700;}.footer{margin-top:8px;font-size:8pt;color:#94A3B8;text-align:right;}</style></head><body>`;data.forEach((roomData,i)=>{const{room,rows,homeworks,collectScore,hwTotalMax}=roomData;const dateStr=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});html+=`<div class="page"><div class="page-title">📋 รายงานการส่งงาน — ${room}</div><div class="page-meta">งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' ('+h.title+')').join(' · ')} &nbsp;|&nbsp; วันที่พิมพ์: ${dateStr} &nbsp;|&nbsp; นักเรียน ${rows.length} คน</div><table><thead><tr><th style="width:40px;">เลขที่</th><th style="width:90px;">เลขประจำตัว</th><th>ชื่อ-นามสกุล</th>${homeworks.map(h=>`<th style="width:65px;">งานครั้งที่ ${h.num}<br><span style="font-size:8pt;font-weight:400;">(/${h.maxScore||100})</span></th>`).join('')}<th style="width:50px;">ส่งแล้ว</th><th style="width:55px;">คะแนนรวม</th><th style="width:40px;">%</th>${collectScore>0?`<th style="width:60px;background:linear-gradient(135deg,#DCFCE7,#BBF7D0);color:#15803D;">คะแนนที่ได้<br><span style="font-size:7pt;font-weight:400;">(/${collectScore})</span></th>`:''}</tr></thead><tbody>${rows.map(r=>{const hwCells=homeworks.map(h=>{const v=r['งานครั้งที่ '+h.num];const isOk=v!==undefined&&v!=='—';const display=isOk?(typeof v==='number'?v:'✓'):'—';return `<td class="${isOk?'ok':'no'}">${display}</td>`;}).join('');const pct=parseInt(r['%คะแนน']);const pctColor=pct===100?'#16A34A':pct>=60?'#2563EB':'#EF4444';const totalScore=r['คะแนนรวม'];const totalMax=r['คะแนนเต็มรวม'];return `<tr><td class="num">${r['เลขที่']}</td><td class="num">${r['เลขประจำตัว']}</td><td>${r['ชื่อ-นามสกุล']}</td>${hwCells}<td class="pct-col">${r['ส่งแล้ว']}</td><td class="pct-col" style="color:#6D28D9;font-weight:700;">${totalScore}<span style="font-size:8pt;color:#94A3B8;">/${totalMax}</span></td><td class="pct-col" style="color:${pctColor};">${r['%คะแนน']}</td>${collectScore>0?`<td class="pct-col" style="color:#15803D;font-weight:800;background:#F0FDF4;">${r['คะแนนที่ได้']??'—'}</td>`:''}</tr>`;}).join('')}</tbody></table><div class="footer">TaskGenius · พิมพ์วันที่ ${dateStr}</div></div>`;pf.style.width=(40+(i+1)/data.length*50)+'%';});html+='</body></html>';const win=window.open('','_blank','width=900,height=700');if(!win){toast('กรุณาอนุญาต Popup เพื่อ Export PDF','warn');return;}win.document.write(html);win.document.close();win.onload=()=>{setTimeout(()=>{win.focus();win.print();},800);};}
+      wsData.push(header);rows.forEach(r=>{const row=[r['เลขที่'],r['เลขประจำตัว'],r['ชื่อ-นามสกุล']];homeworks.forEach(h=>row.push(r['งานครั้งที่ '+h.num]));row.push(r['ส่งแล้ว'],r['คะแนนรวม'],r['คะแนนเต็มรวม'],r['%คะแนน'],r['เกรด']??'');if(hasCollect)row.push(r['คะแนนที่ได้']??'');wsData.push(row);});const ws=XLSX.utils.aoa_to_sheet(wsData);ws['!cols']=[{wch:6},{wch:14},{wch:26},...homeworks.map(()=>({wch:14})),{wch:10},{wch:10},{wch:10},{wch:8},...(hasCollect?[{wch:14}]:[])];const totalCols=3+homeworks.length+(hasCollect?5:4)-1;ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:totalCols}},{s:{r:1,c:0},e:{r:1,c:totalCols}},{s:{r:2,c:0},e:{r:2,c:totalCols}}];XLSX.utils.book_append_sheet(wb,ws,sheetName);pf.style.width=(40+(i+1)/data.length*50)+'%';});const date=new Date().toISOString().slice(0,10);XLSX.writeFile(wb,`รายงานส่งงาน_${date}.xlsx`);resolve();});}
+async function exportPDF(data,pf){const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});let html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"><style>*{font-family:Sarabun,sans-serif;box-sizing:border-box;margin:0;padding:0;}body{font-size:11pt;color:#1E293B;}.page{padding:12mm 15mm;page-break-after:always;}.page:last-child{page-break-after:avoid;}.page-title{font-size:16pt;font-weight:700;color:#2563EB;margin-bottom:4px;}.page-meta{font-size:9pt;color:#64748B;margin-bottom:12px;border-bottom:2px solid #E2E8F0;padding-bottom:8px;}table{width:100%;border-collapse:collapse;font-size:10pt;}th{background:linear-gradient(135deg,#EBF2FF,#DBEAFE);color:#1E40AF;font-weight:700;padding:7px 6px;border:1px solid #BFDBFE;font-size:9pt;text-align:center;}td{padding:6px;border:1px solid #E2E8F0;vertical-align:middle;}tr:nth-child(even) td{background:#F8FAFF;}.num{text-align:center;color:#64748B;}.ok{text-align:center;color:#16A34A;font-weight:700;background:#DCFCE7!important;font-size:9pt;}.no{text-align:center;color:#94A3B8;font-size:9pt;}.pct-col{text-align:center;font-weight:700;}.footer{margin-top:8px;font-size:8pt;color:#94A3B8;text-align:right;}</style></head><body>`;data.forEach((roomData,i)=>{const{room,rows,homeworks,collectScore,hwTotalMax}=roomData;const dateStr=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});html+=`<div class="page"><div class="page-title">📋 รายงานการส่งงาน — ${room}</div><div class="page-meta">งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' ('+h.title+')').join(' · ')} &nbsp;|&nbsp; วันที่พิมพ์: ${dateStr} &nbsp;|&nbsp; นักเรียน ${rows.length} คน</div><table><thead><tr><th style="width:40px;">เลขที่</th><th style="width:90px;">เลขประจำตัว</th><th>ชื่อ-นามสกุล</th>${homeworks.map(h=>`<th style="width:65px;">งานครั้งที่ ${h.num}<br><span style="font-size:8pt;font-weight:400;">(/${h.maxScore||100})</span></th>`).join('')}<th style="width:50px;">ส่งแล้ว</th><th style="width:55px;">คะแนนรวม</th><th style="width:40px;">%</th><th style="width:40px;background:#FAF5FF;color:#7C3AED;">เกรด</th>${collectScore>0?`<th style="width:60px;background:linear-gradient(135deg,#DCFCE7,#BBF7D0);color:#15803D;">คะแนนที่ได้<br><span style="font-size:7pt;font-weight:400;">(/${collectScore})</span></th>`:''}</tr></thead><tbody>${rows.map(r=>{const hwCells=homeworks.map(h=>{const v=r['งานครั้งที่ '+h.num];const isOk=v!==undefined&&v!=='—';const display=isOk?(typeof v==='number'?v:'✓'):'—';return `<td class="${isOk?'ok':'no'}">${display}</td>`;}).join('');const pct=parseInt(r['%คะแนน']);const pctColor=pct===100?'#16A34A':pct>=60?'#2563EB':'#EF4444';const totalScore=r['คะแนนรวม'];const totalMax=r['คะแนนเต็มรวม'];return `<tr><td class="num">${r['เลขที่']}</td><td class="num">${r['เลขประจำตัว']}</td><td>${r['ชื่อ-นามสกุล']}</td>${hwCells}<td class="pct-col">${r['ส่งแล้ว']}</td><td class="pct-col" style="color:#6D28D9;font-weight:700;">${totalScore}<span style="font-size:8pt;color:#94A3B8;">/${totalMax}</span></td><td class="pct-col" style="color:${pctColor};">${r['%คะแนน']}</td><td class="pct-col" style="color:${r['เกรด']>=3?'#16A34A':r['เกรด']>=2?'#2563EB':r['เกรด']>=1?'#F59E0B':'#DC2626'};font-weight:800;">${r['เกรด']??'—'}</td>${collectScore>0?`<td class="pct-col" style="color:#15803D;font-weight:800;background:#F0FDF4;">${r['คะแนนที่ได้']??'—'}</td>`:''}</tr>`;}).join('')}</tbody></table><div class="footer">TaskGenius · พิมพ์วันที่ ${dateStr}</div></div>`;pf.style.width=(40+(i+1)/data.length*50)+'%';});html+='</body></html>';const win=window.open('','_blank','width=900,height=700');if(!win){toast('กรุณาอนุญาต Popup เพื่อ Export PDF','warn');return;}win.document.write(html);win.document.close();win.onload=()=>{setTimeout(()=>{win.focus();win.print();},800);};}
 
 // ---- INIT ----
 // ╔══════════════════════════════════════════════════════╗
@@ -5000,11 +5000,7 @@ function openGradeTab() {
     if(content) {
       content.style.display = 'block';
       content.innerHTML = `
-        <div style="text-align:center;padding:48px 24px;color:var(--text2);">
-          <div style="font-size:48px;margin-bottom:16px;">🚧</div>
-          <div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px;">กำลังพัฒนา</div>
-          <div style="font-size:14px;color:var(--text3);">ระบบเกรดอยู่ระหว่างการพัฒนา<br>จะเปิดให้ใช้งานเร็วๆ นี้</div>
-        </div>`;
+        <div id="grade-tab-content">${renderGradeTab()}</div>`;
     }
     return;
   }
@@ -6239,7 +6235,7 @@ function _sfBuild(){
   function mkG(lbl){var g=document.createElement('div');g.style.cssText='display:flex;flex-direction:column;gap:4px;';var l=document.createElement('div');l.style.cssText='font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;';l.textContent=lbl;g.appendChild(l);return g;}
   function chip(txt,act){var b=document.createElement('button');b.style.cssText='padding:7px 13px;border-radius:20px;border:1.5px solid '+(act?'#F59E0B':'#E2E8F0')+';font-size:12px;font-weight:700;cursor:pointer;background:'+(act?'#F59E0B':'#fff')+';color:'+(act?'#fff':'#475569')+';font-family:Sarabun,sans-serif;';b.textContent=txt;return b;}
   var rg=mkG('ห้อง');var rdd=document.createElement('select');rdd.id='sf-room-dd';rdd.style.cssText='padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:Sarabun,sans-serif;background:#F8FAFC;cursor:pointer;';rdd.onchange=function(){_sfRoom=this.value;_sfRun();};rg.appendChild(rdd);ctrl.appendChild(rg);
-  var mg=mkG('แสดงนักเรียน');var mw=document.createElement('div');mw.style.cssText='display:flex;gap:6px;';
+  var mg=mkG('แสดงนักเรียน');mg.id='sf-mode-group';var mw=document.createElement('div');mw.style.cssText='display:flex;gap:6px;';
   [['below','ต่ำกว่า'],['above','สูงกว่า']].forEach(function(p){var b=chip(p[1],_sfMode===p[0]);b.dataset.mode=p[0];b.onclick=function(){_sfMode=this.dataset.mode;mw.querySelectorAll('button').forEach(function(x){var a=x.dataset.mode===_sfMode;x.style.background=a?'#F59E0B':'#fff';x.style.borderColor=a?'#F59E0B':'#E2E8F0';x.style.color=a?'#fff':'#475569';});_sfRun();};mw.appendChild(b);});mg.appendChild(mw);ctrl.appendChild(mg);
   var tg=mkG('เงื่อนไข');var tw=document.createElement('div');tw.style.cssText='display:flex;gap:6px;';
   var ppanel,spanel;
@@ -6286,7 +6282,7 @@ function _sfRun(){
     hws.forEach(function(h){var sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,s.room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub){done++;totalScore+=(sub.score!==null&&sub.score!==undefined)?Number(sub.score):(h.maxScore||100);}});
     var pct=totalMax>0?Math.round(totalScore/totalMax*100):0;
     var gv=totalMax>=100?calcGrade(pct):null;
-    var ok=_sfType==='grade'?(gv!==null&&(_sfMode==='below'?gv<_sfGrade:gv>=_sfGrade)):_sfType==='score'?(_sfMode==='below'?totalScore<_sfScore:totalScore>=_sfScore):(_sfMode==='below'?pct<_sfPct:pct>=_sfPct);
+    var ok=_sfType==='grade'?(gv!==null&&gv===_sfGrade):_sfType==='score'?(_sfMode==='below'?totalScore<_sfScore:totalScore>=_sfScore):(_sfMode==='below'?pct<_sfPct:pct>=_sfPct);
     if(ok)results.push({s:s,totalScore:totalScore,totalMax:totalMax,pct:pct,done:done,total:hws.length});
   });
   results.sort(function(a,b){return _sfMode==='below'?a.pct-b.pct:b.pct-a.pct;});
@@ -6315,6 +6311,116 @@ function openStatusMenu(sid){var ex=document.getElementById('_smov');if(ex)ex.re
 function calcGrade(pct){if(pct>=80)return 4;if(pct>=75)return 3.5;if(pct>=70)return 3;if(pct>=65)return 2.5;if(pct>=60)return 2;if(pct>=55)return 1.5;if(pct>=50)return 1;return 0;}
 function gradeColor(g){if(g>=3.5)return'#16A34A';if(g>=2.5)return'#2563EB';if(g>=1.5)return'#F59E0B';if(g>=1)return'#EA580C';return'#DC2626';}
 function gradeBg(g){if(g>=3.5)return'#DCFCE7';if(g>=2.5)return'#DBEAFE';if(g>=1.5)return'#FEF3C7';if(g>=1)return'#FFEDD5';return'#FEE2E2';}
+
+function renderGradeTab(){
+  var rooms=DB.rooms.slice().sort();
+  if(!rooms.length) return '<div style="text-align:center;padding:40px;color:#94A3B8;font-size:14px;">ยังไม่มีห้องเรียน</div>';
+  setTimeout(function(){document.querySelectorAll('.grb').forEach(function(b){b.onclick=function(){openGradeStats(this.dataset.r);};});},50);
+  return '<div style="padding:8px 0;">'
+    +rooms.map(function(room){
+      var stus=DB.students.filter(function(s){return s.room===room;});
+      var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;});
+      var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
+      var hasGrade=totalMax>=100;
+      return '<button data-r="'+room+'" class="grb" style="width:100%;text-align:left;padding:14px 16px;margin-bottom:10px;background:#fff;border:1.5px solid #E2E8F0;border-radius:14px;cursor:pointer;font-family:Sarabun,sans-serif;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.04);">'
+        +'<div style="font-size:28px;">🏫</div>'
+        +'<div style="flex:1;">'
+        +'<div style="font-size:15px;font-weight:800;color:#0F172A;">'+room+'</div>'
+        +'<div style="font-size:12px;color:#64748B;margin-top:2px;">'+stus.length+' คน · คะแนนเต็มรวม '+totalMax+(hasGrade?' · ✅ พร้อมดูเกรด':' · ⚠️ คะแนนยังไม่ถึง 100')+'</div>'
+        +'</div>'
+        +'<div style="color:#94A3B8;font-size:18px;">›</div>'
+        +'</button>';
+    }).join('')
+    +'</div>';
+}
+
+function openGradeStats(room){
+  var stus=DB.students.filter(function(s){return s.room===room;});
+  var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;});
+  var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
+
+  // คำนวณเกรดแต่ละคน
+  var gradeCount={0:0,1:0,1.5:0,2:0,2.5:0,3:0,3.5:0,4:0};
+  var gradeList=[4,3.5,3,2.5,2,1.5,1,0];
+  var total=stus.length;
+  stus.forEach(function(s){
+    if(s.status&&s.status!=='active')return;
+    var score=0;
+    hws.forEach(function(h){
+      var sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];
+      if(sub)score+=(sub.score!==null&&sub.score!==undefined?Number(sub.score):(h.maxScore||100));
+    });
+    var pct=totalMax>0?Math.round(score/totalMax*100):0;
+    var g=totalMax>=100?calcGrade(pct):null;
+    if(g!==null) gradeCount[g]=(gradeCount[g]||0)+1;
+  });
+  var activeTotal=stus.filter(function(s){return !s.status||s.status==='active';}).length;
+  var grade34=( gradeCount[3]||0)+(gradeCount[3.5]||0)+(gradeCount[4]||0);
+  var pct34=activeTotal>0?Math.round(grade34/activeTotal*100):0;
+  var maxCount=Math.max.apply(null,gradeList.map(function(g){return gradeCount[g]||0;}));
+
+  var modal=document.getElementById('_gmov');
+  if(!modal){modal=document.createElement('div');modal.id='_gmov';modal.style.cssText='position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.5);display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;';document.body.appendChild(modal);}
+  modal.onclick=function(e){if(e.target===modal)modal.style.display='none';};
+
+  var gColors={4:'#16A34A',3.5:'#22C55E',3:'#2563EB',2.5:'#60A5FA',2:'#F59E0B',1.5:'#FB923C',1:'#EA580C',0:'#DC2626'};
+  var html='<div style="background:#fff;border-radius:20px;width:100%;max-width:500px;padding:24px;font-family:Sarabun,sans-serif;margin:auto;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">'
+    +'<div><div style="font-size:18px;font-weight:800;color:#0F172A;">📊 สถิติเกรด — '+room+'</div>'
+    +'<div style="font-size:12px;color:#64748B;margin-top:2px;">นักเรียน '+activeTotal+' คน · คะแนนเต็มรวม '+totalMax+'</div></div>'
+    +'<button id="_gmcl" style="width:34px;height:34px;border-radius:50%;border:1.5px solid #E2E8F0;background:#F8FAFC;cursor:pointer;font-size:16px;">✕</button>'
+    +'</div>';
+
+  if(totalMax<100){
+    html+='<div style="text-align:center;padding:30px;color:#F59E0B;font-size:14px;">⚠️ คะแนนเต็มรวมยังไม่ถึง 100 ยังไม่สามารถคำนวณเกรดได้</div></div>';
+    modal.innerHTML=html;modal.style.display='flex';return;
+  }
+
+  // Bar chart
+  html+='<div style="margin-bottom:20px;">';
+  gradeList.forEach(function(g){
+    var cnt=gradeCount[g]||0;
+    var barPct=maxCount>0?Math.round(cnt/maxCount*100):0;
+    var pctOfClass=activeTotal>0?Math.round(cnt/activeTotal*100):0;
+    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+      +'<div style="width:44px;text-align:right;font-size:13px;font-weight:700;color:'+gColors[g]+';flex-shrink:0;">เกรด '+g+'</div>'
+      +'<div style="flex:1;background:#F1F5F9;border-radius:6px;height:28px;overflow:hidden;">'
+      +'<div style="width:'+barPct+'%;height:100%;background:'+gColors[g]+';border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;transition:width .3s;">'
+      +(barPct>20?'<span style="color:#fff;font-size:12px;font-weight:700;">'+cnt+' คน</span>':'')
+      +'</div></div>'
+      +(barPct<=20?'<div style="font-size:12px;font-weight:700;color:'+gColors[g]+';width:50px;">'+cnt+' คน</div>':'<div style="width:50px;"></div>')
+      +'<div style="width:36px;text-align:right;font-size:11px;color:#64748B;">'+pctOfClass+'%</div>'
+      +'</div>';
+  });
+  html+='</div>';
+
+  // Summary stats
+  html+='<div style="background:#F8FAFC;border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+    +'<div style="text-align:center;padding:10px;background:#DCFCE7;border-radius:10px;">'
+    +'<div style="font-size:22px;font-weight:900;color:#16A34A;">'+pct34+'%</div>'
+    +'<div style="font-size:11px;color:#15803D;margin-top:2px;">เกรด 3-4<br>('+grade34+' คน)</div></div>'
+    +'<div style="text-align:center;padding:10px;background:#FEE2E2;border-radius:10px;">'
+    +'<div style="font-size:22px;font-weight:900;color:#DC2626;">'+(gradeCount[0]||0)+'</div>'
+    +'<div style="font-size:11px;color:#991B1B;margin-top:2px;">ไม่ผ่าน (เกรด 0)<br>('+(activeTotal>0?Math.round((gradeCount[0]||0)/activeTotal*100):0)+'%)</div></div>'
+    +'</div>';
+
+  // Grade distribution
+  html+='<div style="margin-top:14px;"><div style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:8px;">สัดส่วนแต่ละเกรด</div><div style="display:flex;border-radius:8px;overflow:hidden;height:20px;">';
+  gradeList.slice().reverse().forEach(function(g){
+    var cnt=gradeCount[g]||0;
+    var pctBar=activeTotal>0?Math.round(cnt/activeTotal*100):0;
+    if(pctBar>0) html+='<div style="width:'+pctBar+'%;background:'+gColors[g]+';height:100%;" title="เกรด '+g+': '+pctBar+'%"></div>';
+  });
+  html+='</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">';
+  gradeList.slice().reverse().forEach(function(g){
+    var pctBar=activeTotal>0?Math.round((gradeCount[g]||0)/activeTotal*100):0;
+    if(pctBar>0||gradeCount[g]>0) html+='<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:'+gColors[g]+'22;color:'+gColors[g]+';font-weight:700;">เกรด '+g+': '+pctBar+'%</span>';
+  });
+  html+='</div></div></div>';
+  modal.innerHTML=html;modal.style.display='flex';
+  var cl=document.getElementById('_gmcl');if(cl)cl.onclick=function(){modal.style.display='none';};
+}
+
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
