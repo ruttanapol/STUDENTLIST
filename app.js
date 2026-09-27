@@ -1913,7 +1913,8 @@ function renderStudentView(s, stuDB){
   let html=`<div class="score-hero">
     <div class="score-hero-lbl">🏆 คะแนนรวมทั้งหมด</div>
     <div class="score-hero-num">${totalScore}<span>/${totalMax}</span></div>
-    <div class="score-hero-sub">${done.length?`ได้ ${scorePct}% จากงานที่ส่งแล้ว ${done.length} ชิ้น${pendingCount?` (รอตรวจ ${pendingCount} ชิ้น)`:''}`:'ยังไม่มีงานที่ส่ง'}</div>
+    <div class="score-hero-sub">${done.length?`ส่งแล้ว ${done.length} ชิ้น`:'\ยังไม่มีงานที่ส่ง'}</div>
+    ${done.length&&totalMax>=100?`<div style="margin-top:10px;display:flex;align-items:center;justify-content:center;gap:10px;"><span style="font-size:13px;color:var(--text3);">เกรด</span><span style="font-size:24px;font-weight:900;padding:3px 20px;border-radius:24px;color:${gradeColor(calcGrade(scorePct))};background:${gradeBg(calcGrade(scorePct))};">${calcGrade(scorePct)}</span></div>`:totalMax>0&&totalMax<100?`<div style="margin-top:8px;font-size:12px;color:var(--text3);">คะแนนเต็มรวมยังไม่ถึง 100 (${totalMax}/100)</div>`:''}
   </div>
   ${totalMax?`<div class="card" style="margin-bottom:14px;">
     <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;">🧮 ลองเทียบคะแนน</div>
@@ -2990,7 +2991,9 @@ function buildExportData(){
       row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
       row['คะแนนรวม']=totalScore;
       row['คะแนนเต็มรวม']=hwTotalMax;
-      row['%คะแนน']=totalMax>0?Math.round(totalScore/totalMax*100)+'%':'0%';
+      const _pctG=hwTotalMax>0?Math.round(totalScore/hwTotalMax*100):0;
+      row['%คะแนน']=_pctG+'%';
+      row['เกรด']=hwTotalMax>=100&&doneCount>0?calcGrade(_pctG):'—';
       if(collectScore>0 && hwTotalMax>0) {
         row['คะแนนเก็บ']=collectScore;
         row['คะแนนที่ได้']=Math.round(totalScore/hwTotalMax*collectScore*100)/100;
@@ -6127,7 +6130,8 @@ function _gsRender(){
     thr.appendChild(th);
   });
   var tht=document.createElement('th');tht.style.cssText='background:#FAF5FF;border-bottom:2px solid #DDD6FE;width:72px;min-width:72px;text-align:center;font-size:11px;color:#7C3AED;font-weight:700;padding:6px 4px;';tht.innerHTML='รวม<br><span style="font-weight:400;font-size:10px;">/'+totalMax+'</span>';
-  thr.appendChild(tht);thead.appendChild(thr);
+  var thg=document.createElement('th');thg.style.cssText='background:#FAF5FF;border-bottom:2px solid #DDD6FE;width:56px;min-width:56px;text-align:center;font-size:11px;color:#7C3AED;font-weight:700;padding:6px 4px;';thg.textContent='เกรด';
+  thr.appendChild(tht);thr.appendChild(thg);thead.appendChild(thr);
   var tbody=document.createElement('tbody');
   var stMap={'withdrawn':'⛔','transferred':'🔄','leave':'💤'};
   stus.forEach(function(s,i){
@@ -6158,7 +6162,11 @@ function _gsRender(){
       td.appendChild(inp);tr.appendChild(td);
     });
     var tdt=document.createElement('td');tdt.id='gstot_'+s.id;tdt.style.cssText='border-bottom:1px solid #DDD6FE;width:72px;min-width:72px;text-align:center;font-weight:700;font-size:13px;color:#7C3AED;background:#FAF5FF;vertical-align:middle;padding:4px;';tdt.textContent=rowTotal+'/'+totalMax;
-    tr.appendChild(tdt);tbody.appendChild(tr);
+    var _gp=totalMax>0?Math.round(rowTotal/totalMax*100):0;
+    var _gv=totalMax>=100?calcGrade(_gp):'—';var _gC=totalMax>=100?gradeColor(calcGrade(_gp)):'#94A3B8';var _gB=totalMax>=100?gradeBg(calcGrade(_gp)):'#F1F5F9';
+    var _tg=document.createElement('td');_tg.id='gsgrade_'+s.id;
+    _tg.style.cssText='border-bottom:1px solid #DDD6FE;width:56px;min-width:56px;text-align:center;font-weight:800;font-size:14px;color:'+_gC+';background:'+_gB+';vertical-align:middle;padding:4px;';
+    _tg.textContent=_gv;tr.appendChild(tdt);tr.appendChild(_tg);tbody.appendChild(tr);
   });
   tbl.innerHTML='';tbl.appendChild(thead);tbl.appendChild(tbody);
   var q=document.getElementById('gs-search');_gsFilterRows(q?q.value:'');
@@ -6182,6 +6190,8 @@ function _gsUpdateTot(sid){
     }
   });
   var el=document.getElementById('gstot_'+sid);if(el)el.textContent=total+'/'+totalMax;
+  var eg=document.getElementById('gsgrade_'+sid);
+  if(eg){if(totalMax>=100){var _p=totalMax>0?Math.round(total/totalMax*100):0;var _gv=calcGrade(_p);eg.textContent=_gv;eg.style.color=gradeColor(_gv);eg.style.background=gradeBg(_gv);}else{eg.textContent='—';eg.style.color='#94A3B8';eg.style.background='#F1F5F9';}}
 }
 function _gsColFill(hwNum,defMax){
   var fi=document.getElementById('gsfi_'+hwNum);var v=fi&&fi.value!==''?parseFloat(fi.value):defMax;
@@ -6267,7 +6277,7 @@ function _sfRun(){
   if(!results.length){list.innerHTML='<div style="text-align:center;padding:40px;color:#94A3B8;font-size:14px;">✅ ไม่พบนักเรียนตามเงื่อนไขนี้</div>';return;}
   results.forEach(function(r,i){var bc=r.pct<50?'#FFF5F5':r.pct<75?'#FFFBEB':'#F0FDF4';var bc2=r.pct<50?'#FCA5A5':r.pct<75?'#FCD34D':'#86EFAC';var pc=r.pct<50?'#DC2626':r.pct<75?'#D97706':'#16A34A';var rbc=r.pct<50?'#FEE2E2;color:#DC2626':r.pct<75?'#FEF3C7;color:#B45309':'#DCFCE7;color:#15803D';
     var card=document.createElement('div');card.style.cssText='background:'+bc+';border:1.5px solid '+bc2+';border-radius:14px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;';
-    card.innerHTML='<div style="width:28px;height:28px;border-radius:50%;background:'+rbc+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">'+(i+1)+'</div><div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.s.name+'</div><div style="font-size:12px;color:#64748B;margin-top:2px;">'+r.s.id+' · ห้อง '+r.s.room+' · ส่ง '+r.done+'/'+r.total+' ชิ้น</div><div style="margin-top:6px;background:#E2E8F0;border-radius:6px;height:6px;overflow:hidden;"><div style="width:'+r.pct+'%;height:100%;border-radius:6px;background:'+pc+';"></div></div></div><div style="text-align:right;flex-shrink:0;"><div style="font-size:18px;font-weight:800;color:#0F172A;">'+r.totalScore+'</div><div style="font-size:11px;color:#94A3B8;">จาก '+r.totalMax+'</div><div style="padding:3px 10px;border-radius:20px;font-size:13px;font-weight:800;background:'+rbc+';">'+r.pct+'%</div></div>';
+    card.innerHTML='<div style="width:28px;height:28px;border-radius:50%;background:'+rbc+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">'+(i+1)+'</div><div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.s.name+'</div><div style="font-size:12px;color:#64748B;margin-top:2px;">'+r.s.id+' · ห้อง '+r.s.room+' · ส่ง '+r.done+'/'+r.total+' ชิ้น</div><div style="margin-top:6px;background:#E2E8F0;border-radius:6px;height:6px;overflow:hidden;"><div style="width:'+r.pct+'%;height:100%;border-radius:6px;background:'+pc+';"></div></div></div><div style="text-align:right;flex-shrink:0;"><div style="font-size:18px;font-weight:800;color:#0F172A;">'+r.totalScore+'</div><div style="font-size:11px;color:#94A3B8;">จาก '+r.totalMax+'</div><div style="padding:3px 10px;border-radius:20px;font-size:13px;font-weight:800;background:'+rbc+';">'+r.pct+'%</div><div style="margin-top:4px;padding:2px 10px;border-radius:20px;font-size:15px;font-weight:900;color:'+(r.totalMax>=100?gradeColor(calcGrade(r.pct)):'#64748B')+';background:'+(r.totalMax>=100?gradeBg(calcGrade(r.pct)):'#F1F5F9')+';">'+(r.totalMax>=100?'เกรด '+calcGrade(r.pct):'ยังไม่ถึง 100')+'</div></div>';
     list.appendChild(card);
   });
 }
@@ -6278,6 +6288,10 @@ var _stuStatusMap={'active':'✅ ปกติ','withdrawn':'⛔ ลาออก'
 async function updateStudentStatus(sid,ns){var s=DB.students.find(function(x){return x.id===sid;});if(!s)return;s.status=ns;if(USE_SUPABASE){const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';try{await SB.from('students').update({status:ns}).eq('id',sid).eq('teacher_id',tid);toast('อัพเดต '+s.name+' ✅');}catch(e){toast('ไม่สำเร็จ','err');}}if(typeof _gsRender==='function')_gsRender();}
 function openStatusMenu(sid){var ex=document.getElementById('_smov');if(ex)ex.remove();var s=DB.students.find(function(x){return x.id===sid;});if(!s)return;var ov=document.createElement('div');ov.id='_smov';ov.style.cssText='position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';var box=document.createElement('div');box.style.cssText='background:#fff;border-radius:18px;padding:20px;min-width:240px;max-width:300px;width:100%;font-family:Sarabun,sans-serif;';var ti=document.createElement('div');ti.style.cssText='font-size:15px;font-weight:800;color:#0F172A;margin-bottom:12px;';ti.textContent='สถานะ: '+s.name;box.appendChild(ti);[['active','✅ ปกติ','#DCFCE7','#15803D'],['leave','💤 ลาพัก','#FEF3C7','#B45309'],['transferred','🔄 ย้ายออก','#DBEAFE','#1D4ED8'],['withdrawn','⛔ ลาออก','#FEE2E2','#DC2626']].forEach(function(opt){var btn=document.createElement('button');btn.style.cssText='width:100%;padding:10px 14px;margin-bottom:8px;border:'+(s.status===opt[0]?'2.5px solid '+opt[3]:'1.5px solid transparent')+';border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;background:'+opt[2]+';color:'+opt[3]+';text-align:left;';btn.textContent=opt[1];btn.onclick=function(){updateStudentStatus(sid,opt[0]);ov.remove();};box.appendChild(btn);});var cx=document.createElement('button');cx.style.cssText='width:100%;padding:10px;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:Sarabun,sans-serif;background:#F1F5F9;color:#64748B;font-weight:600;';cx.textContent='ยกเลิก';cx.onclick=function(){ov.remove();};box.appendChild(cx);ov.appendChild(box);ov.onclick=function(e){if(e.target===ov)ov.remove();};document.body.appendChild(ov);}
 
+
+function calcGrade(pct){if(pct>=80)return 4;if(pct>=75)return 3.5;if(pct>=70)return 3;if(pct>=65)return 2.5;if(pct>=60)return 2;if(pct>=55)return 1.5;if(pct>=50)return 1;return 0;}
+function gradeColor(g){if(g>=3.5)return'#16A34A';if(g>=2.5)return'#2563EB';if(g>=1.5)return'#F59E0B';if(g>=1)return'#EA580C';return'#DC2626';}
+function gradeBg(g){if(g>=3.5)return'#DCFCE7';if(g>=2.5)return'#DBEAFE';if(g>=1.5)return'#FEF3C7';if(g>=1)return'#FFEDD5';return'#FEE2E2';}
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
