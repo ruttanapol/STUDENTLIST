@@ -6250,6 +6250,24 @@ function _sfBuild(){
   var sg=mkG('คะแนน');sg.style.display='none';var sw=document.createElement('div');sw.style.cssText='display:flex;gap:6px;flex-wrap:wrap;align-items:center;';
   [20,40,60,80].forEach(function(sc){var b=chip(sc+' คะแนน',_sfScore===sc);b.dataset.sc=sc;b.onclick=function(){_sfScore=parseInt(this.dataset.sc);sw.querySelectorAll('[data-sc]').forEach(function(x){var a=parseInt(x.dataset.sc)===_sfScore;x.style.background=a?'#F59E0B':'#fff';x.style.borderColor=a?'#F59E0B':'#E2E8F0';x.style.color=a?'#fff':'#475569';});sci.value='';_sfRun();};sw.appendChild(b);});
   var sci=document.createElement('input');sci.type='number';sci.min='0';sci.placeholder='กรอก';sci.style.cssText='width:60px;padding:7px 8px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-weight:700;text-align:center;font-family:Sarabun,sans-serif;';sci.oninput=function(){var v=parseFloat(this.value);if(!isNaN(v)&&v>=0){_sfScore=v;sw.querySelectorAll('[data-sc]').forEach(function(x){x.style.background='#fff';x.style.borderColor='#E2E8F0';x.style.color='#475569';});_sfRun();}};sw.appendChild(sci);sg.appendChild(sw);ctrl.appendChild(sg);spanel=sg;
+
+  // grade panel
+  var gpanel=document.createElement('div');gpanel.id='sf-grade-panel';gpanel.style.cssText='display:none;flex-direction:column;gap:4px;';
+  var gl=document.createElement('div');gl.style.cssText='font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;';gl.textContent='เลือกเกรด';
+  var gw=document.createElement('div');gw.style.cssText='display:flex;gap:6px;flex-wrap:wrap;';
+  [[4,'4 ดีเยี่ยม'],[3.5,'3.5'],[3,'3 ดี'],[2.5,'2.5'],[2,'2 ปานกลาง'],[1.5,'1.5'],[1,'1 ผ่าน'],[0,'0 ไม่ผ่าน']].forEach(function(gr){
+    var b=chip('เกรด '+gr[0],_sfGrade===gr[0]);b.dataset.gr=gr[0];b.title=gr[1];
+    b.onclick=function(){
+      _sfGrade=parseFloat(this.dataset.gr);
+      gw.querySelectorAll('[data-gr]').forEach(function(x){
+        var a=parseFloat(x.dataset.gr)===_sfGrade;
+        x.style.background=a?'#7C3AED':'#fff';x.style.borderColor=a?'#7C3AED':'#E2E8F0';x.style.color=a?'#fff':'#475569';
+      });_sfRun();
+    };
+    gw.appendChild(b);
+  });
+  gpanel.appendChild(gl);gpanel.appendChild(gw);ctrl.appendChild(gpanel);
+
   ov.appendChild(ctrl);
   var sm=document.createElement('div');sm.id='sf-summary';sm.style.cssText='padding:10px 14px;background:#FEF3C7;border-bottom:1.5px solid #FCD34D;font-size:13px;color:#92400E;font-weight:600;display:none;flex-shrink:0;';ov.appendChild(sm);
   var list=document.createElement('div');list.id='sf-list';list.style.cssText='flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px 80px;';ov.appendChild(list);
