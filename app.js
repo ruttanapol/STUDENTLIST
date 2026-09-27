@@ -1914,6 +1914,7 @@ function renderStudentView(s, stuDB){
     <div class="score-hero-lbl">🏆 คะแนนรวมทั้งหมด</div>
     <div class="score-hero-num">${totalScore}<span>/${totalMax}</span></div>
     <div class="score-hero-sub">${done.length?`ส่งแล้ว ${done.length} ชิ้น`:'ยังไม่มีงานที่ส่ง'}</div>
+    ${done.length&&totalMax>=100?`<div style="margin-top:10px;display:flex;align-items:center;justify-content:center;gap:10px;"><span style="font-size:13px;color:var(--text3);">เกรด</span><span style="font-size:24px;font-weight:900;padding:3px 20px;border-radius:24px;color:${gradeColor(calcGrade(scorePct))};background:${gradeBg(calcGrade(scorePct))};">${calcGrade(scorePct)}</span></div>`:totalMax>0&&totalMax<100?`<div style="margin-top:8px;font-size:12px;color:var(--text3);">คะแนนเต็มรวมยังไม่ถึง 100 (${totalMax}/100)</div>`:''}
   </div>
   ${totalMax?`<div class="card" style="margin-bottom:14px;">
     <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;">🧮 ลองเทียบคะแนน</div>
@@ -2422,7 +2423,7 @@ function renderTable(){
         <div style="text-align:right;font-size:14px;margin-top:2px;">
           <span style="font-weight:700;color:var(--green-dark);font-size:16px;">${done}</span>
           <span style="color:var(--text3);">/${stuHWs.length}</span>
-          ${(()=>{let sc=0,mx=0;stuHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub){const ms=authMaxScore(h,sub);sc+=clampedItemScore(sub,ms);mx+=ms;}else{mx+=h.maxScore||100;}});return mx>0?`<span style="font-size:12px;color:var(--purple);font-weight:700;margin-left:4px;">${sc}/${mx}</span>`:'';})()}
+          ${(()=>{let sc=0,mx=0;stuHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub){const ms=authMaxScore(h,sub);sc+=clampedItemScore(sub,ms);mx+=ms;}else{mx+=h.maxScore||100;}});return mx>0?`<span style="font-size:12px;color:var(--purple);font-weight:700;margin-left:4px;">${sc}/${mx}</span>`:'';})()}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin:8px 0 4px;">
@@ -2448,7 +2449,7 @@ function showDetail(sid){
       <button onclick="document.getElementById('detail-panel').style.display='none'" style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;color:var(--text2);display:flex;align-items:center;justify-content:center;">✕</button>
     </div>
     <div style="font-size:13px;font-weight:700;color:var(--green-dark);margin-bottom:6px;">✅ ส่งแล้ว (${done.length})</div>
-    ${done.map(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const scoreStr=(sub.score!==null&&sub.score!==undefined)?`<span style="font-size:12px;font-weight:700;color:var(--purple);background:var(--purple-light);padding:2px 8px;border-radius:10px;">${sub.score}/${authMaxScore(h,sub)}</span>`:'';;return `<div class="ds-row"><span>${escapeHtml(h.title)} ${scoreStr}</span><span style="font-size:12px;color:var(--text3);">${sub.ts}</span></div>`;}).join('')||'<div style="font-size:13px;color:var(--text3);padding:6px 0;">ยังไม่มี</div>'}
+    ${done.map(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];const scoreStr=(sub.score!==null&&sub.score!==undefined)?`<span style="font-size:12px;font-weight:700;color:var(--purple);background:var(--purple-light);padding:2px 8px;border-radius:10px;">${sub.score}/${authMaxScore(h,sub)}</span>`:'';;return `<div class="ds-row"><span>${escapeHtml(h.title)} ${scoreStr}</span><span style="font-size:12px;color:var(--text3);">${sub.ts}</span></div>`;}).join('')||'<div style="font-size:13px;color:var(--text3);padding:6px 0;">ยังไม่มี</div>'}
     <div style="font-size:13px;font-weight:700;color:var(--red);margin:12px 0 6px;">❌ ยังไม่ส่ง (${miss.length})</div>
     ${miss.map(h=>`<div class="ds-row"><span>${escapeHtml(h.title)}</span><span style="font-size:12px;color:var(--text2);">${escapeHtml(h.subject)}</span></div>`).join('')||'<div style="font-size:13px;color:var(--green-dark);padding:6px 0;">🎉 ส่งครบทุกชิ้น!</div>'}
   </div>`;
@@ -2980,17 +2981,19 @@ function buildExportData(){
   const collectScore = collectInp ? (parseFloat(collectInp.value)||0) : 0;
   return selectedRooms.map(room=>{
     // เลือกเฉพาะชิ้นงานของห้องนี้จริงๆ (กันเลขชิ้นงานชนกับห้องอื่น)
-    const selectedHWs=DB.homeworks.filter(h=>h.room===room&&exportHWSel.has(h.num)).sort((a,b)=>a.num-b.num);
+    const selectedHWs=DB.homeworks.filter(h=>(h.room===room||!h.room)&&exportHWSel.has(h.room+'|'+h.num)).sort((a,b)=>a.num-b.num);
     const hwTotalMax=selectedHWs.reduce((s,h)=>s+(h.maxScore||100),0);
     const students=DB.students.filter(s=>s.room===room).sort((a,b)=>a.id.localeCompare(b.id));
     const rows=students.map((s,idx)=>{
       const row={เลขที่:idx+1,เลขประจำตัว:s.id,'ชื่อ-นามสกุล':s.name,ห้อง:s.room};
       let totalScore=0,totalMax=0,doneCount=0;
-      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:(sub.maxScore||h.maxScore||100);}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
+      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:(sub.maxScore||h.maxScore||100);}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
       row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
       row['คะแนนรวม']=totalScore;
       row['คะแนนเต็มรวม']=hwTotalMax;
-      row['%คะแนน']=totalMax>0?Math.round(totalScore/totalMax*100)+'%':'0%';
+      const _pctG=hwTotalMax>0?Math.round(totalScore/hwTotalMax*100):0;
+      row['%คะแนน']=_pctG+'%';
+      row['เกรด']=hwTotalMax>=100&&doneCount>0?calcGrade(_pctG):'—';
       if(collectScore>0 && hwTotalMax>0) {
         row['คะแนนเก็บ']=collectScore;
         row['คะแนนที่ได้']=Math.round(totalScore/hwTotalMax*collectScore*100)/100;
@@ -3149,7 +3152,7 @@ function renderStudentScoreList(){
     return;
   }
   list.innerHTML=hws.map(h=>{
-    const sub=DB.submissions[subKey(s.id,h.num,h.room)];
+    const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];
     const hasSub=!!sub;
     const scoreVal=hasSub&&sub.score!==null&&sub.score!==undefined?sub.score:'';
     const statusBadge=hasSub
@@ -3309,7 +3312,7 @@ function renderManage(){
     }else if(!hwsToShow.length){hwList.innerHTML=`<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">ยังไม่มีชิ้นงานสำหรับ ${_hwRoom}</div>`;
     }else{
       const roomStus=DB.students.filter(s=>s.room===_hwRoom);
-      hwList.innerHTML=hwsToShow.map(h=>{const locked=isHWLocked(h);const now=new Date();let dlBadge='<span class="deadline-badge dl-none">ไม่มีกำหนด</span>';if(h.deadline){const dl=new Date(h.deadline);const diff=Math.round((dl-now)/86400000);if(diff<0)dlBadge=`<span class="deadline-badge dl-late">เกิน ${Math.abs(diff)} วัน</span>`;else if(diff<=3)dlBadge=`<span class="deadline-badge dl-soon">เหลือ ${diff} วัน</span>`;else dlBadge=`<span class="deadline-badge dl-ok">${dl.toLocaleDateString('th-TH',{day:'numeric',month:'short'})}</span>`;}const submitted=Object.keys(DB.submissions).filter(k=>{const[sid]=k.split('_'+h.num);return k===sid+'_'+h.num&&roomStus.some(s=>s.id===sid);}).length;const lo=locked?`<div style="position:absolute;inset:0;background:rgba(239,68,68,0.08);border-radius:12px;display:flex;align-items:center;justify-content:flex-end;padding:0 10px;pointer-events:none;"><span style="font-size:11px;font-weight:700;color:var(--red);background:#FEE2E2;padding:3px 8px;border-radius:20px;border:1px solid #FCA5A5;">🔒 ล็อค</span></div>`:'';const ws=locked?'position:relative;opacity:0.7;':'position:relative;';return `<div class="hw-card-item" style="${ws}">${lo}<div class="hw-card-num" style="${locked?'background:#FEE2E2;color:var(--red);':''}">${h.num}</div><div class="hw-card-info"><div class="hw-card-title">${escapeHtml(h.title)}${locked?' <span style="font-size:11px;color:var(--red);">🔒</span>':''}</div><div class="hw-card-sub">${h.subject||''} · เต็ม ${h.maxScore||100} · ส่ง ${submitted}/${roomStus.length} · ${dlBadge}</div>${h.fileUrl?'<div style="margin-top:4px;display:flex;align-items:center;gap:6px;"><span style="font-size:12px;">'+getFileIcon(h.fileName)+'</span><span style="font-size:11px;color:var(--green-dark);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">'+(h.fileName||'ไฟล์แนบ')+'</span><button onclick="removeHWFile('+h.num+')" style="padding:2px 6px;font-size:10px;border-radius:6px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบไฟล์</button></div>':''}</div>${locked?`<button onclick="openRenewalFlow()" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#FEE2E2;color:var(--red);cursor:pointer;white-space:nowrap;">💳 ต่ออายุ</button>`:`<button onclick="openEditHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;margin-right:4px;white-space:nowrap;">แก้ไข</button><button onclick="delHW(${h.num},'${h.room}')" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;">ลบ</button>`}</div>`;}).join('');
+      hwList.innerHTML=hwsToShow.map(h=>{const locked=isHWLocked(h);const now=new Date();let dlBadge='<span class="deadline-badge dl-none">ไม่มีกำหนด</span>';if(h.deadline){const dl=new Date(h.deadline);const diff=Math.round((dl-now)/86400000);if(diff<0)dlBadge=`<span class="deadline-badge dl-late">เกิน ${Math.abs(diff)} วัน</span>`;else if(diff<=3)dlBadge=`<span class="deadline-badge dl-soon">เหลือ ${diff} วัน</span>`;else dlBadge=`<span class="deadline-badge dl-ok">${dl.toLocaleDateString('th-TH',{day:'numeric',month:'short'})}</span>`;}const submitted=roomStus.filter(function(s){return DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,_hwRoom)]||DB.submissions[subKey(s.id,h.num,'')];}).length;const lo=locked?`<div style="position:absolute;inset:0;background:rgba(239,68,68,0.08);border-radius:12px;display:flex;align-items:center;justify-content:flex-end;padding:0 10px;pointer-events:none;"><span style="font-size:11px;font-weight:700;color:var(--red);background:#FEE2E2;padding:3px 8px;border-radius:20px;border:1px solid #FCA5A5;">🔒 ล็อค</span></div>`:'';const ws=locked?'position:relative;opacity:0.7;':'position:relative;';return `<div class="hw-card-item" style="${ws}">${lo}<div class="hw-card-num" style="${locked?'background:#FEE2E2;color:var(--red);':''}">${h.num}</div><div class="hw-card-info"><div class="hw-card-title">${escapeHtml(h.title)}${locked?' <span style="font-size:11px;color:var(--red);">🔒</span>':''}</div><div class="hw-card-sub">${h.subject||''} · เต็ม ${h.maxScore||100} · ส่ง ${submitted}/${roomStus.length} · ${dlBadge}</div>${h.fileUrl?'<div style="margin-top:4px;display:flex;align-items:center;gap:6px;"><span style="font-size:12px;">'+getFileIcon(h.fileName)+'</span><span style="font-size:11px;color:var(--green-dark);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">'+(h.fileName||'ไฟล์แนบ')+'</span><button onclick="removeHWFile('+h.num+')" style="padding:2px 6px;font-size:10px;border-radius:6px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;">ลบไฟล์</button></div>':''}</div>${locked?`<button onclick="openRenewalFlow()" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:#FEE2E2;color:var(--red);cursor:pointer;white-space:nowrap;">💳 ต่ออายุ</button>`:`<button onclick="openEditHW(${h.num})" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;margin-right:4px;white-space:nowrap;">แก้ไข</button><button onclick="delHW(${h.num},'${h.room}')" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;">ลบ</button>`}</div>`;}).join('');
     }
   }
 }
@@ -5269,7 +5272,7 @@ async function exportPrimaryGradeExcel() {
   const wsData=[['ลำดับ','รหัส','ชื่อ','ห้อง','คะแนนงาน%','คะแนนสอบ','รวม','เกรด','GPA'],
     ...students.map((s,i)=>{
       let hwTotal=0,hwMax=0;
-      hws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);hwTotal+=Math.min(parseFloat(sub.score)||0,ms);hwMax+=ms;}else hwMax+=parseFloat(h.maxScore||100);});
+      hws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);hwTotal+=Math.min(parseFloat(sub.score)||0,ms);hwMax+=ms;}else hwMax+=parseFloat(h.maxScore||100);});
       const hwPct=hwMax>0?(hwTotal/hwMax)*100:0;
       const exam=examMatched[s.id]??null;
       const total=exam!==null?(hwPct*0.5+exam*0.5):hwPct;
@@ -5333,12 +5336,12 @@ function renderSecGrade() {
   const rows=students.map(s=>{
     // คะแนนก่อนกลาง
     let pre=0,preMax=0;
-    preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
+    preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
     const prePct=preMax>0?(pre/preMax)*100:0;
 
     // คะแนนหลังกลาง
     let post=0,postMax=0;
-    postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
+    postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
     const postPct=postMax>0?(post/postMax)*100:0;
 
     const midScore=midMatched[s.id]??null;
@@ -5413,9 +5416,9 @@ async function exportSecGradeExcel() {
   const wb=XLSX.utils.book_new();
   const wsData=[['ลำดับ','รหัส','ชื่อ','ห้อง','ก่อนกลาง%','กลางภาค','หลังกลาง%','ปลายภาค','รวม','เกรด','GPA'],
     ...students.map((s,i)=>{
-      let pre=0,preMax=0; preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
+      let pre=0,preMax=0; preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
       const prePct=preMax>0?(pre/preMax)*100:0;
-      let post=0,postMax=0; postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
+      let post=0,postMax=0; postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
       const postPct=postMax>0?(post/postMax)*100:0;
       const mid=midMatched[s.id]??null; const fin=finMatched[s.id]??null;
       let total=prePct*wPre+postPct*wPost+(mid!==null?mid*wMid:0)+(fin!==null?fin*wFin:0);
@@ -6127,7 +6130,8 @@ function _gsRender(){
     thr.appendChild(th);
   });
   var tht=document.createElement('th');tht.style.cssText='background:#FAF5FF;border-bottom:2px solid #DDD6FE;width:72px;min-width:72px;text-align:center;font-size:11px;color:#7C3AED;font-weight:700;padding:6px 4px;';tht.innerHTML='รวม<br><span style="font-weight:400;font-size:10px;">/'+totalMax+'</span>';
-  thr.appendChild(tht);thead.appendChild(thr);
+  var thg=document.createElement('th');thg.style.cssText='background:#FAF5FF;border-bottom:2px solid #DDD6FE;width:56px;min-width:56px;text-align:center;font-size:11px;color:#7C3AED;font-weight:700;padding:6px 4px;';thg.textContent='เกรด';
+  thr.appendChild(tht);thr.appendChild(thg);thead.appendChild(thr);
   var tbody=document.createElement('tbody');
   var stMap={'withdrawn':'⛔','transferred':'🔄','leave':'💤'};
   stus.forEach(function(s,i){
@@ -6158,7 +6162,11 @@ function _gsRender(){
       td.appendChild(inp);tr.appendChild(td);
     });
     var tdt=document.createElement('td');tdt.id='gstot_'+s.id;tdt.style.cssText='border-bottom:1px solid #DDD6FE;width:72px;min-width:72px;text-align:center;font-weight:700;font-size:13px;color:#7C3AED;background:#FAF5FF;vertical-align:middle;padding:4px;';tdt.textContent=rowTotal+'/'+totalMax;
-    tr.appendChild(tdt);tbody.appendChild(tr);
+    var _gp=totalMax>0?Math.round(rowTotal/totalMax*100):0;
+    var _gv=totalMax>=100?calcGrade(_gp):'—';var _gColor=totalMax>=100?gradeColor(calcGrade(_gp)):'#94A3B8';var _gBg=totalMax>=100?gradeBg(calcGrade(_gp)):'#F1F5F9';
+    var _tg=document.createElement('td');_tg.id='gsgrade_'+s.id;
+    _tg.style.cssText='border-bottom:1px solid #DDD6FE;width:56px;min-width:56px;text-align:center;font-weight:800;font-size:14px;color:'+_gColor+';background:'+_gBg+';vertical-align:middle;padding:4px;';
+    _tg.textContent=_gv;tr.appendChild(tdt);tr.appendChild(_tg);tbody.appendChild(tr);
   });
   tbl.innerHTML='';tbl.appendChild(thead);tbl.appendChild(tbody);
   var q=document.getElementById('gs-search');_gsFilterRows(q?q.value:'');
@@ -6182,6 +6190,8 @@ function _gsUpdateTot(sid){
     }
   });
   var el=document.getElementById('gstot_'+sid);if(el)el.textContent=total+'/'+totalMax;
+  var eg=document.getElementById('gsgrade_'+sid);
+  if(eg){if(totalMax>=100){var _p=totalMax>0?Math.round(total/totalMax*100):0;var _gv=calcGrade(_p);eg.textContent=_gv;eg.style.color=gradeColor(_gv);eg.style.background=gradeBg(_gv);}else{eg.textContent='—';eg.style.color='#94A3B8';eg.style.background='#F1F5F9';}}
 }
 function _gsColFill(hwNum,defMax){
   var fi=document.getElementById('gsfi_'+hwNum);var v=fi&&fi.value!==''?parseFloat(fi.value):defMax;
@@ -6267,7 +6277,7 @@ function _sfRun(){
   if(!results.length){list.innerHTML='<div style="text-align:center;padding:40px;color:#94A3B8;font-size:14px;">✅ ไม่พบนักเรียนตามเงื่อนไขนี้</div>';return;}
   results.forEach(function(r,i){var bc=r.pct<50?'#FFF5F5':r.pct<75?'#FFFBEB':'#F0FDF4';var bc2=r.pct<50?'#FCA5A5':r.pct<75?'#FCD34D':'#86EFAC';var pc=r.pct<50?'#DC2626':r.pct<75?'#D97706':'#16A34A';var rbc=r.pct<50?'#FEE2E2;color:#DC2626':r.pct<75?'#FEF3C7;color:#B45309':'#DCFCE7;color:#15803D';
     var card=document.createElement('div');card.style.cssText='background:'+bc+';border:1.5px solid '+bc2+';border-radius:14px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;';
-    card.innerHTML='<div style="width:28px;height:28px;border-radius:50%;background:'+rbc+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">'+(i+1)+'</div><div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.s.name+'</div><div style="font-size:12px;color:#64748B;margin-top:2px;">'+r.s.id+' · ห้อง '+r.s.room+' · ส่ง '+r.done+'/'+r.total+' ชิ้น</div><div style="margin-top:6px;background:#E2E8F0;border-radius:6px;height:6px;overflow:hidden;"><div style="width:'+r.pct+'%;height:100%;border-radius:6px;background:'+pc+';"></div></div></div><div style="text-align:right;flex-shrink:0;"><div style="font-size:18px;font-weight:800;color:#0F172A;">'+r.totalScore+'</div><div style="font-size:11px;color:#94A3B8;">จาก '+r.totalMax+'</div><div style="padding:3px 10px;border-radius:20px;font-size:13px;font-weight:800;background:'+rbc+';">'+r.pct+'%</div></div>';
+    card.innerHTML='<div style="width:28px;height:28px;border-radius:50%;background:'+rbc+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">'+(i+1)+'</div><div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.s.name+'</div><div style="font-size:12px;color:#64748B;margin-top:2px;">'+r.s.id+' · ห้อง '+r.s.room+' · ส่ง '+r.done+'/'+r.total+' ชิ้น</div><div style="margin-top:6px;background:#E2E8F0;border-radius:6px;height:6px;overflow:hidden;"><div style="width:'+r.pct+'%;height:100%;border-radius:6px;background:'+pc+';"></div></div></div><div style="text-align:right;flex-shrink:0;"><div style="font-size:18px;font-weight:800;color:#0F172A;">'+r.totalScore+'</div><div style="font-size:11px;color:#94A3B8;">จาก '+r.totalMax+'</div><div style="padding:3px 10px;border-radius:20px;font-size:13px;font-weight:800;background:'+rbc+';">'+r.pct+'%</div><div style="margin-top:4px;padding:2px 10px;border-radius:20px;font-size:15px;font-weight:900;color:'+(r.totalMax>=100?gradeColor(calcGrade(r.pct)):'#64748B')+';background:'+(r.totalMax>=100?gradeBg(calcGrade(r.pct)):'#F1F5F9')+';">'+(r.totalMax>=100?'เกรด '+calcGrade(r.pct):'ยังไม่ถึง 100')+'</div></div>';
     list.appendChild(card);
   });
 }
@@ -6278,6 +6288,10 @@ var _stuStatusMap={'active':'✅ ปกติ','withdrawn':'⛔ ลาออก'
 async function updateStudentStatus(sid,ns){var s=DB.students.find(function(x){return x.id===sid;});if(!s)return;s.status=ns;if(USE_SUPABASE){const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';try{await SB.from('students').update({status:ns}).eq('id',sid).eq('teacher_id',tid);toast('อัพเดต '+s.name+' ✅');}catch(e){toast('ไม่สำเร็จ','err');}}if(typeof _gsRender==='function')_gsRender();}
 function openStatusMenu(sid){var ex=document.getElementById('_smov');if(ex)ex.remove();var s=DB.students.find(function(x){return x.id===sid;});if(!s)return;var ov=document.createElement('div');ov.id='_smov';ov.style.cssText='position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';var box=document.createElement('div');box.style.cssText='background:#fff;border-radius:18px;padding:20px;min-width:240px;max-width:300px;width:100%;font-family:Sarabun,sans-serif;';var ti=document.createElement('div');ti.style.cssText='font-size:15px;font-weight:800;color:#0F172A;margin-bottom:12px;';ti.textContent='สถานะ: '+s.name;box.appendChild(ti);[['active','✅ ปกติ','#DCFCE7','#15803D'],['leave','💤 ลาพัก','#FEF3C7','#B45309'],['transferred','🔄 ย้ายออก','#DBEAFE','#1D4ED8'],['withdrawn','⛔ ลาออก','#FEE2E2','#DC2626']].forEach(function(opt){var btn=document.createElement('button');btn.style.cssText='width:100%;padding:10px 14px;margin-bottom:8px;border:'+(s.status===opt[0]?'2.5px solid '+opt[3]:'1.5px solid transparent')+';border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;background:'+opt[2]+';color:'+opt[3]+';text-align:left;';btn.textContent=opt[1];btn.onclick=function(){updateStudentStatus(sid,opt[0]);ov.remove();};box.appendChild(btn);});var cx=document.createElement('button');cx.style.cssText='width:100%;padding:10px;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:Sarabun,sans-serif;background:#F1F5F9;color:#64748B;font-weight:600;';cx.textContent='ยกเลิก';cx.onclick=function(){ov.remove();};box.appendChild(cx);ov.appendChild(box);ov.onclick=function(e){if(e.target===ov)ov.remove();};document.body.appendChild(ov);}
 
+
+function calcGrade(pct){if(pct>=80)return 4;if(pct>=75)return 3.5;if(pct>=70)return 3;if(pct>=65)return 2.5;if(pct>=60)return 2;if(pct>=55)return 1.5;if(pct>=50)return 1;return 0;}
+function gradeColor(g){if(g>=3.5)return'#16A34A';if(g>=2.5)return'#2563EB';if(g>=1.5)return'#F59E0B';if(g>=1)return'#EA580C';return'#DC2626';}
+function gradeBg(g){if(g>=3.5)return'#DCFCE7';if(g>=2.5)return'#DBEAFE';if(g>=1.5)return'#FEF3C7';if(g>=1)return'#FFEDD5';return'#FEE2E2';}
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
