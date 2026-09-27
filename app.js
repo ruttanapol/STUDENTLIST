@@ -2990,9 +2990,7 @@ function buildExportData(){
       row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
       row['คะแนนรวม']=totalScore;
       row['คะแนนเต็มรวม']=hwTotalMax;
-      const _pctG=hwTotalMax>0?Math.round(totalScore/hwTotalMax*100):0;
-      row['%คะแนน']=_pctG+'%';
-      row['เกรด']=hwTotalMax>=100&&doneCount>0?calcGrade(_pctG):'—';
+      row['%คะแนน']=totalMax>0?Math.round(totalScore/totalMax*100)+'%':'0%';
       if(collectScore>0 && hwTotalMax>0) {
         row['คะแนนเก็บ']=collectScore;
         row['คะแนนที่ได้']=Math.round(totalScore/hwTotalMax*collectScore*100)/100;
@@ -6125,7 +6123,7 @@ function _gsRender(){
   thr.appendChild(th0);thr.appendChild(th1);
   hws.forEach(function(h){
     var th=document.createElement('th');th.style.cssText='background:#EFF6FF;border-bottom:2px solid #BFDBFE;border-right:1px solid #BFDBFE;width:'+CW+'px;min-width:'+CW+'px;padding:0;';
-    th.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;padding:5px 3px;gap:2px;"><div style="font-size:11px;font-weight:800;color:#1E40AF;">งาน '+h.num+'</div><div style="font-size:9px;color:#64748B;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+h.title+'</div><div style="display:flex;gap:3px;align-items:center;"><input id="gsfi_'+h.num+'" type="number" min="0" max="'+(h.maxScore||100)+'" placeholder="'+(h.maxScore||100)+'" style="width:34px;height:20px;border:1.5px solid #BFDBFE;border-radius:5px;text-align:center;font-size:10px;font-family:Sarabun,sans-serif;"><button onclick="_gsColFill('+h.num+','+(h.maxScore||100)+')" style="padding:2px 5px;background:#2563EB;color:#fff;border:none;border-radius:5px;font-size:9px;cursor:pointer;font-family:Sarabun,sans-serif;font-weight:700;">ทั้งหมด</button></div></div>';
+    th.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;padding:5px 3px;gap:2px;"><div style="font-size:11px;font-weight:800;color:#1E40AF;">งาน '+h.num+'</div><div style="font-size:10px;font-weight:700;color:#7C3AED;background:#EDE9FE;border-radius:6px;padding:1px 6px;">เต็ม '+(h.maxScore||100)+'</div><div style="font-size:9px;color:#64748B;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+h.title+'</div><div style="display:flex;gap:3px;align-items:center;"><input id="gsfi_'+h.num+'" type="number" min="0" max="'+(h.maxScore||100)+'" placeholder="'+(h.maxScore||100)+'" style="width:34px;height:20px;border:1.5px solid #BFDBFE;border-radius:5px;text-align:center;font-size:10px;font-family:Sarabun,sans-serif;"><button onclick="_gsColFill('+h.num+','+(h.maxScore||100)+')" style="padding:2px 5px;background:#2563EB;color:#fff;border:none;border-radius:5px;font-size:9px;cursor:pointer;font-family:Sarabun,sans-serif;font-weight:700;">ทั้งหมด</button></div></div>';
     thr.appendChild(th);
   });
   var tht=document.createElement('th');tht.style.cssText='background:#FAF5FF;border-bottom:2px solid #DDD6FE;width:72px;min-width:72px;text-align:center;font-size:11px;color:#7C3AED;font-weight:700;padding:6px 4px;';tht.innerHTML='รวม<br><span style="font-weight:400;font-size:10px;">/'+totalMax+'</span>';
