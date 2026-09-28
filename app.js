@@ -2379,9 +2379,35 @@ function renderDashboard(){
         </div>
       </div>`
     : `<div class="scard"><div class="snum" style="color:var(--green-dark);">${subsByRoom[curRoom]||0}</div><div class="slbl">✅ ส่งงานแล้ว (ครั้ง) · ${escapeHtml(curRoom)}</div></div>`;
+  const _stCounts={active:0,withdrawn:0,transferred:0,leave:0};
+  DB.students.forEach(function(s){var st=s.status||'active';_stCounts[st]=(_stCounts[st]||0)+1;});
   document.getElementById('stats-grid').innerHTML=`
     <div class="scard"><div class="snum">${DB.students.length}</div><div class="slbl">👨‍🎓 นักเรียนทั้งหมด</div></div>
     <div class="scard"><div class="snum" style="color:#B45309;">${rooms.length}</div><div class="slbl">🏫 ห้องเรียน</div></div>`;
+  // Status bar
+  const _sb=document.getElementById('student-status-bar');
+  if(_sb){
+    const _stDef=[
+      {key:'active',   label:'ปกติ',   icon:'✅', bg:'#DCFCE7', color:'#15803D', click:false},
+      {key:'withdrawn',label:'ลาออก',  icon:'⛔', bg:'#FEE2E2', color:'#DC2626', click:true},
+      {key:'transferred',label:'ย้ายออก',icon:'🔄',bg:'#DBEAFE',color:'#1D4ED8',click:true},
+      {key:'leave',    label:'ลาพัก',  icon:'💤', bg:'#FEF3C7', color:'#B45309', click:true},
+    ];
+    _sb.innerHTML=_stDef.map(function(d){
+      var cnt=_stCounts[d.key]||0;
+      if(!d.click){
+        return '<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:'+d.bg+';border-radius:12px;flex:1;min-width:0;">'
+          +'<span style="font-size:16px;">'+d.icon+'</span>'
+          +'<div><div style="font-size:18px;font-weight:800;color:'+d.color+';">'+cnt+'</div>'
+          +'<div style="font-size:11px;color:'+d.color+';opacity:.8;">'+d.label+'</div></div></div>';
+      }
+      return '<button class="_stbtn" data-stkey="'+d.key+'" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:'+d.bg+';border-radius:12px;flex:1;min-width:0;border:none;cursor:pointer;font-family:Sarabun,sans-serif;text-align:left;">'
+        +'<span style="font-size:16px;">'+d.icon+'</span>'
+        +'<div><div style="font-size:18px;font-weight:800;color:'+d.color+';">'+cnt+'</div>'
+        +'<div style="font-size:11px;color:'+d.color+';opacity:.8;">'+d.label+' <span style="opacity:.6;">›</span></div></div></button>';
+    }).join('');
+    document.querySelectorAll('._stbtn').forEach(function(b){b.onclick=function(){openStatusList(this.dataset.stkey);};});
+  }
   document.getElementById('room-tabs').innerHTML=
     `<button class="rtab ${curRoom==='all'?'on':''}" onclick="setRoom('all')">ทุกห้อง</button>`+
     rooms.map(r=>`<button class="rtab ${curRoom===r?'on':''}" onclick="setRoom('${r}')">${r}</button>`).join('');
@@ -6419,6 +6445,48 @@ function openGradeStats(room){
   html+='</div></div></div>';
   modal.innerHTML=html;modal.style.display='flex';
   var cl=document.getElementById('_gmcl');if(cl)cl.onclick=function(){modal.style.display='none';};
+}
+
+
+function openStatusList(statusKey){
+  var labels={withdrawn:'⛔ ลาออก',transferred:'🔄 ย้ายออก',leave:'💤 ลาพัก'};
+  var colors={withdrawn:'#DC2626',transferred:'#1D4ED8',leave:'#B45309'};
+  var bgs={withdrawn:'#FEE2E2',transferred:'#DBEAFE',leave:'#FEF3C7'};
+  var stus=DB.students.filter(function(s){return (s.status||'active')===statusKey;});
+  var modal=document.getElementById('_stlmod');
+  if(!modal){modal=document.createElement('div');modal.id='_stlmod';modal.style.cssText='position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px;';document.body.appendChild(modal);}
+  modal.onclick=function(e){if(e.target===modal)modal.style.display='none';};
+  var title=labels[statusKey]||statusKey;
+  var color=colors[statusKey]||'#475569';
+  var bg=bgs[statusKey]||'#F1F5F9';
+  var html='<div style="background:#fff;border-radius:20px;width:100%;max-width:420px;max-height:80vh;display:flex;flex-direction:column;font-family:Sarabun,sans-serif;">'
+    +'<div style="padding:18px 20px;border-bottom:1.5px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">'
+    +'<div><div style="font-size:16px;font-weight:800;color:'+color+';">'+title+'</div>'
+    +'<div style="font-size:12px;color:#64748B;margin-top:2px;">'+stus.length+' คน</div></div>'
+    +'<button id="_stlcl" style="width:34px;height:34px;border-radius:50%;border:1.5px solid #E2E8F0;background:#F8FAFC;cursor:pointer;font-size:16px;">✕</button>'
+    +'</div>'
+    +'<div style="overflow-y:auto;padding:12px 16px;flex:1;">';
+  if(!stus.length){
+    html+='<div style="text-align:center;padding:30px;color:#94A3B8;font-size:14px;">ไม่มีนักเรียนในสถานะนี้</div>';
+  } else {
+    stus.sort(function(a,b){return a.room.localeCompare(b.room)||a.id.localeCompare(b.id);});
+    var curRoom='';
+    stus.forEach(function(s,i){
+      if(s.room!==curRoom){
+        if(curRoom) html+='</div>';
+        html+='<div style="font-size:11px;font-weight:700;color:#64748B;margin:'+(i>0?'12px':'0')+'px 0 6px;text-transform:uppercase;">ห้อง '+s.room+'</div><div>';
+        curRoom=s.room;
+      }
+      html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:'+bg+';border-radius:10px;margin-bottom:6px;">'
+        +'<div style="width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">'+s.name.substring(0,1)+'</div>'
+        +'<div><div style="font-size:13px;font-weight:700;color:#0F172A;">'+escapeHtml(s.name)+'</div>'
+        +'<div style="font-size:11px;color:#64748B;">'+s.id+'</div></div></div>';
+    });
+    if(curRoom) html+='</div>';
+  }
+  html+='</div></div>';
+  modal.innerHTML=html;modal.style.display='flex';
+  var cl=document.getElementById('_stlcl');if(cl)cl.onclick=function(){modal.style.display='none';};
 }
 
 window.addEventListener('load', () => {
