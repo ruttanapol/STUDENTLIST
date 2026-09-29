@@ -1021,6 +1021,7 @@ CREATE POLICY "teachers_delete_admin_only" ON teachers FOR DELETE
     <button class="mtab" onclick="switchManageTab('subjects',this)">📚 วิชา</button>
     <button class="mtab" onclick="switchManageTab('homework',this)">📝 งาน</button>
     <button class="mtab" onclick="switchManageTab('grade',this)">📊 เกรด</button>
+    <button class="mtab" onclick="switchManageTab('sgs',this)">🎯 ลงระบบ SGS</button>
     <button class="mtab" onclick="switchManageTab('reset',this)">🗑️</button>
   </div>
 
@@ -1402,6 +1403,10 @@ CREATE POLICY "teachers_delete_admin_only" ON teachers FOR DELETE
 
     </div><!-- end grade-content -->
   </div>
+  <div id="mtab-sgs" class="mtab-page" style="display:none;">
+    <div id="sgs-content" style="padding:8px 0;"></div>
+  </div>
+
   <div id="mtab-reset" class="mtab-page" style="display:none;">
     <div class="card" style="margin-bottom:14px;">
       <div class="card-title">💾 สำรอง / กู้คืนข้อมูล</div>

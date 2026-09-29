@@ -3077,6 +3077,7 @@ function switchManageTab(tab, btn){
   if(tab==='subjects') renderSubjectsFull();
   if(tab==='homework') renderManage();
   if(tab==='grade') openGradeTab();
+  if(tab==='sgs') openSGS();
 }
 
 // ╔══════════════════════════════════════════════════════╗
@@ -6487,6 +6488,257 @@ function openStatusList(statusKey){
   html+='</div></div>';
   modal.innerHTML=html;modal.style.display='flex';
   var cl=document.getElementById('_stlcl');if(cl)cl.onclick=function(){modal.style.display='none';};
+}
+
+
+/* ===== SGS: ลงระบบ SGS ===== */
+var _sgsRoom='';
+var _sgsCfg={
+  sections:[
+    {id:'pre',  name:'ก่อนกลางภาค', max:20, hws:[]},
+    {id:'mid',  name:'กลางภาค',      max:30, hws:[]},
+    {id:'post', name:'หลังกลางภาค', max:20, hws:[]},
+    {id:'final',name:'ปลายภาค',      max:30, hws:[]},
+  ]
+};
+var _sgsScores={}; // {sid: {pre:X, mid:Y, post:Z, final:W}}
+
+function openSGS(){
+  var el=document.getElementById('sgs-content');
+  if(!el)return;
+  // init room
+  if(!_sgsRoom&&DB.rooms.length) _sgsRoom=DB.rooms[0];
+  el.innerHTML=_sgsBuildSetup();
+  // attach events
+  _sgsAttachSetup();
+}
+
+function _sgsBuildSetup(){
+  var rooms=DB.rooms;
+  var roomOpts=rooms.map(function(r){return '<option value="'+r+'"'+(r===_sgsRoom?' selected':'')+'>'+r+'</option>';}).join('');
+  var totalMax=_sgsCfg.sections.reduce(function(s,sec){return s+Number(sec.max);},0);
+  var totalOk=totalMax===100;
+
+  var setupHtml='<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1.5px solid #E2E8F0;">'
+    +'<div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:12px;">🎯 ตั้งค่าคะแนนเต็ม SGS</div>'
+    +'<div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;">'
+    +'<label style="font-size:13px;font-weight:600;color:#475569;">ห้องเรียน:</label>'
+    +'<select id="sgs-room-sel" style="padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:Sarabun,sans-serif;background:#F8FAFC;">'+roomOpts+'</select>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
+
+  _sgsCfg.sections.forEach(function(sec){
+    var hws=DB.homeworks.filter(function(h){return !h.room||h.room===_sgsRoom;}).sort(function(a,b){return a.num-b.num;});
+    var hwOpts=hws.map(function(h){
+      var sel=sec.hws.indexOf(h.num)>=0;
+      return '<option value="'+h.num+'"'+(sel?' selected':'')+'>งาน '+h.num+': '+h.title.substring(0,12)+'... (เต็ม '+(h.maxScore||100)+')</option>';
+    }).join('');
+    setupHtml+='<div style="background:#F8FAFC;border-radius:12px;padding:12px;border:1.5px solid #E2E8F0;">'
+      +'<div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">'+sec.name+'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">'
+      +'<span style="font-size:12px;color:#64748B;">เต็ม</span>'
+      +'<input type="number" class="sgs-max-inp" data-sec="'+sec.id+'" value="'+sec.max+'" min="0" max="100" style="width:60px;padding:5px 8px;border:1.5px solid #BFDBFE;border-radius:8px;font-size:14px;font-weight:700;text-align:center;font-family:Sarabun,sans-serif;">'
+      +'<span style="font-size:12px;color:#64748B;">คะแนน</span></div>'
+      +'<div style="font-size:11px;color:#64748B;margin-bottom:4px;">เลือกงาน (กด Ctrl/Cmd ค้าง):</div>'
+      +'<select multiple class="sgs-hw-sel" data-sec="'+sec.id+'" style="width:100%;height:80px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:Sarabun,sans-serif;padding:4px;">'+hwOpts+'</select>'
+      +'</div>';
+  });
+
+  setupHtml+='</div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;">'
+    +'<div style="font-size:13px;font-weight:700;">รวมคะแนนเต็ม: <span id="sgs-total-max" style="color:'+(totalOk?'#16A34A':'#DC2626')+';">'+totalMax+'/100</span></div>'
+    +'<button onclick="_sgsRenderTable()" style="padding:10px 20px;background:'+(totalOk?'#2563EB':'#94A3B8')+';color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">'+(totalOk?'📋 ดูตาราง SGS':'⚠️ คะแนนเต็มต้องรวม = 100')+'</button>'
+    +'</div></div>';
+
+  return setupHtml;
+}
+
+function _sgsAttachSetup(){
+  // room select
+  var rsel=document.getElementById('sgs-room-sel');
+  if(rsel)rsel.onchange=function(){_sgsRoom=this.value;openSGS();};
+
+  // max score inputs
+  document.querySelectorAll('.sgs-max-inp').forEach(function(inp){
+    inp.oninput=function(){
+      var sec=_sgsCfg.sections.find(function(s){return s.id===inp.dataset.sec;});
+      if(sec) sec.max=Number(inp.value)||0;
+      var total=_sgsCfg.sections.reduce(function(s,x){return s+x.max;},0);
+      var el=document.getElementById('sgs-total-max');
+      if(el){el.textContent=total+'/100';el.style.color=total===100?'#16A34A':'#DC2626';}
+    };
+  });
+
+  // hw multi-select
+  document.querySelectorAll('.sgs-hw-sel').forEach(function(sel){
+    sel.onchange=function(){
+      var sec=_sgsCfg.sections.find(function(s){return s.id===sel.dataset.sec;});
+      if(sec) sec.hws=[].slice.call(sel.selectedOptions).map(function(o){return Number(o.value);});
+    };
+    // restore selection
+    var sec=_sgsCfg.sections.find(function(s){return s.id===sel.dataset.sec;});
+    if(sec)[].slice.call(sel.options).forEach(function(o){o.selected=sec.hws.indexOf(Number(o.value))>=0;});
+  });
+}
+
+function _sgsCalcActual(sid){
+  // คำนวณคะแนนจริงนักเรียนจาก DB
+  var room=_sgsRoom;
+  var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;});
+  var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
+  var totalScore=0;
+  hws.forEach(function(h){
+    var sub=DB.submissions[subKey(sid,h.num,h.room)]||DB.submissions[subKey(sid,h.num,room)]||DB.submissions[subKey(sid,h.num,'')];
+    if(sub) totalScore+=(sub.score!==null&&sub.score!==undefined?Number(sub.score):(h.maxScore||100));
+  });
+  // scale เป็น 100
+  return totalMax>0?Math.round(totalScore/totalMax*100*10)/10:0;
+}
+
+function _sgsAutoDistribute(sid){
+  var actual=_sgsCalcActual(sid);
+  if(!_sgsScores[sid]) _sgsScores[sid]={};
+  var remaining=actual;
+  _sgsCfg.sections.forEach(function(sec,i){
+    var v;
+    if(i===_sgsCfg.sections.length-1){
+      // ช่องสุดท้าย = เศษที่เหลือ (2 decimal)
+      v=Math.round(remaining*100)/100;
+    } else {
+      // แบ่งตามสัดส่วนคะแนนเต็มแต่ละช่อง
+      v=Math.round(actual*(sec.max/100)*100)/100;
+      remaining=Math.round((remaining-v)*100)/100;
+    }
+    _sgsScores[sid][sec.id]=v;
+  });
+  return _sgsScores[sid];
+}
+
+function _sgsRenderTable(){
+  var totalMax=_sgsCfg.sections.reduce(function(s,sec){return s+sec.max;},0);
+  if(totalMax!==100){alert('คะแนนเต็มรวมต้องเท่ากับ 100 (ตอนนี้ '+totalMax+')');return;}
+  var el=document.getElementById('sgs-content');if(!el)return;
+  var stus=DB.students.filter(function(s){return s.room===_sgsRoom;}).sort(function(a,b){return a.id.localeCompare(b.id);});
+  if(!stus.length){el.innerHTML+='<div style="text-align:center;color:#94A3B8;padding:20px;">ไม่พบนักเรียนในห้องนี้</div>';return;}
+
+  // ปุ่ม action
+  var html='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
+    +'<button onclick="_sgsAutoAll()" style="padding:9px 16px;background:#2563EB;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">✨ เกลี่ยทุกคนอัตโนมัติ</button>'
+    +'<button onclick="_sgsCopyTable()" style="padding:9px 16px;background:#059669;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">📋 คัดลอกตาราง</button>'
+    +'<button onclick="openSGS()" style="padding:9px 16px;background:#F1F5F9;color:#475569;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">⚙️ แก้ตั้งค่า</button>'
+    +'</div>';
+
+  // table
+  html+='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:14px;border:1.5px solid #E2E8F0;">'
+    +'<table style="border-collapse:collapse;min-width:100%;font-size:13px;font-family:Sarabun,sans-serif;">'
+    +'<thead><tr style="background:#EFF6FF;">'
+    +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;min-width:34px;">#</th>'
+    +'<th style="padding:10px 10px;border-bottom:2px solid #BFDBFE;text-align:left;min-width:140px;">ชื่อ-นามสกุล</th>'
+    +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;color:#7C3AED;">คะแนนจริง<br><span style="font-size:10px;font-weight:400;">/100</span></th>';
+  _sgsCfg.sections.forEach(function(sec){
+    html+='<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;">'+sec.name+'<br><span style="font-size:10px;font-weight:400;color:#64748B;">เต็ม '+sec.max+'</span></th>';
+  });
+  html+='<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;background:#F0FDF4;">รวม SGS</th>'
+    +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;">สถานะ</th>'
+    +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;">เกลี่ย</th>'
+    +'</tr></thead><tbody>';
+
+  stus.forEach(function(s,i){
+    var actual=_sgsCalcActual(s.id);
+    if(!_sgsScores[s.id]) _sgsScores[s.id]={};
+    var sgsTotal=_sgsCfg.sections.reduce(function(sum,sec){return sum+(Number(_sgsScores[s.id][sec.id])||0);},0);
+    sgsTotal=Math.round(sgsTotal*100)/100;
+    var ok=Math.abs(sgsTotal-actual)<0.01;
+    var isInactive=s.status&&s.status!=='active';
+    var rowBg=isInactive?'#F8FAFC':i%2===0?'#fff':'#FAFBFF';
+
+    html+='<tr data-sid="'+s.id+'" style="background:'+rowBg+(isInactive?';opacity:.55':'')+';">'
+      +'<td style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;color:#94A3B8;font-size:11px;">'+(i+1)+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;font-weight:600;color:'+( isInactive?'#94A3B8':'#0F172A')+';'+(isInactive?'text-decoration:line-through;':'')+'">'+s.name+'<div style="font-size:10px;color:#94A3B8;font-weight:400;">'+s.id+'</div></td>'
+      +'<td style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;font-weight:700;color:#7C3AED;">'+actual+'</td>';
+
+    _sgsCfg.sections.forEach(function(sec){
+      var val=_sgsScores[s.id][sec.id]!=null?_sgsScores[s.id][sec.id]:'';
+      html+='<td style="padding:2px;border-bottom:1px solid #F1F5F9;text-align:center;">'
+        +'<input type="number" class="sgs-inp" data-sid="'+s.id+'" data-sec="'+sec.id+'" data-max="'+sec.max+'" min="0" max="'+sec.max+'" step="0.5" value="'+val+'" placeholder="-"'
+        +' style="width:70px;height:36px;border:1.5px solid #E2E8F0;border-radius:8px;text-align:center;font-size:13px;font-weight:700;font-family:Sarabun,sans-serif;outline:none;background:#F8FAFC;">'
+        +'</td>';
+    });
+
+    var totColor=ok?'#16A34A':'#DC2626';
+    html+='<td id="sgstot_'+s.id+'" style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;font-weight:800;font-size:14px;color:'+totColor+';background:#F0FDF4;">'+( sgsTotal||'-')+'</td>'
+      +'<td id="sgsok_'+s.id+'" style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;font-size:16px;">'+(ok&&sgsTotal>0?'✅':'⚠️')+'</td>'
+      +'<td style="padding:4px;border-bottom:1px solid #F1F5F9;text-align:center;">'
+      +'<button onclick="_sgsAutoSingle(\''+s.id+'\')" style="padding:4px 8px;background:#EFF6FF;color:#2563EB;border:1.5px solid #BFDBFE;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">เกลี่ย</button>'
+      +'</td></tr>';
+  });
+
+  html+='</tbody></table></div>';
+  el.innerHTML=(el.innerHTML.split('<div style="display:flex;gap:8px')[0]||'')+html;
+
+  // attach input events
+  document.querySelectorAll('.sgs-inp').forEach(function(inp){
+    inp.oninput=function(){
+      var sid=this.dataset.sid;var sec=this.dataset.sec;var max=parseFloat(this.dataset.max);
+      var v=this.value===''?null:parseFloat(this.value);
+      if(v!==null&&v>max){v=max;this.value=max;}
+      if(!_sgsScores[sid])_sgsScores[sid]={};
+      _sgsScores[sid][sec]=v;
+      _sgsUpdateRow(sid);
+    };
+    inp.onfocus=function(){this.style.borderColor='#2563EB';this.style.background='#EFF6FF';};
+    inp.onblur=function(){this.style.borderColor='#E2E8F0';this.style.background='#F8FAFC';};
+    inp.onkeydown=function(e){
+      if(e.key==='Enter'||e.key==='Tab'){
+        e.preventDefault();
+        var all=[].slice.call(document.querySelectorAll('.sgs-inp'));
+        var idx=all.indexOf(this);if(idx>=0&&idx<all.length-1)all[idx+1].focus();
+      }
+    };
+  });
+}
+
+function _sgsUpdateRow(sid){
+  var actual=_sgsCalcActual(sid);
+  var sgsTotal=_sgsCfg.sections.reduce(function(sum,sec){return sum+(Number(_sgsScores[sid]&&_sgsScores[sid][sec.id])||0);},0);
+  sgsTotal=Math.round(sgsTotal*100)/100;
+  var ok=Math.abs(sgsTotal-actual)<0.01;
+  var totEl=document.getElementById('sgstot_'+sid);
+  var okEl=document.getElementById('sgsok_'+sid);
+  if(totEl){totEl.textContent=sgsTotal||'-';totEl.style.color=ok?'#16A34A':'#DC2626';}
+  if(okEl)okEl.textContent=ok&&sgsTotal>0?'✅':'⚠️';
+}
+
+function _sgsAutoSingle(sid){
+  _sgsAutoDistribute(sid);
+  // อัพเดต inputs
+  _sgsCfg.sections.forEach(function(sec){
+    var inp=document.querySelector('.sgs-inp[data-sid="'+sid+'"][data-sec="'+sec.id+'"]');
+    if(inp) inp.value=_sgsScores[sid][sec.id]!=null?_sgsScores[sid][sec.id]:'';
+  });
+  _sgsUpdateRow(sid);
+}
+
+function _sgsAutoAll(){
+  var stus=DB.students.filter(function(s){return s.room===_sgsRoom;});
+  stus.forEach(function(s){_sgsAutoSingle(s.id);});
+}
+
+function _sgsCopyTable(){
+  var stus=DB.students.filter(function(s){return s.room===_sgsRoom;}).sort(function(a,b){return a.id.localeCompare(b.id);});
+  var header=['เลขที่','รหัส','ชื่อ-นามสกุล','คะแนนจริง'].concat(_sgsCfg.sections.map(function(s){return s.name+'('+s.max+')';})).concat(['รวมSGS','สถานะ']);
+  var rows=[header.join('\t')];
+  stus.forEach(function(s,i){
+    var actual=_sgsCalcActual(s.id);
+    var vals=_sgsCfg.sections.map(function(sec){return _sgsScores[s.id]&&_sgsScores[s.id][sec.id]!=null?_sgsScores[s.id][sec.id]:'-';});
+    var tot=_sgsCfg.sections.reduce(function(sum,sec){return sum+(Number(_sgsScores[s.id]&&_sgsScores[s.id][sec.id])||0);},0);
+    tot=Math.round(tot*100)/100;
+    var ok=Math.abs(tot-actual)<0.01;
+    rows.push([(i+1),s.id,s.name,actual].concat(vals).concat([tot,ok?'✓':'✗']).join('\t'));
+  });
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(rows.join('\n')).then(function(){if(typeof toast==='function')toast('คัดลอกตารางแล้ว ✅');});
+  }
 }
 
 window.addEventListener('load', () => {
