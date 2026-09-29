@@ -1020,8 +1020,7 @@ CREATE POLICY "teachers_delete_admin_only" ON teachers FOR DELETE
     <button class="mtab" onclick="switchManageTab('students',this)">👤 นักเรียน</button>
     <button class="mtab" onclick="switchManageTab('subjects',this)">📚 วิชา</button>
     <button class="mtab" onclick="switchManageTab('homework',this)">📝 งาน</button>
-    <button class="mtab" onclick="switchManageTab('grade',this)">📊 เกรด</button>
-    <button class="mtab" onclick="switchManageTab('sgs',this)">🎯 ลงระบบ SGS</button>
+
     <button class="mtab" onclick="switchManageTab('reset',this)">🗑️</button>
   </div>
 
@@ -1434,6 +1433,22 @@ CREATE POLICY "teachers_delete_admin_only" ON teachers FOR DELETE
   </div>
   </div><!-- end ap-manage -->
 
+  <!-- ===== GRADE PAGE ===== -->
+  <div id="ap-grade" class="page">
+    <div style="padding-bottom:8px;border-bottom:1.5px solid #E2E8F0;margin-bottom:12px;">
+      <div style="font-size:17px;font-weight:800;color:#0F172A;">📊 สถิติเกรด</div>
+    </div>
+    <div id="ap-grade-content"></div>
+  </div>
+
+  <!-- ===== SGS PAGE ===== -->
+  <div id="ap-sgs" class="page">
+    <div style="padding-bottom:8px;border-bottom:1.5px solid #E2E8F0;margin-bottom:12px;">
+      <div style="font-size:17px;font-weight:800;color:#0F172A;">🎯 ลงระบบ SGS</div>
+    </div>
+    <div id="sgs-content-main" style="padding:4px 0;"></div>
+  </div>
+
 
   <!-- ══════════════════════════════════════════════ -->
   <!-- ap-attend: ATTENDANCE PAGE                    -->
@@ -1640,6 +1655,20 @@ CREATE POLICY "teachers_delete_admin_only" ON teachers FOR DELETE
       </svg>
       <div class="bnav-label">ปฏิทิน</div>
       <div class="bnav-dot" id="cal-bnav-dot" style="opacity:0"></div>
+    </button>
+    <button class="bnav-btn" onclick="showAP('grade',this)" id="bnav-grade">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 19V6l12-3v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="15" r="3"/>
+      </svg>
+      <div class="bnav-label">เกรด</div>
+      <div class="bnav-dot"></div>
+    </button>
+    <button class="bnav-btn" onclick="showAP('sgs',this)" id="bnav-sgs">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/>
+      </svg>
+      <div class="bnav-label">SGS</div>
+      <div class="bnav-dot"></div>
     </button>
   </div>
 </div>
