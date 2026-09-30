@@ -6694,7 +6694,8 @@ function _sgsRenderTable(){
   });
   html+='<td colspan="3" style="padding:6px;font-size:10px;color:#B45309;text-align:center;">เกลี่ยจะไม่ลดต่ำกว่านี้</td>'
     +'</tr>'
-    +'</thead><tbody>';us.forEach(function(s,i){
+    +'</thead><tbody>';
+  stus.forEach(function(s,i){
     var actual=_sgsCalcActual(s.id);
     if(!_sgsScores[s.id]) _sgsScores[s.id]={};
     var sgsTotal=_sgsCfg.sections.reduce(function(sum,sec){return sum+(Number(_sgsScores[s.id][sec.id])||0);},0);
