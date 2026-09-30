@@ -6671,6 +6671,7 @@ function _sgsRenderTable(){
     +'<button onclick="_sgsCopyTable()" style="padding:9px 16px;background:#059669;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">📋 คัดลอกตาราง</button>'
     +'<button onclick="_sgsPrint()" style="padding:9px 16px;background:#7C3AED;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">🖨️ พิมพ์</button>'
     +'<button onclick="openSGS()" style="padding:9px 16px;background:#F1F5F9;color:#475569;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">⚙️ แก้ตั้งค่า</button>'
+    +'<button onclick="_sgsResetScores()" style="padding:9px 16px;background:#FEE2E2;color:#DC2626;border:1.5px solid #FECACA;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">🗑️ รีเซตคะแนน</button>'
     +'</div>';
 
   // table
@@ -6767,6 +6768,7 @@ function _sgsUpdateRow(sid){
   var okEl=document.getElementById('sgsok_'+sid);
   if(totEl){totEl.textContent=sgsTotal||'-';totEl.style.color=ok?'#16A34A':'#DC2626';}
   if(okEl)okEl.textContent=ok&&sgsTotal>0?'✅':'⚠️';
+  var rtaEl=document.getElementById("sgsrta_"+sid);if(rtaEl){rtaEl.textContent=calcRTA(actual);rtaEl.style.color=rtaColor(calcRTA(actual));}
 }
 
 function _sgsAutoSingle(sid){
@@ -6786,7 +6788,7 @@ function _sgsAutoAll(){
 
 function _sgsCopyTable(){
   var stus=DB.students.filter(function(s){return s.room===_sgsRoom;}).sort(function(a,b){return a.id.localeCompare(b.id);});
-  var header=['เลขที่','รหัส','ชื่อ-นามสกุล','คะแนนจริง'].concat(_sgsCfg.sections.map(function(s){return s.name+'('+s.max+')';})).concat(['รวมSGS','สถานะ']);
+  var header=['เลขที่','รหัส','ชื่อ-นามสกุล','คะแนนจริง'].concat(_sgsCfg.sections.map(function(s){return s.name+'('+s.max+')';})).concat(['รวมSGS','อ่าน-คิด-วิเคราะห์','สถานะ']);
   var rows=[header.join('\t')];
   stus.forEach(function(s,i){
     var actual=_sgsCalcActual(s.id);
@@ -6794,7 +6796,7 @@ function _sgsCopyTable(){
     var tot=_sgsCfg.sections.reduce(function(sum,sec){return sum+(Number(_sgsScores[s.id]&&_sgsScores[s.id][sec.id])||0);},0);
     tot=Math.round(tot*100)/100;
     var ok=Math.abs(tot-actual)<0.01;
-    rows.push([(i+1),s.id,s.name,actual].concat(vals).concat([tot,ok?'✓':'✗']).join('\t'));
+    rows.push([(i+1),s.id,s.name,actual].concat(vals).concat([tot,calcRTA(actual),ok?'✓':'✗']).join('\t'));
   });
   if(navigator.clipboard){
     navigator.clipboard.writeText(rows.join('\n')).then(function(){if(typeof toast==='function')toast('คัดลอกตารางแล้ว ✅');});
@@ -6823,6 +6825,7 @@ function _sgsPrint(){
       '<td style="padding:6px;border:1px solid #ccc;text-align:center;font-weight:700;color:#7C3AED;">'+actual+'</td>'+
       secCells+
       '<td style="padding:6px;border:1px solid #ccc;text-align:center;font-weight:800;font-size:14px;color:'+(ok?'#16A34A':'#DC2626')+';">'+sgsTotal+'</td>'+
+      '<td style="padding:6px;border:1px solid #ccc;text-align:center;font-weight:800;font-size:15px;color:'+rtaColor(calcRTA(actual))+';">'+calcRTA(actual)+'</td>'+
       '<td style="padding:6px;border:1px solid #ccc;text-align:center;">'+(ok&&sgsTotal>0?'✓':'✗')+'</td>'+
       '</tr>';
   }).join('');
@@ -6847,7 +6850,7 @@ function _sgsPrint(){
     '<th style="padding:8px 6px;border:1px solid #ccc;text-align:center;color:#7C3AED;">คะแนนจริง<br><span style="font-weight:400;">/100</span></th>'+
     secHeaders+
     '<th style="padding:8px 6px;border:1px solid #ccc;text-align:center;background:#F0FDF4;color:#16A34A;">รวม SGS</th>'+
-    '<th style="padding:8px 6px;border:1px solid #ccc;text-align:center;width:40px;">✓</th>'+
+    '<th style="padding:8px 6px;border:1px solid #ccc;text-align:center;color:#16A34A;">อ่าน-คิด-วิเคราะห์<br>/3</th>'+'<th style="padding:8px 6px;border:1px solid #ccc;text-align:center;width:40px;">✓</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table>'+
     '<div style="margin-top:16px;display:flex;gap:20px;font-size:11px;color:#64748B;">'+
     '<span>✓ = คะแนน SGS รวมตรงกับคะแนนจริง</span>'+
@@ -7157,6 +7160,17 @@ function _sgsImportPrint(){
   win.document.close();
 }
 
+
+function _sgsResetScores(){
+  if(!confirm('ล้างคะแนน SGS ทั้งหมดในห้อง '+_sgsRoom+' ใช่ไหม?')) return;
+  var stus=DB.students.filter(function(s){return s.room===_sgsRoom;});
+  stus.forEach(function(s){_sgsScores[s.id]={};});
+  _sgsRenderTable();
+}
+
+
+function calcRTA(s){return s>=70?3:s>=60?2:s>=40?1:0;}
+function rtaColor(v){return v>=3?"#16A34A":v>=2?"#2563EB":v>=1?"#F59E0B":"#DC2626";}
 window.addEventListener('load', () => {
   checkSetupOnLoad();
   checkResetRedirect();
