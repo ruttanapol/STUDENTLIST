@@ -6657,9 +6657,13 @@ function _sgsAutoDistribute(sid){
 function _sgsRenderTable(){
   var totalMax=_sgsCfg.sections.reduce(function(s,sec){return s+sec.max;},0);
   if(totalMax!==100){alert('คะแนนเต็มรวมต้องเท่ากับ 100 (ตอนนี้ '+totalMax+')');return;}
-  var el=document.getElementById(_sgsTargetId||'sgs-content');if(!el)return;
+  var el=document.getElementById(_sgsTargetId||'sgs-content');if(!el){console.error('[SGS] el not found:',_sgsTargetId);return;}
   var stus=DB.students.filter(function(s){return s.room===_sgsRoom;}).sort(function(a,b){return a.id.localeCompare(b.id);});
-  if(!stus.length){el.innerHTML+='<div style="text-align:center;color:#94A3B8;padding:20px;">ไม่พบนักเรียนในห้องนี้</div>';return;}
+  console.log('[SGS] room='+_sgsRoom+' stus='+stus.length+' el='+( el?el.id:'null')+' targetId='+_sgsTargetId);
+  if(!stus.length){
+    el.innerHTML='<div style="text-align:center;padding:40px;"><div style="font-size:40px;margin-bottom:12px;">🔍</div><div style="font-size:14px;font-weight:700;color:#94A3B8;">ไม่พบนักเรียนในห้อง: '+_sgsRoom+'</div><div style="font-size:12px;color:#CBD5E1;margin-top:6px;">ห้องที่มีในระบบ: '+((DB&&DB.rooms)||[]).join(', ')+'</div><button onclick="openSGS()" style="margin-top:14px;padding:8px 16px;background:#EFF6FF;color:#2563EB;border:1.5px solid #BFDBFE;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">← กลับตั้งค่า</button></div>';
+    return;
+  }
 
   // ปุ่ม action
   var html='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
