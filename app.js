@@ -6672,6 +6672,7 @@ function _sgsRenderTable(){
     +'<button onclick="_sgsPrint()" style="padding:9px 16px;background:#7C3AED;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">🖨️ พิมพ์</button>'
     +'<button onclick="openSGS()" style="padding:9px 16px;background:#F1F5F9;color:#475569;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">⚙️ แก้ตั้งค่า</button>'
     +'<button onclick="_sgsResetScores()" style="padding:9px 16px;background:#FEE2E2;color:#DC2626;border:1.5px solid #FECACA;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">🗑️ รีเซตคะแนน</button>'
+    +'<button onclick="_sgsRenderTable()" style="padding:9px 16px;background:#F0FDF4;color:#16A34A;border:1.5px solid #BBF7D0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">🔄 รีเฟรชคะแนน</button>'
     +'</div>';
 
   // table
@@ -6685,6 +6686,7 @@ function _sgsRenderTable(){
     html+='<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;">'+sec.name+'<br><span style="font-size:10px;font-weight:400;color:#64748B;">เต็ม '+sec.max+'</span></th>';
   });
   html+='<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;background:#F0FDF4;">รวม SGS</th>'
+    +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;background:#DCFCE7;color:#16A34A;white-space:nowrap;">อ่าน-คิด<br>วิเคราะห์<br><span style=\"font-size:9px;font-weight:400;\">/3</span></th>'
     +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;">สถานะ</th>'
     +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;">เกลี่ย</th>'
     +'</tr>'
@@ -6697,7 +6699,7 @@ function _sgsRenderTable(){
     +'</tr>'
     +'</thead><tbody>';
   stus.forEach(function(s,i){
-    var actual=_sgsCalcActual(s.id);
+    var actual=Math.round(_sgsCalcActual(s.id));
     if(!_sgsScores[s.id]) _sgsScores[s.id]={};
     var sgsTotal=_sgsCfg.sections.reduce(function(sum,sec){return sum+(Number(_sgsScores[s.id][sec.id])||0);},0);
     sgsTotal=Math.round(sgsTotal*100)/100;
@@ -6720,7 +6722,8 @@ function _sgsRenderTable(){
 
     var totColor=ok?'#16A34A':'#DC2626';
     html+='<td id="sgstot_'+s.id+'" style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;font-weight:800;font-size:14px;color:'+totColor+';background:#F0FDF4;">'+( sgsTotal||'-')+'</td>'
-      +'<td id="sgsok_'+s.id+'" style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;font-size:16px;">'+(ok&&sgsTotal>0?'✅':'⚠️')+'</td>'
+      +'<td id="sgsrta_'+s.id+'" style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;font-weight:800;font-size:16px;background:#DCFCE7;color:'+rtaColor(calcRTA(actual))+';">'+calcRTA(actual)+'</td>'
+      +'<td id="sgsok_'+s.id+'"" style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;font-size:16px;">'+(ok&&sgsTotal>0?'✅':'⚠️')+'</td>'
       +'<td style="padding:4px;border-bottom:1px solid #F1F5F9;text-align:center;">'
       +'<button onclick="_sgsAutoSingle(\''+s.id+'\')" style="padding:4px 8px;background:#EFF6FF;color:#2563EB;border:1.5px solid #BFDBFE;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">เกลี่ย</button>'
       +'</td></tr>';
