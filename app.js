@@ -6763,7 +6763,7 @@ function _sgsRenderTable(){
 }
 
 function _sgsUpdateRow(sid){
-  var actual=_sgsCalcActual(sid);
+  var actual=Math.round(_sgsCalcActual(sid));
   var sgsTotal=_sgsCfg.sections.reduce(function(sum,sec){return sum+(Number(_sgsScores[sid]&&_sgsScores[sid][sec.id])||0);},0);
   sgsTotal=Math.round(sgsTotal*100)/100;
   var ok=Math.abs(sgsTotal-actual)<0.01;
