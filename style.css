@@ -129,21 +129,23 @@ body { background:var(--bg); overscroll-behavior:none; }
 
 /* ===== BOTTOM NAV (mobile only) ===== */
 .bnav {
-  display:flex;border-top:none;overflow:hidden;
+  display:flex;border-top:none;overflow-x:auto;overflow-y:hidden;
   background:#fff;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
   padding:6px 0 calc(8px + env(safe-area-inset-bottom));
   box-shadow:0 -4px 20px rgba(0,0,0,0.08);
   position:sticky;bottom:0;z-index:10;
 }
 .bnav-btn {
-  flex:1;display:flex;flex-direction:column;
-  align-items:center;gap:1px;padding:6px 2px 4px;
+  flex:0 0 auto;display:flex;flex-direction:column;
+  align-items:center;gap:1px;padding:6px 6px 4px;
   background:none;border:none;cursor:pointer;
   color:var(--text3);font-size:10px;font-weight:600;
-  transition:color .15s;min-height:52px;min-width:0;
+  transition:color .15s;min-height:52px;min-width:52px;
 }
 .bnav-btn svg { flex-shrink:0; width:22px; height:22px; }
 .bnav-btn.on{color:var(--blue);}
+.bnav::-webkit-scrollbar{display:none;}
 .bnav-btn .bnav-dot{width:4px;height:4px;border-radius:50%;background:var(--blue);margin-top:2px;display:none;}
 .bnav-btn.on .bnav-dot{display:block;}
 
