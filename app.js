@@ -6530,6 +6530,7 @@ function openSGS(){
       el.innerHTML='<div style="text-align:center;padding:40px;color:#94A3B8;font-size:14px;">⚠️ ยังไม่มีห้องเรียน — กรุณาเพิ่มห้องและนักเรียนก่อน</div>';
       return;
     }
+    el.innerHTML='';
     el.innerHTML=_sgsBuildSetup();
     _sgsAttachSetup();
   }catch(err){
@@ -6720,7 +6721,7 @@ function _sgsRenderTable(){
   });
 
   html+='</tbody></table></div>';
-  el.innerHTML=(el.innerHTML.split('<div style="display:flex;gap:8px')[0]||'')+html;
+  el.innerHTML=html;
 
   // attach input events
   document.querySelectorAll('.sgs-inp').forEach(function(inp){
