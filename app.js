@@ -6338,6 +6338,7 @@ function _sfRun(){
   var results=[];
   DB.students.forEach(function(s){
     if(_sfRoom!=='all'&&s.room!==_sfRoom)return;
+    if(s.status&&s.status!=='active')return; // ข้ามนักเรียนที่ลาออก/ย้ายออก
     var hws=(DB&&DB.homeworks?DB.homeworks:[]).filter(function(h){return !h.room||h.room===s.room;});
     if(!hws.length)return;
     var totalMax=hws.reduce(function(sum,h){return sum+(h.maxScore||100);},0);
@@ -6382,6 +6383,7 @@ function renderGradeTab(){
   return '<div style="padding:8px 0;">'
     +rooms.map(function(room){
       var stus=DB.students.filter(function(s){return s.room===room;});
+      var activeStus=stus.filter(function(s){return !s.status||s.status==='active';});
       var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;});
       var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
       var hasGrade=totalMax>=100;
@@ -6389,7 +6391,7 @@ function renderGradeTab(){
         +'<div style="font-size:28px;">🏫</div>'
         +'<div style="flex:1;">'
         +'<div style="font-size:15px;font-weight:800;color:#0F172A;">'+room+'</div>'
-        +'<div style="font-size:12px;color:#64748B;margin-top:2px;">'+stus.length+' คน · คะแนนเต็มรวม '+totalMax+(hasGrade?' · ✅ พร้อมดูเกรด':' · ⚠️ คะแนนยังไม่ถึง 100')+'</div>'
+        +'<div style="font-size:12px;color:#64748B;margin-top:2px;">'+activeStus.length+' คน (active) · คะแนนเต็มรวม '+totalMax+(hasGrade?' · ✅ พร้อมดูเกรด':' · ⚠️ คะแนนยังไม่ถึง 100')+'</div>'
         +'</div>'
         +'<div style="color:#94A3B8;font-size:18px;">›</div>'
         +'</button>';
@@ -6656,6 +6658,12 @@ function _sgsAttachSetup(){
     // restore selection
     var sec=_sgsCfg.sections.find(function(s){return s.id===sel.dataset.sec;});
     if(sec)[].slice.call(sel.options).forEach(function(o){o.selected=sec.hws.indexOf(Number(o.value))>=0;});
+    // ป้องกัน scroll bubble ขึ้นหน้า
+    sel.addEventListener('wheel',function(e){
+      var atTop=this.scrollTop===0;
+      var atBottom=this.scrollTop+this.clientHeight>=this.scrollHeight;
+      if(!(atTop&&e.deltaY<0)&&!(atBottom&&e.deltaY>0)) e.stopPropagation();
+    },{passive:false});
   });
 }
 
@@ -7351,6 +7359,11 @@ function _renderSGSConfig(){
     };
     var sec=_sgsCfg.sections.find(function(s){return s.id===sel.dataset.sec;});
     if(sec)[].slice.call(sel.options).forEach(function(o){o.selected=sec.hws.indexOf(parseInt(o.value))>=0;});
+    sel.addEventListener('wheel',function(e){
+      var atTop=this.scrollTop===0;
+      var atBottom=this.scrollTop+this.clientHeight>=this.scrollHeight;
+      if(!(atTop&&e.deltaY<0)&&!(atBottom&&e.deltaY>0)) e.stopPropagation();
+    },{passive:false});
   });
 }
 
