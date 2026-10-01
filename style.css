@@ -802,3 +802,52 @@ input[type="search"],
 
 /* toast */
 .tbar { color: #fff !important; }
+
+/* ===== ATTENDANCE PAGE - light content on dark shell ===== */
+/* stat cards เช็คชื่อ — มีสีของตัวเอง ไม่ต้องแก้ */
+
+/* รายชื่อนักเรียน panel (พื้นขาว) */
+#ap-attend .stu-row,
+#ap-attend [class*="stu-row"] { 
+  color: #1e293b !important; 
+  border-bottom-color: #e2e8f0 !important;
+}
+#ap-attend .stu-name,
+#ap-attend [class*="stu-name"] { color: #0f172a !important; }
+#ap-attend .stu-meta { color: #64748b !important; }
+#ap-attend [style*="background:#fff"],
+#ap-attend [style*="background: #fff"],
+#ap-attend [style*="background: white"] { color: #1e293b !important; }
+
+/* container รายชื่อ */
+#ap-attend .card,
+#ap-attend [class*="card"] { 
+  background: #fff !important; 
+  color: #1e293b !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* ชื่อนักเรียนที่อยู่ใน white panel */
+#ap-attend [style*="color:#"] { }
+#ap-attend span, #ap-attend div { }
+
+/* Global fix: ทุกที่ที่มี bg ขาวชัดๆ ให้ text เข้ม */
+[style*="background:#fff"] > *,
+[style*="background: #fff"] > *,
+[style*="background:white"] > * { color: inherit; }
+
+/* attend-specific selectors */
+.attend-row { color: #1e293b !important; }
+.attend-name { color: #0f172a !important; }
+#attend-list .stu-name { color: #1e293b !important; }
+#attend-list .stu-meta { color: #64748b !important; }
+#attend-list { color: #1e293b !important; }
+
+/* หัวข้อ รายชื่อนักเรียน */
+#ap-attend h3, #ap-attend h4,
+#ap-attend [style*="font-weight:700"],
+#ap-attend [style*="font-weight: 700"] { color: #0f172a; }
+
+/* override stu-row ที่ถูก glass เขียนทับ */
+#ap-attend .stu-row { background: transparent !important; }
+#stu-list .stu-row, #attend-list .stu-row { color: #1e293b !important; }
