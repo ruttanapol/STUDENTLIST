@@ -715,3 +715,85 @@ a[download]:active { transform:scale(0.96); }
   border-bottom: 1px solid rgba(255,255,255,0.1) !important;
 }
 .tb-name, .tb-role { color: rgba(255,255,255,0.9) !important; }
+
+/* ===== GLASS TEXT CONTRAST FIXES (mobile/tablet) ===== */
+
+/* === DARK BG → TEXT ขาว === */
+/* stu-row บน dark bg */
+.stu-row { color: #f1f5f9; border-bottom-color: rgba(255,255,255,0.08) !important; }
+.stu-name { color: #fff !important; }
+.stu-meta { color: rgba(255,255,255,0.55) !important; }
+.room-pill { background: rgba(255,255,255,0.15) !important; color: #e0e7ff !important; border: none !important; }
+.hw-num-tag { color: rgba(255,255,255,0.6) !important; }
+.score-hero { color: #fff !important; }
+.score-hero-lbl { color: rgba(255,255,255,0.7) !important; }
+.score-hero-num { color: #fff !important; }
+.score-hero-sub { color: rgba(255,255,255,0.65) !important; }
+
+/* room tabs (rtab) */
+.rtab { background: rgba(255,255,255,0.1) !important; border-color: rgba(255,255,255,0.2) !important; color: rgba(255,255,255,0.75) !important; }
+.rtab.on { background: rgba(255,255,255,0.25) !important; color: #fff !important; border-color: rgba(255,255,255,0.4) !important; }
+
+/* search bar บน dark bg */
+.srch-wrap input,
+input[type="search"],
+#srch {
+  background: rgba(255,255,255,0.1) !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+  color: #fff !important;
+}
+.srch-wrap input::placeholder, #srch::placeholder { color: rgba(255,255,255,0.4) !important; }
+
+/* stats grid label */
+.slbl { color: rgba(255,255,255,0.7) !important; }
+.snum { color: #fff !important; }
+
+/* action popup dark bg */
+#ap-icon, #ap-title, #ap-sub { color: #fff !important; }
+
+/* ===== LIGHT BG → TEXT สีเข้ม ===== */
+/* modal/sheet บน light bg */
+.modal-sheet { color: #1e293b !important; }
+.modal-sheet h2, .modal-sheet .modal-title { color: #0f172a !important; }
+.modal-sheet label { color: #475569 !important; }
+.modal-sheet input, .modal-sheet select, .modal-sheet textarea {
+  color: #0f172a !important;
+  background: #fff !important;
+  border-color: #e2e8f0 !important;
+}
+.modal-sheet .text-muted, .modal-sheet small { color: #64748b !important; }
+
+/* detail-sheet (student detail) light bg */
+.detail-sheet { color: #0f172a !important; }
+.detail-sheet h3, .detail-sheet strong { color: #1e293b !important; }
+
+/* hw-card-item (manage tabs) light bg */
+.hw-card-item { color: #1e293b !important; }
+.hw-card-item .hw-card-title { color: #0f172a !important; }
+.hw-card-item .hw-card-meta { color: #64748b !important; }
+
+/* code-modal-sheet */
+.code-modal-sheet { color: #1e293b !important; }
+
+/* export modal */
+.export-type-btn { color: #1e293b !important; }
+
+/* stu-list (empty state) */
+.empty { color: rgba(255,255,255,0.5) !important; }
+
+/* plan banner */
+.plan-chip { color: #fff !important; }
+
+/* form labels บน page (dark bg) */
+.page > label,
+.page .form-label { color: rgba(255,255,255,0.8) !important; }
+
+/* input บน dark bg (ที่ไม่ได้อยู่ใน modal) */
+.page input:not(.modal-sheet input):not(input[type="checkbox"]):not(input[type="radio"]),
+.page select:not(.modal-sheet select) {
+  color: #0f172a !important;
+  background: rgba(255,255,255,0.92) !important;
+}
+
+/* toast */
+.tbar { color: #fff !important; }
