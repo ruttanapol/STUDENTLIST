@@ -2045,9 +2045,33 @@ function showAP(id,btn){
     setTimeout(function(){document.querySelectorAll('.grb').forEach(function(b){b.onclick=function(){openGradeStats(this.dataset.r);};});},100);
   }
   if(id==='sgs-import'){ openSGSImport(); return; }
+  if(id==='sgs-config'){ openSGSConfig(); return; }
   if(id==='sgs'){
-    // redirect sgs-content to main page container
     _sgsTargetId='sgs-content-main';
+    // เพิ่ม room selector ด้านบน
+    var sgsHdr=document.getElementById('sgs-room-selector');
+    if(!sgsHdr){
+      var sgsMain=document.getElementById('sgs-content-main');
+      if(sgsMain&&sgsMain.parentElement){
+        var sel=document.createElement('div');sel.id='sgs-room-selector';
+        sel.style.cssText='margin-bottom:12px;';
+        var rooms=(DB&&DB.rooms)||[];
+        sel.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+          +'<span style="font-size:13px;font-weight:700;color:#475569;">ห้อง:</span>'
+          +rooms.map(function(r){return '<button class="sgs-room-tab" data-room="'+r+'" style="padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;border:1.5px solid '+(r===_sgsRoom?'#2563EB':'#E2E8F0')+';background:'+(r===_sgsRoom?'#2563EB':'#fff')+';color:'+(r===_sgsRoom?'#fff':'#475569')+';">'+r+'</button>';}).join('')
+          +'</div>';
+        sgsMain.parentElement.insertBefore(sel,sgsMain);
+        sel.addEventListener('click',function(e){var b=e.target.closest('.sgs-room-tab');if(b)_sgsSwitchRoom(b.dataset.room);});
+      }
+    } else {
+      // อัพเดต active state
+      sgsHdr.querySelectorAll('.sgs-room-tab').forEach(function(b){
+        var r=b.textContent.trim();
+        b.style.background=r===_sgsRoom?'#2563EB':'#fff';
+        b.style.color=r===_sgsRoom?'#fff':'#475569';
+        b.style.borderColor=r===_sgsRoom?'#2563EB':'#E2E8F0';
+      });
+    }
     openSGSTo('sgs-content-main');
   }
 }
@@ -6523,20 +6547,33 @@ function openSGSTo(targetId){
 function openSGS(){
   var el=document.getElementById(_sgsTargetId||'sgs-content');
   if(!el){console.error('sgs-content not found');return;}
-  try{
-    var rooms=DB&&DB.rooms?DB.rooms:[];
-    if(!_sgsRoom&&rooms.length) _sgsRoom=rooms[0];
-    if(!rooms.length){
-      el.innerHTML='<div style="text-align:center;padding:40px;color:#94A3B8;font-size:14px;">⚠️ ยังไม่มีห้องเรียน — กรุณาเพิ่มห้องและนักเรียนก่อน</div>';
-      return;
-    }
-    el.innerHTML='';
-    el.innerHTML=_sgsBuildSetup();
-    _sgsAttachSetup();
-  }catch(err){
-    el.innerHTML='<div style="text-align:center;padding:40px;color:#DC2626;font-size:13px;">เกิดข้อผิดพลาด: '+err.message+'</div>';
-    console.error('openSGS error:',err);
+  var rooms=DB&&DB.rooms?DB.rooms:[];
+  if(!_sgsRoom&&rooms.length)_sgsRoom=rooms[0];
+  if(!rooms.length){
+    el.innerHTML='<div style="text-align:center;padding:40px;color:#94A3B8;font-size:14px;">⚠️ ยังไม่มีห้องเรียน</div>';return;
   }
+  // แสดง loading + โหลด config จาก DB
+  el.innerHTML='<div style="text-align:center;padding:40px;color:#64748B;font-size:14px;">⏳ กำลังโหลดตั้งค่า SGS...</div>';
+  _sgsLoadCfg(_sgsRoom).then(function(loaded){
+    _sgsOpenWithRoom(_sgsRoom,el,loaded);
+  });
+}
+
+function _sgsOpenWithRoom(room,el,cfgLoaded){
+  var errs=_sgsValidateHW();
+  if(!cfgLoaded||errs.length>0){
+    // ยังไม่มี config หรือ config ไม่ valid → แสดง prompt ไปตั้งค่า
+    el.innerHTML='<div style="text-align:center;padding:40px;">'
+      +'<div style="font-size:48px;margin-bottom:12px;">⚙️</div>'
+      +'<div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:8px;">'+(cfgLoaded?'ตั้งค่า SGS ไม่ครบ':'ยังไม่มีตั้งค่า SGS สำหรับห้อง '+room)+'</div>'
+      +'<div style="font-size:13px;color:#64748B;margin-bottom:16px;">'+(errs.length?errs.join('<br>'):'กรุณาตั้งค่าก่อนใช้งาน')+'</div>'
+      +'<button onclick="openSGSConfig()" style="padding:12px 24px;background:#2563EB;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">⚙️ ไปตั้งค่า SGS</button>'
+      +'</div>';
+    return;
+  }
+  // config ดี → pre-fill + render table
+  _sgsPreFillFromHW();
+  _sgsRenderTable();
 }
 
 function _sgsBuildSetup(){
@@ -7229,6 +7266,150 @@ function _sgsRenderTableWithHW(){
   // Pre-fill จากชิ้นงานจริง
   _sgsPreFillFromHW();
   _sgsRenderTable();
+}
+
+
+/* ===== SGS Config (Save/Load per room) ===== */
+var _sgsCfgCache = {}; // {room: {sections:[...]}}
+
+function openSGSConfig(){
+  document.querySelectorAll('#s-admin .page').forEach(function(p){p.classList.remove('on');p.style.display='none';});
+  var pg=document.getElementById('ap-sgs-config');
+  if(pg){pg.classList.add('on');pg.style.display='block';}
+  document.querySelectorAll('.bnav-btn,.sidebar-nav-item').forEach(function(b){b.classList.remove('on');});
+  _renderSGSConfig();
+}
+
+function _renderSGSConfig(){
+  var el=document.getElementById('sgs-config-content');if(!el)return;
+  var rooms=(DB&&DB.rooms)?DB.rooms:[];
+  if(!rooms.length){el.innerHTML='<div style="text-align:center;padding:40px;color:#94A3B8;">ยังไม่มีห้องเรียน</div>';return;}
+  if(!_sgsRoom&&rooms.length)_sgsRoom=rooms[0];
+
+  var roomOpts=rooms.map(function(r){return '<option value="'+r+'"'+(r===_sgsRoom?' selected':'')+'>'+r+'</option>';}).join('');
+  var hws=(DB&&DB.homeworks?DB.homeworks:[]).filter(function(h){return !h.room||h.room===_sgsRoom;}).sort(function(a,b){return a.num-b.num;});
+  var totalMax=_sgsCfg.sections.reduce(function(s,sec){return s+sec.max;},0);
+  var totalOk=totalMax===100;
+
+  var html='<div style="background:#F8FAFC;border-radius:14px;padding:14px;margin-bottom:12px;border:1.5px solid #E2E8F0;">'
+    +'<div style="font-size:13px;font-weight:700;color:#475569;margin-bottom:8px;">เลือกห้องเรียน</div>'
+    +'<select id="sgscfg-room" style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:Sarabun,sans-serif;background:#fff;">'+roomOpts+'</select>'
+    +'</div>';
+
+  // sections
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">';
+  _sgsCfg.sections.forEach(function(sec){
+    var selMax=sec.hws.reduce(function(s,n){var h=hws.find(function(x){return x.num===n;});return s+(h?h.maxScore||100:0);},0);
+    var secOk=sec.hws.length>0&&selMax===sec.max;
+    var valColor=sec.hws.length===0?'#94A3B8':secOk?'#16A34A':selMax>sec.max?'#DC2626':'#F59E0B';
+    var valMsg=sec.hws.length===0?'ยังไม่ได้เลือก':secOk?'✅ ครบ':selMax>sec.max?'❌ เกิน '+selMax+'/'+sec.max:'⚠️ ขาด '+selMax+'/'+sec.max;
+    var hwOpts=hws.map(function(h){
+      return '<option value="'+h.num+'"'+(sec.hws.indexOf(h.num)>=0?' selected':'')+'>งาน '+h.num+' (เต็ม '+(h.maxScore||100)+') - '+h.title.substring(0,15)+'</option>';
+    }).join('');
+    html+='<div style="background:#fff;border-radius:12px;padding:12px;border:1.5px solid '+(secOk?'#86EFAC':'#E2E8F0')+';box-shadow:0 1px 4px rgba(0,0,0,.04);">'
+      +'<div style="font-size:13px;font-weight:800;color:#0F172A;margin-bottom:8px;">'+sec.name+'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">'
+      +'<span style="font-size:12px;color:#64748B;">เต็ม</span>'
+      +'<input type="number" class="sgscfg-max" data-sec="'+sec.id+'" value="'+sec.max+'" min="0" max="100" '
+      +'style="width:58px;padding:5px;border:1.5px solid #BFDBFE;border-radius:8px;font-size:14px;font-weight:700;text-align:center;font-family:Sarabun,sans-serif;">'
+      +'<span style="font-size:11px;font-weight:700;color:'+valColor+';">'+valMsg+'</span>'
+      +'</div>'
+      +'<div style="font-size:11px;color:#64748B;margin-bottom:4px;">เลือกงาน (Ctrl/Cmd ค้าง):</div>'
+      +'<select multiple class="sgscfg-hw" data-sec="'+sec.id+'" style="width:100%;height:90px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:Sarabun,sans-serif;padding:4px;">'+hwOpts+'</select>'
+      +'</div>';
+  });
+  html+='</div>';
+
+  // validate total + save
+  var allSecOk=_sgsCfg.sections.every(function(sec){
+    var sm=sec.hws.reduce(function(s,n){var h=hws.find(function(x){return x.num===n;});return s+(h?h.maxScore||100:0);},0);
+    return sec.hws.length>0&&sm===sec.max;
+  });
+  var canSave=totalOk&&allSecOk;
+  html+='<div style="background:#F8FAFC;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">'
+    +'<div style="font-size:13px;font-weight:700;color:'+(totalOk?'#16A34A':'#DC2626')+';"> รวมคะแนนเต็ม: '+totalMax+'/100</div>'
+    +'<div style="font-size:12px;color:'+(canSave?'#16A34A':'#F59E0B')+';font-weight:700;">'+(canSave?'✅ พร้อมบันทึก':allSecOk?'':'⚠️ บางช่องยังไม่ครบ')+'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;">'
+    +'<button id="sgscfg-save-btn" onclick="_sgsSaveCfg()" style="flex:1;padding:12px;background:'+(canSave?'#2563EB':'#94A3B8')+';color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">'+(canSave?'💾 บันทึกตั้งค่า':'⚠️ กรุณาตั้งค่าให้ครบก่อน')+'</button>'
+    +'</div>';
+
+  el.innerHTML=html;
+
+  // events
+  document.getElementById('sgscfg-room').onchange=function(){_sgsRoom=this.value;_renderSGSConfig();};
+  document.querySelectorAll('.sgscfg-max').forEach(function(inp){
+    inp.oninput=function(){
+      var sec=_sgsCfg.sections.find(function(s){return s.id===inp.dataset.sec;});
+      if(sec){sec.max=parseInt(inp.value)||0;_renderSGSConfig();}
+    };
+  });
+  document.querySelectorAll('.sgscfg-hw').forEach(function(sel){
+    sel.onchange=function(){
+      var sec=_sgsCfg.sections.find(function(s){return s.id===sel.dataset.sec;});
+      if(sec){sec.hws=[].slice.call(sel.selectedOptions).map(function(o){return parseInt(o.value);});_renderSGSConfig();}
+    };
+    var sec=_sgsCfg.sections.find(function(s){return s.id===sel.dataset.sec;});
+    if(sec)[].slice.call(sel.options).forEach(function(o){o.selected=sec.hws.indexOf(parseInt(o.value))>=0;});
+  });
+}
+
+async function _sgsSaveCfg(){
+  if(!CURRENT_TEACHER)return;
+  var room=_sgsRoom;
+  var key='sgs_cfg_'+room+'_'+CURRENT_TEACHER.id;
+  var val={sections:_sgsCfg.sections.map(function(s){return {id:s.id,name:s.name,max:s.max,hws:s.hws.slice(),minScore:s.minScore||0};})};
+  try{
+    var btn=document.getElementById('sgscfg-save-btn');
+    if(btn){btn.textContent='⏳ กำลังบันทึก...';btn.disabled=true;}
+    var {data:ex}=await SB.from('settings').select('key').eq('key',key).maybeSingle();
+    if(ex){await SB.from('settings').update({value:val}).eq('key',key);}
+    else{await SB.from('settings').insert({key:key,value:val});}
+    _sgsCfgCache[room]=val;
+    if(typeof toast==='function')toast('บันทึกตั้งค่า SGS สำเร็จ ✅');
+    _renderSGSConfig();
+  }catch(err){
+    alert('บันทึกไม่สำเร็จ: '+err.message);
+    _renderSGSConfig();
+  }
+}
+
+async function _sgsLoadCfg(room){
+  if(!CURRENT_TEACHER||!room)return false;
+  if(_sgsCfgCache[room]){
+    _applySGSCfg(_sgsCfgCache[room]);return true;
+  }
+  var key='sgs_cfg_'+room+'_'+CURRENT_TEACHER.id;
+  try{
+    var {data}=await SB.from('settings').select('value').eq('key',key).maybeSingle();
+    if(data&&data.value&&data.value.sections){
+      _sgsCfgCache[room]=data.value;
+      _applySGSCfg(data.value);return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+function _applySGSCfg(cfg){
+  _sgsCfg.sections.forEach(function(sec){
+    var saved=cfg.sections.find(function(s){return s.id===sec.id;});
+    if(saved){sec.max=saved.max;sec.hws=saved.hws.slice();sec.minScore=saved.minScore||0;}
+  });
+}
+
+
+function _sgsSwitchRoom(room){
+  _sgsRoom=room;
+  var sel=document.getElementById('sgs-room-selector');
+  if(sel){
+    sel.querySelectorAll('.sgs-room-tab').forEach(function(b){
+      var r=b.textContent.trim();
+      b.style.background=r===room?'#2563EB':'#fff';
+      b.style.color=r===room?'#fff':'#475569';
+      b.style.borderColor=r===room?'#2563EB':'#E2E8F0';
+    });
+  }
+  openSGSTo('sgs-content-main');
 }
 
 window.addEventListener('load', () => {
