@@ -1,22 +1,3 @@
-
-/* ===== DARK MINIMAL THEME ===== */
-:root {
-  --blue:#6366f1; --blue-light:#312e81; --blue-dark:#818cf8;
-  --green:#22c55e; --green-light:#14532d; --green-dark:#4ade80;
-  --red:#ef4444; --red-light:#450a0a;
-  --yellow:#f59e0b; --yellow-light:#422006;
-  --purple:#a855f7; --purple-light:#3b0764;
-  --bg:#0f172a; --card:#1e293b; --border:#334155;
-  --text:#f1f5f9; --text2:#94a3b8; --text3:#64748b;
-  --radius:16px; --radius-sm:10px;
-  --sidebar-w:260px; --topbar-h:64px;
-  /* dark minimal specifics */
-  --dm-card:#1e293b;
-  --dm-card2:#283548;
-  --dm-border:#334155;
-  --dm-accent:#6366f1;
-  --dm-accent2:#818cf8;
-}
 /* ===== RESET & BASE ===== */
 /* ===== [1] RESET & BASE ===== */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;font-family:Sarabun,sans-serif;}
@@ -35,8 +16,7 @@
 }
 
 html, body { height: 100%; }
-body { background:#0f172a; overscroll-behavior:none; min-height:100vh; }
-#s-admin, #s-stu { background: #0f172a; }
+body { background:var(--bg); overscroll-behavior:none; }
 
 /* ===== SCREEN SYSTEM ===== */
 .screen { display:none; }
@@ -79,8 +59,8 @@ body { background:#0f172a; overscroll-behavior:none; min-height:100vh; }
     flex-shrink: 0;
     height: calc(100vh - var(--topbar-h));
     overflow-y: auto;
-    background: #161f2e;
-    border-right: 1px solid #334155;
+    background: var(--card);
+    border-right: 1.5px solid var(--border);
     padding: 20px 12px;
     display: block;
   }
@@ -149,23 +129,21 @@ body { background:#0f172a; overscroll-behavior:none; min-height:100vh; }
 
 /* ===== BOTTOM NAV (mobile only) ===== */
 .bnav {
-  display:flex;border-top:none;overflow-x:auto;overflow-y:hidden;
-  background:#1e293b; border-top:1px solid #334155;
-  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  display:flex;border-top:none;overflow:hidden;
+  background:#fff;
   padding:6px 0 calc(8px + env(safe-area-inset-bottom));
   box-shadow:0 -4px 20px rgba(0,0,0,0.08);
   position:sticky;bottom:0;z-index:10;
 }
 .bnav-btn {
-  flex:0 0 auto;display:flex;flex-direction:column;
-  align-items:center;gap:1px;padding:6px 6px 4px;
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;gap:1px;padding:6px 2px 4px;
   background:none;border:none;cursor:pointer;
   color:var(--text3);font-size:10px;font-weight:600;
-  transition:color .15s;min-height:52px;min-width:52px;
+  transition:color .15s;min-height:52px;min-width:0;
 }
 .bnav-btn svg { flex-shrink:0; width:22px; height:22px; }
 .bnav-btn.on{color:var(--blue);}
-.bnav::-webkit-scrollbar{display:none;}
 .bnav-btn .bnav-dot{width:4px;height:4px;border-radius:50%;background:var(--blue);margin-top:2px;display:none;}
 .bnav-btn.on .bnav-dot{display:block;}
 
@@ -267,8 +245,8 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,1
 .score-hero-num{font-size:46px;font-weight:800;color:#fff;line-height:1.1;margin:4px 0;position:relative;z-index:1;}
 .score-hero-num span{font-size:22px;font-weight:600;color:rgba(255,255,255,0.75);}
 .score-hero-sub{font-size:12px;color:rgba(255,255,255,0.8);font-weight:500;position:relative;z-index:1;}
-.scard{border-radius:14px;padding:14px 16px;position:relative;overflow:hidden;border:1px solid #334155;box-shadow:0 1px 8px rgba(0,0,0,0.3);}
-.scard:nth-child(1){background:linear-gradient(135deg,#1e3a5f,#1e2d5f);border:1.5px solid #BFDBFE;}
+.scard{border-radius:14px;padding:14px 16px;position:relative;overflow:hidden;}
+.scard:nth-child(1){background:linear-gradient(135deg,#EBF2FF,#DBEAFE);border:1.5px solid #BFDBFE;}
 .scard:nth-child(2){background:linear-gradient(135deg,#DCFCE7,#BBF7D0);border:1.5px solid #86EFAC;}
 .scard:nth-child(3){background:linear-gradient(135deg,#EDE9FE,#DDD6FE);border:1.5px solid #C4B5FD;}
 .scard:nth-child(4){background:linear-gradient(135deg,#FEF3C7,#FDE68A);border:1.5px solid #FCD34D;}
@@ -371,7 +349,7 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,1
 
 /* ===== MANAGE TABS ===== */
 /* ===== [14] MANAGE TABS ===== */
-.mtab-row{display:flex;gap:0;border-radius:12px;overflow:hidden;border:1px solid #334155;margin-bottom:14px;background:#161f2e;}
+.mtab-row{display:flex;gap:0;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);margin-bottom:14px;background:#fff;}
 .mtab{flex:1;padding:11px 4px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--text3);transition:all .15s;font-family:Sarabun,sans-serif;line-height:1.3;}
 .mtab.on{background:var(--blue);color:#fff;}
 .room-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
@@ -674,180 +652,3 @@ a[download]:active { transform:scale(0.96); }
   0%, 100% { box-shadow: 0 0 0 3px rgba(34,197,94,.3); }
   50% { box-shadow: 0 0 0 7px rgba(34,197,94,.1); }
 }
-
-/* ===== GLASS UI EXTRAS ===== */
-/* page content text on dark bg */
-.page { --text: #f1f5f9; --text2: #cbd5e1; --text3: #94a3b8; }
-
-/* student list cards on dark */
-.stu-row { background: rgba(255,255,255,0.08) !important; border:1px solid rgba(255,255,255,0.12) !important; color:#f1f5f9; }
-.stu-name { color:#fff !important; }
-.stu-meta { color:rgba(255,255,255,0.6) !important; }
-.room-pill { background:rgba(255,255,255,0.15) !important; color:#e0e7ff !important; }
-
-/* hw dots */
-.dot-ok { background: #22c55e !important; }
-.dot-no { background: rgba(255,255,255,0.15) !important; }
-
-/* search bar */
-#srch, input[type="search"], input[type="text"] {
-  background: rgba(255,255,255,0.1) !important;
-  border: 1px solid rgba(255,255,255,0.2) !important;
-  color: #fff !important;
-}
-#srch::placeholder, input[type="text"]::placeholder { color: rgba(255,255,255,0.4) !important; }
-
-/* manage tabs active */
-.mtab.on { background: rgba(255,255,255,0.2) !important; color:#fff !important; font-weight:700; }
-
-/* Plan banner */
-#plan-banner > div { background: rgba(255,255,255,0.1) !important; border:1px solid rgba(255,255,255,0.2) !important; color:#fff !important; }
-
-/* scroll areas */
-::-webkit-scrollbar { width:6px; height:6px; }
-::-webkit-scrollbar-track { background:#0f172a; }
-::-webkit-scrollbar-thumb { background:#334155; border-radius:4px; }
-::-webkit-scrollbar-thumb:hover { background:#475569; }
-
-/* sidebar text */
-.sidebar-section { color: rgba(255,255,255,0.4) !important; }
-#s-admin-sidebar { color: rgba(255,255,255,0.8); }
-
-/* topbar */
-#s-admin .topbar, #s-stu .topbar {
-  background: #1e293b !important;
-  border-bottom: 1px solid #334155 !important;
-}
-.tb-name, .tb-role { color: rgba(255,255,255,0.9) !important; }
-
-/* ===== GLASS TEXT CONTRAST FIXES (mobile/tablet) ===== */
-
-/* === DARK BG → TEXT ขาว === */
-/* stu-row บน dark bg */
-.stu-row { color: #f1f5f9; border-bottom-color: #1e293b !important; }
-.stu-name { color: #fff !important; }
-.stu-meta { color: rgba(255,255,255,0.55) !important; }
-.room-pill { background: #312e81 !important; color: #a5b4fc !important; border: none !important; }
-.hw-num-tag { color: rgba(255,255,255,0.6) !important; }
-.score-hero { color: #fff !important; }
-.score-hero-lbl { color: rgba(255,255,255,0.7) !important; }
-.score-hero-num { color: #fff !important; }
-.score-hero-sub { color: rgba(255,255,255,0.65) !important; }
-
-/* room tabs (rtab) */
-.rtab { background: #1e293b !important; border-color: #334155 !important; color: #94a3b8 !important; }
-.rtab.on { background: #6366f1 !important; color: #fff !important; border-color: #6366f1 !important; }
-
-/* search bar บน dark bg */
-.srch-wrap input,
-input[type="search"],
-#srch {
-  background: #1e293b !important;
-  border: 1px solid #334155 !important;
-  color: #f1f5f9 !important;
-}
-.srch-wrap input::placeholder, #srch::placeholder { color: #475569 !important; }
-
-/* stats grid label */
-.slbl { color: rgba(255,255,255,0.7) !important; }
-.snum { color: #fff !important; }
-
-/* action popup dark bg */
-#ap-icon, #ap-title, #ap-sub { color: #fff !important; }
-
-/* ===== LIGHT BG → TEXT สีเข้ม ===== */
-/* modal/sheet บน light bg */
-.modal-sheet { color: #1e293b !important; }
-.modal-sheet h2, .modal-sheet .modal-title { color: #0f172a !important; }
-.modal-sheet label { color: #475569 !important; }
-.modal-sheet input, .modal-sheet select, .modal-sheet textarea {
-  color: #0f172a !important;
-  background: #fff !important;
-  border-color: #e2e8f0 !important;
-}
-.modal-sheet .text-muted, .modal-sheet small { color: #64748b !important; }
-
-/* detail-sheet (student detail) light bg */
-.detail-sheet { color: #0f172a !important; }
-.detail-sheet h3, .detail-sheet strong { color: #1e293b !important; }
-
-/* hw-card-item (manage tabs) light bg */
-.hw-card-item { color: #1e293b !important; }
-.hw-card-item .hw-card-title { color: #0f172a !important; }
-.hw-card-item .hw-card-meta { color: #64748b !important; }
-
-/* code-modal-sheet */
-.code-modal-sheet { color: #1e293b !important; }
-
-/* export modal */
-.export-type-btn { color: #1e293b !important; }
-
-/* stu-list (empty state) */
-.empty { color: rgba(255,255,255,0.5) !important; }
-
-/* plan banner */
-.plan-chip { color: #fff !important; }
-
-/* form labels บน page (dark bg) */
-.page > label,
-.page .form-label { color: rgba(255,255,255,0.8) !important; }
-
-/* input บน dark bg (ที่ไม่ได้อยู่ใน modal) */
-.page input:not(.modal-sheet input):not(input[type="checkbox"]):not(input[type="radio"]),
-.page select:not(.modal-sheet select) {
-  color: #f1f5f9 !important;
-  background: #1e293b !important;
-  border-color: #334155 !important;
-}
-
-/* toast */
-.tbar { color: #fff !important; }
-
-/* ===== ATTENDANCE PAGE - light content on dark shell ===== */
-/* stat cards เช็คชื่อ — มีสีของตัวเอง ไม่ต้องแก้ */
-
-/* รายชื่อนักเรียน panel (พื้นขาว) */
-#ap-attend .stu-row,
-#ap-attend [class*="stu-row"] { 
-  color: #1e293b !important; 
-  border-bottom-color: #e2e8f0 !important;
-}
-#ap-attend .stu-name,
-#ap-attend [class*="stu-name"] { color: #0f172a !important; }
-#ap-attend .stu-meta { color: #64748b !important; }
-#ap-attend [style*="background:#fff"],
-#ap-attend [style*="background: #fff"],
-#ap-attend [style*="background: white"] { color: #1e293b !important; }
-
-/* container รายชื่อ */
-#ap-attend .card,
-#ap-attend [class*="card"] { 
-  background: #fff !important; 
-  color: #1e293b !important;
-  border-color: #e2e8f0 !important;
-}
-
-/* ชื่อนักเรียนที่อยู่ใน white panel */
-#ap-attend [style*="color:#"] { }
-#ap-attend span, #ap-attend div { }
-
-/* Global fix: ทุกที่ที่มี bg ขาวชัดๆ ให้ text เข้ม */
-[style*="background:#fff"] > *,
-[style*="background: #fff"] > *,
-[style*="background:white"] > * { color: inherit; }
-
-/* attend-specific selectors */
-.attend-row { color: #1e293b !important; }
-.attend-name { color: #0f172a !important; }
-#attend-list .stu-name { color: #1e293b !important; }
-#attend-list .stu-meta { color: #64748b !important; }
-#attend-list { color: #1e293b !important; }
-
-/* หัวข้อ รายชื่อนักเรียน */
-#ap-attend h3, #ap-attend h4,
-#ap-attend [style*="font-weight:700"],
-#ap-attend [style*="font-weight: 700"] { color: #0f172a; }
-
-/* override stu-row ที่ถูก glass เขียนทับ */
-#ap-attend .stu-row { background: transparent !important; }
-#stu-list .stu-row, #attend-list .stu-row { color: #1e293b !important; }
