@@ -18,6 +18,36 @@
 html, body { height: 100%; }
 body { background:var(--bg); overscroll-behavior:none; }
 
+/* ===== TERM THEME ===== */
+/* เทอม 1 = ม่วง/น้ำเงิน (default) */
+/* เทอม 2 = เขียว/teal */
+body.term-2 .topbar {
+  background: linear-gradient(135deg, #059669, #0d9488) !important;
+  box-shadow: 0 2px 12px rgba(5,150,105,0.3) !important;
+}
+body.term-2 .bnav { background: linear-gradient(135deg,#059669,#0d9488) !important; }
+body.term-2 .bnav-item.on { background: rgba(255,255,255,0.22) !important; }
+body.term-2 .score-hero { background: linear-gradient(135deg,#059669,#0d9488) !important; box-shadow: 0 8px 24px rgba(13,148,136,0.35) !important; }
+body.term-2 .prog-fill { background: linear-gradient(90deg,#059669,#0d9488) !important; }
+body.term-2 .btn-admin { background: linear-gradient(135deg,#059669,#047857) !important; box-shadow: 0 4px 16px rgba(5,150,105,0.4) !important; }
+body.term-2 .rtab.on { background: linear-gradient(135deg,#059669,#047857) !important; border-color:#047857 !important; box-shadow: 0 2px 8px rgba(5,150,105,0.3) !important; }
+body.term-2 #term-btn-2 { background: #fff !important; color: #059669 !important; }
+body.term-2 #term-btn-1 { background: transparent !important; color: rgba(255,255,255,0.8) !important; }
+body.term-2 .export-go-btn { background: linear-gradient(135deg,#059669,#0d9488) !important; }
+body.term-2 .section-badge { background: linear-gradient(135deg,#D1FAE5,#CCFBF1) !important; border-color:#6EE7B7 !important; color:#059669 !important; }
+body.term-2 .add-btn { background: linear-gradient(135deg,#0d9488,#047857) !important; box-shadow: 0 3px 12px rgba(13,148,136,0.3) !important; }
+/* term picker overlay */
+.stu-term-picker { position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;padding:24px; }
+.stu-term-picker-card { background:#fff;border-radius:24px;padding:32px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25); }
+.stu-term-btn { width:100%;padding:18px;border-radius:16px;border:none;cursor:pointer;font-size:17px;font-weight:800;font-family:Sarabun,sans-serif;transition:all .2s;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between; }
+.stu-term-btn-1 { background:linear-gradient(135deg,#EBF2FF,#EDE9FE);color:#4F46E5;border:2px solid #C4B5FD; }
+.stu-term-btn-1:hover { background:linear-gradient(135deg,#4F8EF7,#7C3AED);color:#fff;border-color:#7C3AED; }
+.stu-term-btn-2 { background:linear-gradient(135deg,#D1FAE5,#CCFBF1);color:#059669;border:2px solid #6EE7B7; }
+.stu-term-btn-2:hover { background:linear-gradient(135deg,#059669,#0d9488);color:#fff;border-color:#0d9488; }
+.stu-term-btn.no-data { opacity:.5;cursor:not-allowed; }
+.stu-term-btn .hw-count { font-size:13px;font-weight:600;opacity:.8; }
+
+
 /* ===== SCREEN SYSTEM ===== */
 .screen { display:none; }
 .screen.on { display:block; }

@@ -411,7 +411,7 @@ async function loadFromSupabase() {
   (setRes.data || []).forEach(r => { settingsMap[r.key] = r.value; });
   // load currentTerm
   const termKey = 'current_term_'+(CURRENT_TEACHER?CURRENT_TEACHER.id:'');
-  if(settingsMap[termKey] != null) DB.currentTerm = parseInt(settingsMap[termKey])||1;
+  if(settingsMap[termKey] != null) { DB.currentTerm = parseInt(settingsMap[termKey])||1; applyTermTheme(DB.currentTerm); }
   else DB.currentTerm = 1;
   updateTermToggleUI();
 
@@ -1816,6 +1816,62 @@ function selectTeacher(id, name, username){
   document.getElementById('teacher-dropdown').style.display = 'none';
 }
 
+
+function showStuTermPicker(student, stuDB) {
+  const room = student.room;
+  const hws1 = stuDB.homeworks.filter(h=>(!h.room||h.room===room)&&(h.term||1)===1);
+  const hws2 = stuDB.homeworks.filter(h=>(!h.room||h.room===room)&&(h.term||1)===2);
+
+  // Remove old picker if exists
+  const old = document.getElementById('stu-term-picker');
+  if(old) old.remove();
+
+  const ov = document.createElement('div');
+  ov.id = 'stu-term-picker';
+  ov.className = 'stu-term-picker';
+
+  const card = document.createElement('div');
+  card.className = 'stu-term-picker-card';
+  card.innerHTML = `
+    <div style="font-size:28px;margin-bottom:8px;">📚</div>
+    <div style="font-size:18px;font-weight:800;color:#1E293B;margin-bottom:4px;">เลือกภาคเรียน</div>
+    <div style="font-size:13px;color:#64748B;margin-bottom:24px;">สวัสดี <b>${student.name}</b> เลือกภาคเรียนที่ต้องการดูคะแนน</div>
+    <button id="stu-pick-t1" class="stu-term-btn stu-term-btn-1${hws1.length===0?' no-data':''}">
+      <span>📘 ภาคเรียนที่ 1</span>
+      <span class="hw-count">${hws1.length>0?hws1.length+' ชิ้นงาน':'ไม่มีข้อมูล'}</span>
+    </button>
+    <button id="stu-pick-t2" class="stu-term-btn stu-term-btn-2${hws2.length===0?' no-data':''}">
+      <span>📗 ภาคเรียนที่ 2</span>
+      <span class="hw-count">${hws2.length>0?hws2.length+' ชิ้นงาน':'ไม่มีข้อมูล'}</span>
+    </button>
+  `;
+  ov.appendChild(card);
+  document.body.appendChild(ov);
+
+  function pickTerm(t, hwsForTerm) {
+    if(hwsForTerm.length===0) {
+      // Show alert inside card
+      const msg = card.querySelector('.stu-no-reg-msg');
+      if(!msg) {
+        const m = document.createElement('div');
+        m.className = 'stu-no-reg-msg';
+        m.style.cssText = 'background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:12px;padding:12px 16px;margin-top:-4px;margin-bottom:12px;font-size:13px;color:#DC2626;font-weight:600;';
+        m.textContent = 'ท่านไม่ได้ลงทะเบียนเรียนในภาคเรียนที่ '+t;
+        const btn = card.querySelector('#stu-pick-t'+t);
+        btn.after(m);
+      }
+      return;
+    }
+    ov.remove();
+    DB.currentTerm = t;
+    applyTermTheme(t);
+    renderStudentView(student, stuDB);
+  }
+
+  card.querySelector('#stu-pick-t1').onclick = () => pickTerm(1, hws1);
+  card.querySelector('#stu-pick-t2').onclick = () => pickTerm(2, hws2);
+}
+
 async function loginStudent(){
   const sid=document.getElementById('stu-id').value.trim();
   const errEl=document.getElementById('stu-err');
@@ -1833,7 +1889,7 @@ async function loginStudent(){
     const {data:hwData}=await SB.from('homeworks').select('*').eq('teacher_id',tid).eq('room',stuData.room).order('num');
     const stuDB={
       student:{id:stuData.id,name:stuData.name,room:stuData.room},
-      homeworks:(hwData||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||'',fileUrl:r.file_url||'',fileName:r.file_name||'',room:r.room||''})),
+      homeworks:(hwData||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||'',fileUrl:r.file_url||'',fileName:r.file_name||'',room:r.room||'',term:r.term||1})),
       submissions:{}
     };
     (subData||[]).forEach(r=>{
@@ -1848,7 +1904,7 @@ async function loginStudent(){
     _currentStuTeacher=STU_SELECTED_TEACHER;
     showScreen('s-stu');
     document.getElementById('stu-id').value='';
-    renderStudentView(stuDB.student,stuDB);
+    showStuTermPicker(stuDB.student,stuDB);
   }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
 }
 
@@ -1859,6 +1915,8 @@ function logout(){
   _currentStuTeacher=null;
   STU_SELECTED_TEACHER=null;
   CURRENT_TEACHER=null;
+  const oldPicker=document.getElementById('stu-term-picker');
+  if(oldPicker)oldPicker.remove();
   if(USE_SUPABASE&&SB){SB.auth.signOut().catch(()=>{});}
   showScreen('s-login');
   // Reset student teacher dropdown on logout
@@ -6290,6 +6348,11 @@ function openStatusMenu(sid){var ex=document.getElementById('_smov');if(ex)ex.re
 if(typeof DB === 'undefined') window.DB = {};
 DB.currentTerm = 1;
 
+function applyTermTheme(t) {
+  if(t===2) document.body.classList.add('term-2');
+  else document.body.classList.remove('term-2');
+}
+
 function updateTermToggleUI() {
   const ct = DB.currentTerm||1;
   const b1 = document.getElementById('term-btn-1');
@@ -6304,6 +6367,7 @@ function updateTermToggleUI() {
 async function setTerm(t) {
   DB.currentTerm = t;
   updateTermToggleUI();
+  applyTermTheme(t);
   // บันทึกลง settings (wrapped ใน try/catch เผื่อ constraint ไม่ตรง)
   if(USE_SUPABASE && SB && CURRENT_TEACHER) {
     try {
