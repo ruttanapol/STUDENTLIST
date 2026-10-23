@@ -90,7 +90,14 @@ body { background:var(--bg); overscroll-behavior:none; }
   flex-shrink: 0;
 }
 @media(max-width:1023px){
-  .topbar { height: auto; padding: 14px 16px; padding-top: calc(14px + env(safe-area-inset-top)); }
+  .topbar { height: auto; padding: 10px 14px; padding-top: calc(10px + env(safe-area-inset-top)); flex-wrap:nowrap; gap:8px; }
+  .tb-left { min-width:0; flex:1; overflow:hidden; gap:8px; }
+  .tb-left > div { min-width:0; overflow:hidden; }
+  .tb-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; font-size:13px; }
+  .tb-role { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; font-size:10px; }
+  #term-toggle-wrap { flex-shrink:0; }
+  #term-toggle-wrap button { padding:4px 10px; font-size:12px; }
+  .tb-icon-btn { width:32px; height:32px; font-size:13px; }
 }
 /* ===== [5] TOPBAR ELEMENTS ===== */
 .tb-left {display:flex;align-items:center;gap:10px;}
