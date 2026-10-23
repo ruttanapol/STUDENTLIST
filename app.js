@@ -5394,7 +5394,7 @@ function renderSecGrade() {
   const students=getFilteredStudentsSec();
   if(!students.length){el.innerHTML='<div class="empty">ไม่พบนักเรียน</div>';return;}
 
-  const allHws=(DB.homeworks||[]).filter(h=>!filterSubj||h.subject===filterSubj);
+  const allHws=(DB.homeworks||[]).filter(h=>(!filterSubj||h.subject===filterSubj)&&(h.term||1)===(DB.currentTerm||1));
   const preHws=allHws.filter(h=>h.num<=cutoff);
   const postHws=allHws.filter(h=>h.num>cutoff);
   const midMatched=matchScoreToStudents(students,_secMidScores);
@@ -5403,12 +5403,12 @@ function renderSecGrade() {
   const rows=students.map(s=>{
     // คะแนนก่อนกลาง
     let pre=0,preMax=0;
-    preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
+    preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||DB.currentTerm||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
     const prePct=preMax>0?(pre/preMax)*100:0;
 
     // คะแนนหลังกลาง
     let post=0,postMax=0;
-    postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
+    postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||DB.currentTerm||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
     const postPct=postMax>0?(post/postMax)*100:0;
 
     const midScore=midMatched[s.id]??null;
@@ -5475,7 +5475,7 @@ async function exportSecGradeExcel() {
   const wPost=(parseFloat(document.getElementById('sec-w-post')?.value)||20)/100;
   const wFin=(parseFloat(document.getElementById('sec-w-final')?.value)||30)/100;
   const students=getFilteredStudentsSec();
-  const allHws=(DB.homeworks||[]).filter(h=>!filterSubj||filterSubj==='ทุกวิชา'||h.subject===filterSubj);
+  const allHws=(DB.homeworks||[]).filter(h=>(!filterSubj||filterSubj==='ทุกวิชา'||h.subject===filterSubj)&&(h.term||1)===(DB.currentTerm||1));
   const preHws=allHws.filter(h=>h.num<=cutoff);
   const postHws=allHws.filter(h=>h.num>cutoff);
   const midMatched=matchScoreToStudents(students,_secMidScores);
@@ -5483,9 +5483,9 @@ async function exportSecGradeExcel() {
   const wb=XLSX.utils.book_new();
   const wsData=[['ลำดับ','รหัส','ชื่อ','ห้อง','ก่อนกลาง%','กลางภาค','หลังกลาง%','ปลายภาค','รวม','เกรด','GPA'],
     ...students.map((s,i)=>{
-      let pre=0,preMax=0; preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
+      let pre=0,preMax=0; preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||DB.currentTerm||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
       const prePct=preMax>0?(pre/preMax)*100:0;
-      let post=0,postMax=0; postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
+      let post=0,postMax=0; postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||DB.currentTerm||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
       const postPct=postMax>0?(post/postMax)*100:0;
       const mid=midMatched[s.id]??null; const fin=finMatched[s.id]??null;
       let total=prePct*wPre+postPct*wPost+(mid!==null?mid*wMid:0)+(fin!==null?fin*wFin:0);
