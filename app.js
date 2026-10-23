@@ -6378,7 +6378,7 @@ async function setTerm(t) {
   // reload both homeworks AND submissions for new term
   await reloadHomeworks();
   await reloadSubmissions();
-  renderDash();
+  renderDashboard();
   renderManage();
   toast('เปลี่ยนเป็นเทอม '+t+' ✅');
 }
