@@ -2433,23 +2433,13 @@ function stopScan(){
 function renderDashboard(){
   renderPlanBanner();
   const rooms=[...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
-  // นับจำนวนครั้งที่ส่งงาน แยกเป็นรายห้อง แทนการรวมยอดทั้งหมดเป็นก้อนเดียว (ตัวเลขรวมดิบๆ อ่านแล้วเข้าใจยากและไม่ actionable)
-  const subsByRoom={};
-  Object.values(DB.submissions).forEach(s=>{ const r=s.room||'-'; subsByRoom[r]=(subsByRoom[r]||0)+1; });
-  const submissionStatHtml = curRoom==='all'
-    ? `<div class="scard" style="grid-column:span 2;">
-        <div class="slbl" style="margin-bottom:6px;">✅ ส่งงานแล้ว (ครั้ง) แยกตามห้อง</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;">
-          ${rooms.length ? rooms.map(r=>`<span style="font-size:12px;font-weight:700;color:var(--green-dark);background:#DCFCE7;border-radius:8px;padding:3px 9px;">${escapeHtml(r)}: ${subsByRoom[r]||0}</span>`).join('') : '<span style="font-size:12px;color:var(--text3);">ยังไม่มีห้องเรียน</span>'}
-        </div>
-      </div>`
-    : `<div class="scard"><div class="snum" style="color:var(--green-dark);">${subsByRoom[curRoom]||0}</div><div class="slbl">✅ ส่งงานแล้ว (ครั้ง) · ${escapeHtml(curRoom)}</div></div>`;
   const hwThisTerm = DB.homeworks.filter(h=>(h.term||1)===(DB.currentTerm||1));
+  const totalSubs = Object.values(DB.submissions).length;
   document.getElementById('stats-grid').innerHTML=`
     <div class="scard"><div class="snum">${DB.students.length}</div><div class="slbl">👨‍🎓 นักเรียนทั้งหมด</div></div>
     <div class="scard"><div class="snum" style="color:#B45309;">${rooms.length}</div><div class="slbl">🏫 ห้องเรียน</div></div>
     <div class="scard"><div class="snum" style="color:#7C3AED;">${hwThisTerm.length}</div><div class="slbl">📝 งานเทอม ${DB.currentTerm||1}</div></div>
-    ${submissionStatHtml}`;
+    <div class="scard"><div class="snum" style="color:var(--green-dark);">${totalSubs}</div><div class="slbl">✅ ส่งงานแล้ว (ครั้ง)</div></div>`;
   document.getElementById('room-tabs').innerHTML=
     `<button class="rtab ${curRoom==='all'?'on':''}" onclick="setRoom('all')">ทุกห้อง</button>`+
     rooms.map(r=>`<button class="rtab ${curRoom===r?'on':''}" onclick="setRoom('${r}')">${r}</button>`).join('');
@@ -5053,7 +5043,7 @@ let _currentSecTerm = 1;
 // ==================== NAVIGATION ====================
 
 function isGradeAllowed() {
-  return CURRENT_TEACHER?.username === 'test';
+  return true;
 }
 
 function openGradeTab() {
