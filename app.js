@@ -2444,9 +2444,12 @@ function renderDashboard(){
         </div>
       </div>`
     : `<div class="scard"><div class="snum" style="color:var(--green-dark);">${subsByRoom[curRoom]||0}</div><div class="slbl">✅ ส่งงานแล้ว (ครั้ง) · ${escapeHtml(curRoom)}</div></div>`;
+  const hwThisTerm = DB.homeworks.filter(h=>(h.term||1)===(DB.currentTerm||1));
   document.getElementById('stats-grid').innerHTML=`
     <div class="scard"><div class="snum">${DB.students.length}</div><div class="slbl">👨‍🎓 นักเรียนทั้งหมด</div></div>
-    <div class="scard"><div class="snum" style="color:#B45309;">${rooms.length}</div><div class="slbl">🏫 ห้องเรียน</div></div>`;
+    <div class="scard"><div class="snum" style="color:#B45309;">${rooms.length}</div><div class="slbl">🏫 ห้องเรียน</div></div>
+    <div class="scard"><div class="snum" style="color:#7C3AED;">${hwThisTerm.length}</div><div class="slbl">📝 งานเทอม ${DB.currentTerm||1}</div></div>
+    ${submissionStatHtml}`;
   document.getElementById('room-tabs').innerHTML=
     `<button class="rtab ${curRoom==='all'?'on':''}" onclick="setRoom('all')">ทุกห้อง</button>`+
     rooms.map(r=>`<button class="rtab ${curRoom===r?'on':''}" onclick="setRoom('${r}')">${r}</button>`).join('');
@@ -6179,7 +6182,7 @@ function _gsMkUI(){
 function _gsRender(){
   var tbl=document.getElementById('gs-tbl');if(!tbl)return;
   var room=_gsRoom;
-  var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;}).sort(function(a,b){return a.num-b.num;});
+  var hws=DB.homeworks.filter(function(h){return (!h.room||h.room===room)&&(h.term||1)===(DB.currentTerm||1);}).sort(function(a,b){return a.num-b.num;});
   var stus=DB.students.filter(function(s){return s.room===room;}).sort(function(a,b){return a.id.localeCompare(b.id);});
   if(!stus.length||!hws.length){tbl.innerHTML='<tr><td colspan="20" style="padding:40px;text-align:center;color:#94A3B8;font-size:14px;">ไม่พบข้อมูล</td></tr>';return;}
   var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
@@ -6208,7 +6211,7 @@ function _gsRender(){
     tdNm.appendChild(stBtn);tdNm.appendChild(nm);tdNm.appendChild(id2);tr.appendChild(tdN);tr.appendChild(tdNm);
     var rowTotal=0;
     hws.forEach(function(h){
-      var key=subKey(s.id, h.num, h.room, h.term||1);
+      var key=subKey(s.id, h.num, h.room, h.term||DB.currentTerm||1);
       var sub=DB.submissions[key]||DB.submissions[subKey(s.id, h.num, room, h.term||DB.currentTerm||1)]||DB.submissions[subKey(s.id, h.num, '', h.term||DB.currentTerm||1)];
       var chg=_gsChanges[key];
       var stored=sub?(sub.score!==null&&sub.score!==undefined?Number(sub.score):(h.maxScore||100)):null;
