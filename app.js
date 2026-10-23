@@ -211,6 +211,7 @@ async function tryRestoreSession(){
     setTimeout(()=>setupRealtime(),500);
     document.getElementById('teacher-topbar-name').textContent=teacher.display_name;if(teacher.avatar_url) updateTopbarAvatar(teacher.avatar_url);
     document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
+    updateTermToggleUI();
     // เช็คและแจ้งเตือนอายุการใช้งาน
 await checkAndNotifyExpiry(teacher);
     showScreen('s-admin');
@@ -390,14 +391,14 @@ async function loadFromSupabase() {
   const stuRes = {data: stuData}, hwRes = {data: hwData}, subRes = {data: subData}, setRes = {data: setData};
 
   DB.students = (stuRes.data || []).map(r => ({id: r.id, name: r.name, room: r.room, status: r.status||'active'}));
-  DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||'', fileUrl: r.file_url||'', fileName: r.file_name||'', room: r.room||''}));
+  DB.homeworks = (hwRes.data || []).map(r => ({num: r.num, title: r.title, subject: r.subject||'', maxScore: r.max_score||100, deadline: r.deadline||'', fileUrl: r.file_url||'', fileName: r.file_name||'', room: r.room||'', term: r.term||1}));
 
   const subs = {};
   (subRes.data || []).forEach(r => {
-    const key = subKey(r.student_id, r.hw_num, r.room);
+    const key = subKey(r.student_id, r.hw_num, r.room, r.term||1);
     subs[key] = {
       sid: r.student_id, hwNum: r.hw_num, hwTitle: r.hw_title,
-      room: r.room, score: r.score, maxScore: r.max_score||100,
+      room: r.room, term: r.term||1, score: r.score, maxScore: r.max_score||100,
       ts: r.submitted_at ? new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : ''
     };
   });
@@ -408,6 +409,12 @@ async function loadFromSupabase() {
   const roomsKey = tid ? 'rooms_'+tid : 'rooms';
   const settingsMap = {};
   (setRes.data || []).forEach(r => { settingsMap[r.key] = r.value; });
+  // load currentTerm
+  const termKey = 'current_term_'+(CURRENT_TEACHER?CURRENT_TEACHER.id:'');
+  if(settingsMap[termKey] != null) DB.currentTerm = parseInt(settingsMap[termKey])||1;
+  else DB.currentTerm = 1;
+  updateTermToggleUI();
+
   if(settingsMap[settingsKey]) {
     DB.subjects = settingsMap[settingsKey];
   } else if(settingsMap['subjects']) {
@@ -490,8 +497,8 @@ function showRealtimeDot() {
 
 // รหัสนักเรียนอาจซ้ำกันข้ามห้อง (เช่นเลขที่ 1-40 ใช้ซ้ำทุกห้อง) และ "เลขที่งาน" ก็รีเซ็ตใหม่ทุกห้องเช่นกัน
 // ดังนั้น key ที่ใช้อ้างอิงการส่งงานของนักเรียนแต่ละคน ต้องรวม "ห้อง" เข้าไปด้วยเสมอ ไม่งั้นข้อมูลจะไปทับกันข้ามห้อง
-function subKey(sid, hwNum, room) {
-  return sid + '_' + hwNum + '_' + (room || '');
+function subKey(sid, hwNum, room, term) {
+  return sid + '_' + hwNum + '_' + (room || '') + '_t' + (term != null ? term : DB.currentTerm||1);
 }
 // คะแนนเต็มที่แท้จริงต้องยึดจาก "ชิ้นงานปัจจุบัน" (h.maxScore) เป็นหลักเสมอ
 // ค่า sub.maxScore ที่บันทึกไว้ตอนตรวจอาจเป็นค่าเก่า/ผิดพลาดจากก่อนมีการตรวจสอบ ใช้เป็นแค่ fallback เท่านั้น
@@ -533,8 +540,8 @@ async function reloadSubmissions() {
   const data = await sbFetchAll('submissions', q => tid ? q.eq('teacher_id', tid) : q);
   const subs = {};
   (data||[]).forEach(r => {
-    const key = subKey(r.student_id, r.hw_num, r.room);
-    subs[key] = {sid:r.student_id,hwNum:r.hw_num,hwTitle:r.hw_title,room:r.room,
+    const key = subKey(r.student_id, r.hw_num, r.room, r.term||1);
+    subs[key] = {sid:r.student_id,hwNum:r.hw_num,hwTitle:r.hw_title,room:r.room,term:r.term||1,
       score: r.score !== null && r.score !== undefined ? Number(r.score) : null ,maxScore:r.max_score||100,
       ts:r.submitted_at?new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}):''};
   });
@@ -558,7 +565,7 @@ async function reloadHomeworks() {
   const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : null;
   const data = await sbFetchAll('homeworks', q => tid ? q.eq('teacher_id', tid) : q);
   data.sort((a,b)=>(a.num||0)-(b.num||0));
-  DB.homeworks = (data||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||'',fileUrl:r.file_url||'',fileName:r.file_name||'',room:r.room||''}));
+  DB.homeworks = (data||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||'',fileUrl:r.file_url||'',fileName:r.file_name||'',room:r.room||'',term:r.term||1}));
   // อัพเดต UI ทั้งหมด
   renderManage();
   renderDashboard();   // ← อัพเดต stat card งานทั้งหมด
@@ -613,7 +620,7 @@ async function sbUpdateStudent(oldId, stu) {
     if(oldId !== stu.id) {
       const newSubs = {};
       Object.entries(DB.submissions).forEach(([k,v]) => {
-        if(v.sid===oldId) { newSubs[subKey(stu.id, v.hwNum, v.room)]={...v,sid:stu.id}; }
+        if(v.sid===oldId) { newSubs[subKey(stu.id, v.hwNum, v.room, v.term||DB.currentTerm||1)]={...v,sid:stu.id}; }
         else newSubs[k]=v;
       });
       DB.submissions = newSubs;
@@ -645,11 +652,11 @@ async function sbAddHomework(hw) {
   if(USE_SUPABASE) {
     const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';
     const {error}=await SB.from('homeworks').upsert({
-      num:hw.num,teacher_id:tid,room:hw.room||'',title:hw.title,
+      num:hw.num,teacher_id:tid,room:hw.room||'',term:hw.term||(DB.currentTerm||1),title:hw.title,
       subject:hw.subject||'',max_score:hw.maxScore||100,
       deadline:hw.deadline&&hw.deadline.trim()!==''?hw.deadline:null,
       file_url:hw.fileUrl||null,file_name:hw.fileName||null
-    },{onConflict:'num,teacher_id,room'});
+    },{onConflict:'num,teacher_id,room,term'});
     if(error)throw error;
     await reloadHomeworks();
   } else {
@@ -661,23 +668,23 @@ async function sbAddHomework(hw) {
 }
 
 async function sbDeleteHomework(num,room){
-  if(USE_SUPABASE){const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';let q=SB.from('homeworks').delete().eq('num',num).eq('teacher_id',tid);if(room!==undefined)q=q.eq('room',room);const{error}=await q;if(error)throw error;await reloadHomeworks();}else{DB.homeworks=DB.homeworks.filter(h=>!(h.num===num&&(room===undefined||h.room===room)));saveDB();}
+  if(USE_SUPABASE){const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';let q=SB.from('homeworks').delete().eq('num',num).eq('teacher_id',tid);if(room!==undefined)q=q.eq('room',room);const{error}=await q;if(error)throw error;await reloadHomeworks();}else{DB.homeworks=DB.homeworks.filter(h=>!(h.num===num&&(room===undefined||h.room===room)&&(h.term||1)===(DB.currentTerm||1)));saveDB();}
 }
 
 async function sbRecordSubmission(sub) {
   // sub = {sid, hwNum, hwTitle, room, score, maxScore}
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
-    await SB.from('submissions').delete().eq('student_id',sub.sid).eq('hw_num',sub.hwNum).eq('room',sub.room||'').eq('teacher_id',tid);
+    await SB.from('submissions').delete().eq('student_id',sub.sid).eq('hw_num',sub.hwNum).eq('room',sub.room||'').eq('teacher_id',tid).eq('term',sub.term||(DB.currentTerm||1));
     const {error} = await SB.from('submissions').insert({
       student_id: sub.sid, hw_num: sub.hwNum, hw_title: sub.hwTitle,
-      room: sub.room, score: sub.score, max_score: sub.maxScore, teacher_id: tid
+      room: sub.room, term: sub.term||(DB.currentTerm||1), score: sub.score, max_score: sub.maxScore, teacher_id: tid
     });
     if(error) throw error;
 await reloadSubmissions();
 renderDashboard();
   } else {
-    const key = subKey(sub.sid, sub.hwNum, sub.room);
+    const key = subKey(sub.sid, sub.hwNum, sub.room, sub.term||DB.currentTerm||1);
     DB.submissions[key] = {...sub, ts: ts()};
     saveDB();
     // อัพเดต UI ทันที
@@ -695,7 +702,7 @@ async function sbUpdateScore(sid, hwNum, score, room) {
     if(error) throw error;
     await reloadSubmissions();
   } else {
-    const key = subKey(sid, hwNum, room);
+    const key = subKey(sid, hwNum, room, DB.currentTerm||1);
     if(DB.submissions[key]) DB.submissions[key].score = score;
     saveDB();
   }
@@ -934,6 +941,7 @@ async function loginTeacher(){
     setTimeout(()=>setupRealtime(),500);
     document.getElementById('teacher-topbar-name').textContent=teacher.display_name;if(teacher.avatar_url) updateTopbarAvatar(teacher.avatar_url);
     document.getElementById('teacher-topbar-email').textContent=teacher.email||'';
+    updateTermToggleUI();
     document.getElementById('teacher-email-input').value='';
     document.getElementById('teacher-pw-input').value='';
     showScreen('s-admin');
@@ -1731,7 +1739,7 @@ function renderSATeacherData(){
   document.getElementById('sa-tv-students').innerHTML=DB.students.length?
     `<table class="mini-tbl"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>ห้อง</th><th>ส่งงาน</th></tr></thead><tbody>`+
     DB.students.map(s=>{
-      const done=DB.homeworks.filter(h=>DB.submissions[subKey(s.id,h.num,h.room)]).length;
+      const done=DB.homeworks.filter(h=>DB.submissions[subKey(s.id, h.num, h.room, h.term||1)]).length;
       return `<tr><td style="font-size:12px;">${escapeHtml(s.id)}</td><td style="font-size:13px;">${escapeHtml(s.name)}</td><td style="font-size:12px;">${escapeHtml(s.room)}</td><td style="text-align:center;font-weight:700;color:var(--green-dark);">${done}/${DB.homeworks.length}</td></tr>`;
     }).join('')+`</tbody></table>`
     :'<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">ยังไม่มีนักเรียน</div>';
@@ -1829,7 +1837,7 @@ async function loginStudent(){
       submissions:{}
     };
     (subData||[]).forEach(r=>{
-      stuDB.submissions[subKey(r.student_id,r.hw_num,r.room)]={
+      stuDB.submissions[subKey(r.student_id,r.hw_num,r.room,r.term||1)]={
         sid:r.student_id,hwNum:r.hw_num,hwTitle:r.hw_title,room:r.room,
         score:r.score,maxScore:r.max_score||100,
         ts:r.submitted_at?new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}):''
@@ -1882,25 +1890,25 @@ function calcGradeConversion(){
 
 function renderStudentView(s, stuDB){
   const db=stuDB||{student:s,homeworks:DB.homeworks,submissions:DB.submissions};
-  const roomHWs=db.homeworks.filter(h=>!h.room||h.room===s.room);
+  const roomHWs=db.homeworks.filter(h=>(!h.room||h.room===s.room)&&(h.term||1)===(DB.currentTerm||1));
   const teacher = _currentStuTeacher;
   document.getElementById('stu-avatar').textContent=s.name.substring(0,2);
   document.getElementById('stu-display-name').textContent=s.name;
   document.getElementById('stu-display-room').textContent='ห้อง '+s.room+' · รหัส '+s.id+(teacher?' · ครู: '+teacher.display_name:'');
-  const done=roomHWs.filter(h=>db.submissions[subKey(s.id,h.num,h.room)]);
-  const miss=roomHWs.filter(h=>!db.submissions[subKey(s.id,h.num,h.room)]);
+  const done=roomHWs.filter(h=>db.submissions[subKey(s.id, h.num, h.room, h.term||1)]);
+  const miss=roomHWs.filter(h=>!db.submissions[subKey(s.id, h.num, h.room, h.term||1)]);
   const pct=roomHWs.length?Math.round(done.length/roomHWs.length*100):0;
 
   // ===== รวมคะแนนทั้งหมดของนักเรียน =====
   // ชิ้นที่ส่งแล้วแต่ยังไม่มีคะแนนตัวเลข (แค่ติ๊กถูกว่าส่งแล้ว) ให้นับเป็นคะแนนเต็มของชิ้นนั้น
   // (ใช้หลักการเดียวกับหน้าครู/PDF export: ส่งแล้ว = ได้คะแนนเต็ม ถ้ายังไม่ได้ระบุคะแนนเจาะจง)
   const gradedHWs=done.filter(h=>{
-    const sub=db.submissions[subKey(s.id,h.num,h.room)];
+    const sub=db.submissions[subKey(s.id, h.num, h.room, h.term||1)];
     return sub.score!==null && sub.score!==undefined;
   });
   const pendingCount=done.length-gradedHWs.length;
   const totalScore=done.reduce((sum,h)=>{
-    const sub=db.submissions[subKey(s.id,h.num,h.room)];
+    const sub=db.submissions[subKey(s.id, h.num, h.room, h.term||1)];
     const ms=Number(h.maxScore||sub.maxScore||100);
     const sc=(sub.score!==null&&sub.score!==undefined)?Number(sub.score):ms;
     return sum+sc;
@@ -1914,7 +1922,6 @@ function renderStudentView(s, stuDB){
     <div class="score-hero-lbl">🏆 คะแนนรวมทั้งหมด</div>
     <div class="score-hero-num">${totalScore}<span>/${totalMax}</span></div>
     <div class="score-hero-sub">${done.length?`ได้ ${scorePct}% จากงานที่ส่งแล้ว ${done.length} ชิ้น${pendingCount?` (รอตรวจ ${pendingCount} ชิ้น)`:''}`:'ยังไม่มีงานที่ส่ง'}</div>
-    ${done.length&&totalMax>=100?`<div style="margin-top:10px;display:flex;align-items:center;justify-content:center;gap:10px;"><span style="font-size:13px;color:var(--text3);">เกรด</span><span style="font-size:24px;font-weight:900;padding:3px 20px;border-radius:24px;color:${gradeColor(calcGrade(scorePct))};background:${gradeBg(calcGrade(scorePct))};"> ${calcGrade(scorePct)}</span></div>`:totalMax>0&&totalMax<100?`<div style="margin-top:8px;font-size:12px;color:var(--text3);">คะแนนเต็มรวมยังไม่ถึง 100 (${totalMax}/100)</div>`:''}
   </div>
   ${totalMax?`<div class="card" style="margin-bottom:14px;">
     <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:8px;">🧮 ลองเทียบคะแนน</div>
@@ -1942,7 +1949,7 @@ function renderStudentView(s, stuDB){
   });
 
   Object.entries(subjects).forEach(([subj, hws]) => {
-    const doneInSubj = hws.filter(h => db.submissions[subKey(s.id,h.num,h.room)]).length;
+    const doneInSubj = hws.filter(h => db.submissions[subKey(s.id, h.num, h.room, h.term||1)]).length;
     const pctSubj = Math.round(doneInSubj/hws.length*100);
     const pctColor = pctSubj===100?'var(--green-dark)':pctSubj>=60?'var(--blue)':'var(--red)';
 
@@ -1959,7 +1966,7 @@ function renderStudentView(s, stuDB){
       <div class="my-hw-card" style="margin-bottom:0;">`;
 
     hws.forEach(h => {
-      const sub = db.submissions[subKey(s.id,h.num,h.room)];
+      const sub = db.submissions[subKey(s.id, h.num, h.room, h.term||1)];
       html += `<div class="my-hw-row" style="flex-wrap:wrap;gap:8px;">
         <div style="flex:1;min-width:0;">
           <div style="font-size:15px;font-weight:700;color:var(--text);">ชิ้นที่ ${h.num}: ${escapeHtml(h.title)}</div>
@@ -2004,7 +2011,7 @@ async function refreshStudentView(){
   // อัพเดต submissions
   const subs = {};
   (subRes.data||[]).forEach(r => {
-    subs[subKey(r.student_id,r.hw_num,r.room)] = {
+    subs[subKey(r.student_id,r.hw_num,r.room,r.term||1)] = {
       sid:r.student_id, hwNum:r.hw_num, hwTitle:r.hw_title,
       room:r.room, score: r.score !== null && r.score !== undefined ? Number(r.score) : null, maxScore:r.max_score||100,
       ts:r.submitted_at ? new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : ''
@@ -2020,7 +2027,7 @@ function showAP(id,btn){
     if(!checkFeatureGate('attendance','เช็คชื่อ')) return;
   }
   // sync sidebar nav items
-  ['scan','dash','manage','attend','calendar','grade','sgs'].forEach(function(p){
+  ['scan','dash','manage','attend','calendar'].forEach(function(p){
     var sn = document.getElementById('snav-'+p);
     if(sn) sn.classList.toggle('on', p===id);
   });
@@ -2038,42 +2045,6 @@ function showAP(id,btn){
   if(id==='manage') renderManage();
   if(id==='attend') initAttendanceTab();
   if(id==='calendar') _showCal();
-  if(id==='grade'){
-    var _gel=document.getElementById('ap-grade-content');
-    if(_gel) _gel.innerHTML=renderGradeTab();
-    // attach grade-room-btn events
-    setTimeout(function(){document.querySelectorAll('.grb').forEach(function(b){b.onclick=function(){openGradeStats(this.dataset.r);};});},100);
-  }
-  if(id==='sgs-import'){ openSGSImport(); return; }
-  if(id==='sgs-config'){ openSGSConfig(); return; }
-  if(id==='sgs'){
-    _sgsTargetId='sgs-content-main';
-    // เพิ่ม room selector ด้านบน
-    var sgsHdr=document.getElementById('sgs-room-selector');
-    if(!sgsHdr){
-      var sgsMain=document.getElementById('sgs-content-main');
-      if(sgsMain&&sgsMain.parentElement){
-        var sel=document.createElement('div');sel.id='sgs-room-selector';
-        sel.style.cssText='margin-bottom:12px;';
-        var rooms=(DB&&DB.rooms)||[];
-        sel.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-          +'<span style="font-size:13px;font-weight:700;color:#475569;">ห้อง:</span>'
-          +rooms.map(function(r){return '<button class="sgs-room-tab" data-room="'+r+'" style="padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;border:1.5px solid '+(r===_sgsRoom?'#2563EB':'#E2E8F0')+';background:'+(r===_sgsRoom?'#2563EB':'#fff')+';color:'+(r===_sgsRoom?'#fff':'#475569')+';">'+r+'</button>';}).join('')
-          +'</div>';
-        sgsMain.parentElement.insertBefore(sel,sgsMain);
-        sel.addEventListener('click',function(e){var b=e.target.closest('.sgs-room-tab');if(b)_sgsSwitchRoom(b.dataset.room);});
-      }
-    } else {
-      // อัพเดต active state
-      sgsHdr.querySelectorAll('.sgs-room-tab').forEach(function(b){
-        var r=b.textContent.trim();
-        b.style.background=r===_sgsRoom?'#2563EB':'#fff';
-        b.style.color=r===_sgsRoom?'#fff':'#475569';
-        b.style.borderColor=r===_sgsRoom?'#2563EB':'#E2E8F0';
-      });
-    }
-    openSGSTo('sgs-content-main');
-  }
 }
 
 function ts(){return new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});}
@@ -2169,7 +2140,7 @@ async function recordScan(sid, scoreOverride){
   // เพราะ "เลขที่งาน" ซ้ำกันได้ข้ามห้อง ค่าเต็มที่ค้างมาจากห้องอื่นอาจไม่ตรงกับชิ้นงานจริงที่กำลังตรวจ
   const hwRecord = stu ? DB.homeworks.find(h=>h.num===hwNum && h.room===stu.room) : null;
   const maxScore = hwRecord ? (hwRecord.maxScore||100) : formMaxScore;
-  const key=subKey(sid,hwNum,stu?stu.room:'');
+  const key=subKey(sid,hwNum,stu?stu.room:'',DB.currentTerm||1);
   const log=document.getElementById('scan-log');
   const empty=log.querySelector('.empty');
   if(empty)empty.remove();
@@ -2415,35 +2386,9 @@ function renderDashboard(){
         </div>
       </div>`
     : `<div class="scard"><div class="snum" style="color:var(--green-dark);">${subsByRoom[curRoom]||0}</div><div class="slbl">✅ ส่งงานแล้ว (ครั้ง) · ${escapeHtml(curRoom)}</div></div>`;
-  const _stCounts={active:0,withdrawn:0,transferred:0,leave:0};
-  DB.students.forEach(function(s){var st=s.status||'active';_stCounts[st]=(_stCounts[st]||0)+1;});
   document.getElementById('stats-grid').innerHTML=`
     <div class="scard"><div class="snum">${DB.students.length}</div><div class="slbl">👨‍🎓 นักเรียนทั้งหมด</div></div>
     <div class="scard"><div class="snum" style="color:#B45309;">${rooms.length}</div><div class="slbl">🏫 ห้องเรียน</div></div>`;
-  // Status bar
-  const _sb=document.getElementById('student-status-bar');
-  if(_sb){
-    const _stDef=[
-      {key:'active',   label:'ปกติ',   icon:'✅', bg:'#DCFCE7', color:'#15803D', click:false},
-      {key:'withdrawn',label:'ลาออก',  icon:'⛔', bg:'#FEE2E2', color:'#DC2626', click:true},
-      {key:'transferred',label:'ย้ายออก',icon:'🔄',bg:'#DBEAFE',color:'#1D4ED8',click:true},
-      {key:'leave',    label:'ลาพัก',  icon:'💤', bg:'#FEF3C7', color:'#B45309', click:true},
-    ];
-    _sb.innerHTML=_stDef.map(function(d){
-      var cnt=_stCounts[d.key]||0;
-      if(!d.click){
-        return '<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:'+d.bg+';border-radius:12px;flex:1;min-width:0;">'
-          +'<span style="font-size:16px;">'+d.icon+'</span>'
-          +'<div><div style="font-size:18px;font-weight:800;color:'+d.color+';">'+cnt+'</div>'
-          +'<div style="font-size:11px;color:'+d.color+';opacity:.8;">'+d.label+'</div></div></div>';
-      }
-      return '<button class="_stbtn" data-stkey="'+d.key+'" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:'+d.bg+';border-radius:12px;flex:1;min-width:0;border:none;cursor:pointer;font-family:Sarabun,sans-serif;text-align:left;">'
-        +'<span style="font-size:16px;">'+d.icon+'</span>'
-        +'<div><div style="font-size:18px;font-weight:800;color:'+d.color+';">'+cnt+'</div>'
-        +'<div style="font-size:11px;color:'+d.color+';opacity:.8;">'+d.label+' <span style="opacity:.6;">›</span></div></div></button>';
-    }).join('');
-    document.querySelectorAll('._stbtn').forEach(function(b){b.onclick=function(){openStatusList(this.dataset.stkey);};});
-  }
   document.getElementById('room-tabs').innerHTML=
     `<button class="rtab ${curRoom==='all'?'on':''}" onclick="setRoom('all')">ทุกห้อง</button>`+
     rooms.map(r=>`<button class="rtab ${curRoom===r?'on':''}" onclick="setRoom('${r}')">${r}</button>`).join('');
@@ -2466,11 +2411,11 @@ function renderTable(){
   if(q)list=list.filter(s=>s.id.includes(q)||s.name.toLowerCase().includes(q));
   if(!list.length){sl.innerHTML='<div class="empty">ไม่พบนักเรียน</div>';return;}
   sl.innerHTML=list.map(s=>{
-    const stuHWs=DB.homeworks.filter(h=>!h.room||h.room===s.room);
-    const done=stuHWs.filter(h=>DB.submissions[subKey(s.id,h.num,h.room)]).length;
+    const stuHWs=DB.homeworks.filter(h=>(!h.room||h.room===s.room)&&(h.term||1)===(DB.currentTerm||1));
+    const done=stuHWs.filter(h=>DB.submissions[subKey(s.id, h.num, h.room, h.term||1)]).length;
     const pct=stuHWs.length?Math.round(done/stuHWs.length*100):0;
     const dots=stuHWs.map(h=>{
-  const sub = DB.submissions[subKey(s.id,h.num,h.room)];
+  const sub = DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];
   const scoreLabel = (sub && sub.score !== null && sub.score !== undefined) ? sub.score : '';
   const onclick = sub ? `openEditScoreById('${s.id}',${h.num})` : '';
   return `<div class="hw-dot ${sub?'dot-ok':'dot-no'}"
@@ -2485,7 +2430,7 @@ function renderTable(){
         <div style="text-align:right;font-size:14px;margin-top:2px;">
           <span style="font-weight:700;color:var(--green-dark);font-size:16px;">${done}</span>
           <span style="color:var(--text3);">/${stuHWs.length}</span>
-          ${(()=>{let sc=0,mx=0;stuHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub){const ms=authMaxScore(h,sub);sc+=clampedItemScore(sub,ms);mx+=ms;}else{mx+=h.maxScore||100;}});return mx>0?`<span style="font-size:12px;color:var(--purple);font-weight:700;margin-left:4px;">${sc}/${mx}</span>`:'';})()}
+          ${(()=>{let sc=0,mx=0;stuHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];if(sub){const ms=authMaxScore(h,sub);sc+=clampedItemScore(sub,ms);mx+=ms;}else{mx+=h.maxScore||100;}});return mx>0?`<span style="font-size:12px;color:var(--purple);font-weight:700;margin-left:4px;">${sc}/${mx}</span>`:'';})()}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin:8px 0 4px;">
@@ -2500,9 +2445,9 @@ function renderTable(){
 function showDetail(sid){
   const s=DB.students.find(x=>x.id===sid);
   if(!s)return;
-  const stuHWs=DB.homeworks.filter(h=>!h.room||h.room===s.room);
-  const done=stuHWs.filter(h=>DB.submissions[subKey(s.id,h.num,h.room)]);
-  const miss=stuHWs.filter(h=>!DB.submissions[subKey(s.id,h.num,h.room)]);
+  const stuHWs=DB.homeworks.filter(h=>(!h.room||h.room===s.room)&&(h.term||1)===(DB.currentTerm||1));
+  const done=stuHWs.filter(h=>DB.submissions[subKey(s.id, h.num, h.room, h.term||1)]);
+  const miss=stuHWs.filter(h=>!DB.submissions[subKey(s.id, h.num, h.room, h.term||1)]);
   const p=document.getElementById('detail-panel');
   p.style.display='block';
   p.innerHTML=`<div class="detail-sheet">
@@ -2511,7 +2456,7 @@ function showDetail(sid){
       <button onclick="document.getElementById('detail-panel').style.display='none'" style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;color:var(--text2);display:flex;align-items:center;justify-content:center;">✕</button>
     </div>
     <div style="font-size:13px;font-weight:700;color:var(--green-dark);margin-bottom:6px;">✅ ส่งแล้ว (${done.length})</div>
-    ${done.map(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];const scoreStr=(sub.score!==null&&sub.score!==undefined)?`<span style="font-size:12px;font-weight:700;color:var(--purple);background:var(--purple-light);padding:2px 8px;border-radius:10px;">${sub.score}/${authMaxScore(h,sub)}</span>`:'';;return `<div class="ds-row"><span>${escapeHtml(h.title)} ${scoreStr}</span><span style="font-size:12px;color:var(--text3);">${sub.ts}</span></div>`;}).join('')||'<div style="font-size:13px;color:var(--text3);padding:6px 0;">ยังไม่มี</div>'}
+    ${done.map(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];const scoreStr=(sub.score!==null&&sub.score!==undefined)?`<span style="font-size:12px;font-weight:700;color:var(--purple);background:var(--purple-light);padding:2px 8px;border-radius:10px;">${sub.score}/${authMaxScore(h,sub)}</span>`:'';;return `<div class="ds-row"><span>${escapeHtml(h.title)} ${scoreStr}</span><span style="font-size:12px;color:var(--text3);">${sub.ts}</span></div>`;}).join('')||'<div style="font-size:13px;color:var(--text3);padding:6px 0;">ยังไม่มี</div>'}
     <div style="font-size:13px;font-weight:700;color:var(--red);margin:12px 0 6px;">❌ ยังไม่ส่ง (${miss.length})</div>
     ${miss.map(h=>`<div class="ds-row"><span>${escapeHtml(h.title)}</span><span style="font-size:12px;color:var(--text2);">${escapeHtml(h.subject)}</span></div>`).join('')||'<div style="font-size:13px;color:var(--green-dark);padding:6px 0;">🎉 ส่งครบทุกชิ้น!</div>'}
   </div>`;
@@ -3043,19 +2988,17 @@ function buildExportData(){
   const collectScore = collectInp ? (parseFloat(collectInp.value)||0) : 0;
   return selectedRooms.map(room=>{
     // เลือกเฉพาะชิ้นงานของห้องนี้จริงๆ (กันเลขชิ้นงานชนกับห้องอื่น)
-    const selectedHWs=DB.homeworks.filter(h=>(h.room===room||!h.room)&&exportHWSel.has(h.room+'|'+h.num)).sort((a,b)=>a.num-b.num);
+    const selectedHWs=DB.homeworks.filter(h=>h.room===room&&exportHWSel.has(h.num)).sort((a,b)=>a.num-b.num);
     const hwTotalMax=selectedHWs.reduce((s,h)=>s+(h.maxScore||100),0);
     const students=DB.students.filter(s=>s.room===room).sort((a,b)=>a.id.localeCompare(b.id));
     const rows=students.map((s,idx)=>{
       const row={เลขที่:idx+1,เลขประจำตัว:s.id,'ชื่อ-นามสกุล':s.name,ห้อง:s.room};
       let totalScore=0,totalMax=0,doneCount=0;
-      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:(sub.maxScore||h.maxScore||100);}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
+      selectedHWs.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];const maxScore=authMaxScore(h,sub);if(sub){doneCount++;const sc=clampedItemScore(sub,maxScore);totalScore+=sc;totalMax+=maxScore;row['งานครั้งที่ '+h.num]=(sub.score!==null&&sub.score!==undefined)?sub.score:(sub.maxScore||h.maxScore||100);}else{totalMax+=maxScore;row['งานครั้งที่ '+h.num]='—';}});
       row['ส่งแล้ว']=doneCount+'/'+selectedHWs.length;
       row['คะแนนรวม']=totalScore;
       row['คะแนนเต็มรวม']=hwTotalMax;
-      const _pctG=hwTotalMax>0?Math.round(totalScore/hwTotalMax*100):0;
-      row['%คะแนน']=_pctG+'%';
-      row['เกรด']=hwTotalMax>=100&&doneCount>0?calcGrade(_pctG):'—';
+      row['%คะแนน']=totalMax>0?Math.round(totalScore/totalMax*100)+'%':'0%';
       if(collectScore>0 && hwTotalMax>0) {
         row['คะแนนเก็บ']=collectScore;
         row['คะแนนที่ได้']=Math.round(totalScore/hwTotalMax*collectScore*100)/100;
@@ -3094,10 +3037,10 @@ async function doExport(){
   btn.disabled=false;
 }
 function exportExcel(data,pf){return new Promise(resolve=>{const wb=XLSX.utils.book_new();data.forEach((roomData,i)=>{const{room,rows,homeworks,collectScore,hwTotalMax}=roomData;const sheetName=room.replace(/[\\\/\?\*\[\]]/g,'').substring(0,31);const wsData=[];wsData.push([`รายงานการส่งงาน - ${room}`]);wsData.push([`งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' '+h.title).join(', ')}`]);wsData.push([`วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}`]);wsData.push([]);const header=['เลขที่','เลขประจำตัว','ชื่อ-นามสกุล'];homeworks.forEach(h=>header.push('งานครั้งที่ '+h.num+'\n'+h.title.substring(0,15)+'\n(เต็ม '+(h.maxScore||100)+')'));const hasCollect = collectScore>0;
-      header.push('ส่งแล้ว','คะแนนรวม',`คะแนนเต็ม(/${hwTotalMax})`,'%คะแนน','เกรด');
+      header.push('ส่งแล้ว','คะแนนรวม',`คะแนนเต็ม(/${hwTotalMax})`,'%คะแนน');
       if(hasCollect) header.push(`คะแนนที่ได้(/${collectScore})`);
-      wsData.push(header);rows.forEach(r=>{const row=[r['เลขที่'],r['เลขประจำตัว'],r['ชื่อ-นามสกุล']];homeworks.forEach(h=>row.push(r['งานครั้งที่ '+h.num]));row.push(r['ส่งแล้ว'],r['คะแนนรวม'],r['คะแนนเต็มรวม'],r['%คะแนน'],r['เกรด']??'');if(hasCollect)row.push(r['คะแนนที่ได้']??'');wsData.push(row);});const ws=XLSX.utils.aoa_to_sheet(wsData);ws['!cols']=[{wch:6},{wch:14},{wch:26},...homeworks.map(()=>({wch:14})),{wch:10},{wch:10},{wch:10},{wch:8},...(hasCollect?[{wch:14}]:[])];const totalCols=3+homeworks.length+(hasCollect?5:4)-1;ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:totalCols}},{s:{r:1,c:0},e:{r:1,c:totalCols}},{s:{r:2,c:0},e:{r:2,c:totalCols}}];XLSX.utils.book_append_sheet(wb,ws,sheetName);pf.style.width=(40+(i+1)/data.length*50)+'%';});const date=new Date().toISOString().slice(0,10);XLSX.writeFile(wb,`รายงานส่งงาน_${date}.xlsx`);resolve();});}
-async function exportPDF(data,pf){const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});let html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"><style>*{font-family:Sarabun,sans-serif;box-sizing:border-box;margin:0;padding:0;}body{font-size:11pt;color:#1E293B;}.page{padding:12mm 15mm;page-break-after:always;}.page:last-child{page-break-after:avoid;}.page-title{font-size:16pt;font-weight:700;color:#2563EB;margin-bottom:4px;}.page-meta{font-size:9pt;color:#64748B;margin-bottom:12px;border-bottom:2px solid #E2E8F0;padding-bottom:8px;}table{width:100%;border-collapse:collapse;font-size:10pt;}th{background:linear-gradient(135deg,#EBF2FF,#DBEAFE);color:#1E40AF;font-weight:700;padding:7px 6px;border:1px solid #BFDBFE;font-size:9pt;text-align:center;}td{padding:6px;border:1px solid #E2E8F0;vertical-align:middle;}tr:nth-child(even) td{background:#F8FAFF;}.num{text-align:center;color:#64748B;}.ok{text-align:center;color:#16A34A;font-weight:700;background:#DCFCE7!important;font-size:9pt;}.no{text-align:center;color:#94A3B8;font-size:9pt;}.pct-col{text-align:center;font-weight:700;}.footer{margin-top:8px;font-size:8pt;color:#94A3B8;text-align:right;}</style></head><body>`;data.forEach((roomData,i)=>{const{room,rows,homeworks,collectScore,hwTotalMax}=roomData;const dateStr=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});html+=`<div class="page"><div class="page-title">📋 รายงานการส่งงาน — ${room}</div><div class="page-meta">งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' ('+h.title+')').join(' · ')} &nbsp;|&nbsp; วันที่พิมพ์: ${dateStr} &nbsp;|&nbsp; นักเรียน ${rows.length} คน</div><table><thead><tr><th style="width:40px;">เลขที่</th><th style="width:90px;">เลขประจำตัว</th><th>ชื่อ-นามสกุล</th>${homeworks.map(h=>`<th style="width:65px;">งานครั้งที่ ${h.num}<br><span style="font-size:8pt;font-weight:400;">(/${h.maxScore||100})</span></th>`).join('')}<th style="width:50px;">ส่งแล้ว</th><th style="width:55px;">คะแนนรวม</th><th style="width:40px;">%</th><th style="width:40px;background:#FAF5FF;color:#7C3AED;">เกรด</th>${collectScore>0?`<th style="width:60px;background:linear-gradient(135deg,#DCFCE7,#BBF7D0);color:#15803D;">คะแนนที่ได้<br><span style="font-size:7pt;font-weight:400;">(/${collectScore})</span></th>`:''}</tr></thead><tbody>${rows.map(r=>{const hwCells=homeworks.map(h=>{const v=r['งานครั้งที่ '+h.num];const isOk=v!==undefined&&v!=='—';const display=isOk?(typeof v==='number'?v:'✓'):'—';return `<td class="${isOk?'ok':'no'}">${display}</td>`;}).join('');const pct=parseInt(r['%คะแนน']);const pctColor=pct===100?'#16A34A':pct>=60?'#2563EB':'#EF4444';const totalScore=r['คะแนนรวม'];const totalMax=r['คะแนนเต็มรวม'];return `<tr><td class="num">${r['เลขที่']}</td><td class="num">${r['เลขประจำตัว']}</td><td>${r['ชื่อ-นามสกุล']}</td>${hwCells}<td class="pct-col">${r['ส่งแล้ว']}</td><td class="pct-col" style="color:#6D28D9;font-weight:700;">${totalScore}<span style="font-size:8pt;color:#94A3B8;">/${totalMax}</span></td><td class="pct-col" style="color:${pctColor};">${r['%คะแนน']}</td><td class="pct-col" style="color:${r['เกรด']>=3?'#16A34A':r['เกรด']>=2?'#2563EB':r['เกรด']>=1?'#F59E0B':'#DC2626'};font-weight:800;">${r['เกรด']??'—'}</td>${collectScore>0?`<td class="pct-col" style="color:#15803D;font-weight:800;background:#F0FDF4;">${r['คะแนนที่ได้']??'—'}</td>`:''}</tr>`;}).join('')}</tbody></table><div class="footer">TaskGenius · พิมพ์วันที่ ${dateStr}</div></div>`;pf.style.width=(40+(i+1)/data.length*50)+'%';});html+='</body></html>';const win=window.open('','_blank','width=900,height=700');if(!win){toast('กรุณาอนุญาต Popup เพื่อ Export PDF','warn');return;}win.document.write(html);win.document.close();win.onload=()=>{setTimeout(()=>{win.focus();win.print();},800);};}
+      wsData.push(header);rows.forEach(r=>{const row=[r['เลขที่'],r['เลขประจำตัว'],r['ชื่อ-นามสกุล']];homeworks.forEach(h=>row.push(r['งานครั้งที่ '+h.num]));row.push(r['ส่งแล้ว'],r['คะแนนรวม'],r['คะแนนเต็มรวม'],r['%คะแนน']);if(hasCollect)row.push(r['คะแนนที่ได้']??'');wsData.push(row);});const ws=XLSX.utils.aoa_to_sheet(wsData);ws['!cols']=[{wch:6},{wch:14},{wch:26},...homeworks.map(()=>({wch:14})),{wch:10},{wch:10},{wch:10},{wch:8},...(hasCollect?[{wch:14}]:[])];const totalCols=3+homeworks.length+(hasCollect?5:4)-1;ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:totalCols}},{s:{r:1,c:0},e:{r:1,c:totalCols}},{s:{r:2,c:0},e:{r:2,c:totalCols}}];XLSX.utils.book_append_sheet(wb,ws,sheetName);pf.style.width=(40+(i+1)/data.length*50)+'%';});const date=new Date().toISOString().slice(0,10);XLSX.writeFile(wb,`รายงานส่งงาน_${date}.xlsx`);resolve();});}
+async function exportPDF(data,pf){const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});let html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"><style>*{font-family:Sarabun,sans-serif;box-sizing:border-box;margin:0;padding:0;}body{font-size:11pt;color:#1E293B;}.page{padding:12mm 15mm;page-break-after:always;}.page:last-child{page-break-after:avoid;}.page-title{font-size:16pt;font-weight:700;color:#2563EB;margin-bottom:4px;}.page-meta{font-size:9pt;color:#64748B;margin-bottom:12px;border-bottom:2px solid #E2E8F0;padding-bottom:8px;}table{width:100%;border-collapse:collapse;font-size:10pt;}th{background:linear-gradient(135deg,#EBF2FF,#DBEAFE);color:#1E40AF;font-weight:700;padding:7px 6px;border:1px solid #BFDBFE;font-size:9pt;text-align:center;}td{padding:6px;border:1px solid #E2E8F0;vertical-align:middle;}tr:nth-child(even) td{background:#F8FAFF;}.num{text-align:center;color:#64748B;}.ok{text-align:center;color:#16A34A;font-weight:700;background:#DCFCE7!important;font-size:9pt;}.no{text-align:center;color:#94A3B8;font-size:9pt;}.pct-col{text-align:center;font-weight:700;}.footer{margin-top:8px;font-size:8pt;color:#94A3B8;text-align:right;}</style></head><body>`;data.forEach((roomData,i)=>{const{room,rows,homeworks,collectScore,hwTotalMax}=roomData;const dateStr=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});html+=`<div class="page"><div class="page-title">📋 รายงานการส่งงาน — ${room}</div><div class="page-meta">งานที่รายงาน: ${homeworks.map(h=>'ครั้งที่ '+h.num+' ('+h.title+')').join(' · ')} &nbsp;|&nbsp; วันที่พิมพ์: ${dateStr} &nbsp;|&nbsp; นักเรียน ${rows.length} คน</div><table><thead><tr><th style="width:40px;">เลขที่</th><th style="width:90px;">เลขประจำตัว</th><th>ชื่อ-นามสกุล</th>${homeworks.map(h=>`<th style="width:65px;">งานครั้งที่ ${h.num}<br><span style="font-size:8pt;font-weight:400;">(/${h.maxScore||100})</span></th>`).join('')}<th style="width:50px;">ส่งแล้ว</th><th style="width:55px;">คะแนนรวม</th><th style="width:40px;">%</th>${collectScore>0?`<th style="width:60px;background:linear-gradient(135deg,#DCFCE7,#BBF7D0);color:#15803D;">คะแนนที่ได้<br><span style="font-size:7pt;font-weight:400;">(/${collectScore})</span></th>`:''}</tr></thead><tbody>${rows.map(r=>{const hwCells=homeworks.map(h=>{const v=r['งานครั้งที่ '+h.num];const isOk=v!==undefined&&v!=='—';const display=isOk?(typeof v==='number'?v:'✓'):'—';return `<td class="${isOk?'ok':'no'}">${display}</td>`;}).join('');const pct=parseInt(r['%คะแนน']);const pctColor=pct===100?'#16A34A':pct>=60?'#2563EB':'#EF4444';const totalScore=r['คะแนนรวม'];const totalMax=r['คะแนนเต็มรวม'];return `<tr><td class="num">${r['เลขที่']}</td><td class="num">${r['เลขประจำตัว']}</td><td>${r['ชื่อ-นามสกุล']}</td>${hwCells}<td class="pct-col">${r['ส่งแล้ว']}</td><td class="pct-col" style="color:#6D28D9;font-weight:700;">${totalScore}<span style="font-size:8pt;color:#94A3B8;">/${totalMax}</span></td><td class="pct-col" style="color:${pctColor};">${r['%คะแนน']}</td>${collectScore>0?`<td class="pct-col" style="color:#15803D;font-weight:800;background:#F0FDF4;">${r['คะแนนที่ได้']??'—'}</td>`:''}</tr>`;}).join('')}</tbody></table><div class="footer">TaskGenius · พิมพ์วันที่ ${dateStr}</div></div>`;pf.style.width=(40+(i+1)/data.length*50)+'%';});html+='</body></html>';const win=window.open('','_blank','width=900,height=700');if(!win){toast('กรุณาอนุญาต Popup เพื่อ Export PDF','warn');return;}win.document.write(html);win.document.close();win.onload=()=>{setTimeout(()=>{win.focus();win.print();},800);};}
 
 // ---- INIT ----
 // ╔══════════════════════════════════════════════════════╗
@@ -3113,7 +3056,6 @@ function switchManageTab(tab, btn){
   if(tab==='subjects') renderSubjectsFull();
   if(tab==='homework') renderManage();
   if(tab==='grade') openGradeTab();
-  if(tab==='sgs') openSGS();
 }
 
 // ╔══════════════════════════════════════════════════════╗
@@ -3130,14 +3072,14 @@ async function saveHW(){
   const room=_hwRoom;
   if(!num||!title){toast('กรอกให้ครบ','warn');return;}
   if(!room){toast('กรุณาเลือกห้องเรียนก่อน','warn');return;}
-  const isNew=!DB.homeworks.find(h=>h.num===num&&h.room===room);
+  const isNew=!DB.homeworks.find(h=>h.num===num&&h.room===room&&(h.term||1)===(DB.currentTerm||1));
   if(isNew){
     const limit = checkPlanLimit('homework');
     if(!limit.ok){ showUpgradeModal(limit.msg); return; }
   }
   showActionPopup('กำลังบันทึกชิ้นงาน','ครั้งที่ '+num+': '+title,'add');
   try{
-    await sbAddHomework({num,title,subject,maxScore,deadline,room});
+    await sbAddHomework({num,title,subject,maxScore,deadline,room,term:DB.currentTerm||1});
     renderManage();
     actionPopupDone('บันทึกงานแล้ว ✅','ครั้งที่ '+num+': '+title,'add');
     document.getElementById('n-hwnum').value='';
@@ -3147,7 +3089,7 @@ async function saveHW(){
 }
 
 function openEditHW(num){
-  const h=DB.homeworks.find(x=>x.num===num&&x.room===_hwRoom);
+  const h=DB.homeworks.find(x=>x.num===num&&x.room===_hwRoom&&(x.term||1)===(DB.currentTerm||1));
   if(!h)return;
   document.getElementById('n-hwnum').value=h.num;
   document.getElementById('n-hwtitle').value=h.title;
@@ -3176,8 +3118,8 @@ function renderStudentsListManage(){
     return;
   }
   tbody.innerHTML=list.map(s=>{
-    const hws=DB.homeworks.filter(h=>!h.room||h.room===s.room);
-    const doneCount=hws.filter(h=>DB.submissions[subKey(s.id,h.num,h.room)]).length;
+    const hws=DB.homeworks.filter(h=>(!h.room||h.room===s.room)&&(h.term||1)===(DB.currentTerm||1));
+    const doneCount=hws.filter(h=>DB.submissions[subKey(s.id, h.num, h.room, h.term||1)]).length;
     return `<tr>
       <td style="font-size:12px;color:var(--text2);">${escapeHtml(s.id)}</td>
       <td style="font-size:13px;font-weight:600;">${escapeHtml(s.name)}</td>
@@ -3209,13 +3151,13 @@ function renderStudentScoreList(){
   const list=document.getElementById('ssm-list');
   const s=DB.students.find(x=>x.id===_ssmSid);
   if(!list||!s)return;
-  const hws=DB.homeworks.filter(h=>!h.room||h.room===s.room).sort((a,b)=>a.num-b.num);
+  const hws=DB.homeworks.filter(h=>(!h.room||h.room===s.room)&&(h.term||1)===(DB.currentTerm||1)).sort((a,b)=>a.num-b.num);
   if(!hws.length){
     list.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:16px;">ห้องนี้ยังไม่มีชิ้นงาน</div>';
     return;
   }
   list.innerHTML=hws.map(h=>{
-    const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];
+    const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];
     const hasSub=!!sub;
     const scoreVal=hasSub&&sub.score!==null&&sub.score!==undefined?sub.score:'';
     const statusBadge=hasSub
@@ -3271,7 +3213,7 @@ async function clearOneStudentScore(num){
       if(error)throw error;
       await reloadSubmissions();
     }else{
-      delete DB.submissions[subKey(s.id,num,s.room)];
+      delete DB.submissions[subKey(s.id, num, s.room, DB.currentTerm||1)];
       saveDB();
     }
     renderDashboard();
@@ -3370,7 +3312,7 @@ function renderManage(){
   populateHWRoomSelect();
   const hwList=document.getElementById('hw-card-list');
   if(hwList){
-    const hwsToShow=_hwRoom?DB.homeworks.filter(h=>!h.room||h.room===_hwRoom):[];
+    const hwsToShow=_hwRoom?DB.homeworks.filter(h=>(!h.room||h.room===_hwRoom)&&(h.term||1)===(DB.currentTerm||1)):[];
     if(!_hwRoom){hwList.innerHTML='<div style="font-size:13px;color:#92400E;text-align:center;padding:16px;background:#FFF7ED;border-radius:10px;border:1.5px solid #FED7AA;">👆 เลือกห้องเรียนด้านบนก่อน จึงจะเพิ่มชิ้นงานได้</div>';
     }else if(!hwsToShow.length){hwList.innerHTML=`<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">ยังไม่มีชิ้นงานสำหรับ ${_hwRoom}</div>`;
     }else{
@@ -4410,7 +4352,7 @@ function filterRoomModal() {
   renderRoomModal(filtered);
 }
 
-function renderRoomModal(students){const el=document.getElementById('room-stu-list');if(!students.length){el.innerHTML='<div class="empty">ไม่พบนักเรียน</div>';return;}el.innerHTML=students.map((s,i)=>{const sh=DB.homeworks.filter(h=>!h.room||h.room===s.room);const hc=sh.length;const dc=sh.filter(h=>DB.submissions[subKey(s.id,h.num,h.room)]).length;const pct=hc>0?Math.round(dc/hc*100):0;return `<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);"><div style="width:30px;height:30px;border-radius:50%;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--purple);flex-shrink:0;">${i+1}</div><div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:700;color:var(--text);">${escapeHtml(s.name)}</div><div style="font-size:12px;color:var(--text2);">🪪 ${escapeHtml(s.id)}</div></div><div style="text-align:right;flex-shrink:0;margin-right:6px;"><div style="font-size:13px;font-weight:700;color:${pct>=80?'var(--green-dark)':pct>=50?'#B45309':'var(--red)'};">${dc}/${hc}</div><div style="font-size:11px;color:var(--text3);">${pct}%</div></div><button onclick="openEditStuFromRoom('${s.id}')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;white-space:nowrap;flex-shrink:0;">✏️ แก้ไข</button></div>`;}).join('');}
+function renderRoomModal(students){const el=document.getElementById('room-stu-list');if(!students.length){el.innerHTML='<div class="empty">ไม่พบนักเรียน</div>';return;}el.innerHTML=students.map((s,i)=>{const sh=DB.homeworks.filter(h=>(!h.room||h.room===s.room)&&(h.term||1)===(DB.currentTerm||1));const hc=sh.length;const dc=sh.filter(h=>DB.submissions[subKey(s.id, h.num, h.room, h.term||1)]).length;const pct=hc>0?Math.round(dc/hc*100):0;return `<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);"><div style="width:30px;height:30px;border-radius:50%;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--purple);flex-shrink:0;">${i+1}</div><div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:700;color:var(--text);">${escapeHtml(s.name)}</div><div style="font-size:12px;color:var(--text2);">🪪 ${escapeHtml(s.id)}</div></div><div style="text-align:right;flex-shrink:0;margin-right:6px;"><div style="font-size:13px;font-weight:700;color:${pct>=80?'var(--green-dark)':pct>=50?'#B45309':'var(--red)'};">${dc}/${hc}</div><div style="font-size:11px;color:var(--text3);">${pct}%</div></div><button onclick="openEditStuFromRoom('${s.id}')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;white-space:nowrap;flex-shrink:0;">✏️ แก้ไข</button></div>`;}).join('');}
 function openEditStuFromRoom(id){const t=document.getElementById('room-stu-modal-title');_editStuFromRoom=t?t.textContent.replace('🏫 ',''):'';closeRoomModal();openEditStu(id);}
 
 function closeRoomModal() {
@@ -4641,7 +4583,7 @@ function checkPlanLimit(type, extra) {
       return { ok: true };
     }
     case 'homework': {
-      const hwCount=_hwRoom?DB.homeworks.filter(h=>!h.room||h.room===_hwRoom).length:DB.homeworks.length;
+      const hwCount=_hwRoom?DB.homeworks.filter(h=>(!h.room||h.room===_hwRoom)&&(h.term||1)===(DB.currentTerm||1)).length:DB.homeworks.length;
       if(hwCount>=FREE_LIMITS.homeworks)return{ok:false,msg:`แพลน Free จำกัด ${FREE_LIMITS.homeworks} ชิ้นงาน/ห้อง 🔒`,upgrade:true};
       return{ok:true};
     }
@@ -5063,7 +5005,11 @@ function openGradeTab() {
     if(content) {
       content.style.display = 'block';
       content.innerHTML = `
-        <div id="grade-tab-content">${renderGradeTab()}</div>`;
+        <div style="text-align:center;padding:48px 24px;color:var(--text2);">
+          <div style="font-size:48px;margin-bottom:16px;">🚧</div>
+          <div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px;">กำลังพัฒนา</div>
+          <div style="font-size:14px;color:var(--text3);">ระบบเกรดอยู่ระหว่างการพัฒนา<br>จะเปิดให้ใช้งานเร็วๆ นี้</div>
+        </div>`;
     }
     return;
   }
@@ -5152,7 +5098,7 @@ function renderGradeCriteria(elId) {
         style="width:64px;text-align:center;font-weight:700;padding:5px;font-size:13px;border-radius:8px;"
         onchange="gradeCriteria[${i}].min=parseFloat(this.value);gradeCriteria.sort((a,b)=>b.min-a.min);localStorage.setItem('grade_criteria',JSON.stringify(gradeCriteria));renderGradeCriteria('${elId||'grade-criteria-list'}');renderPrimaryGrade();renderSecGrade();">
       <div style="font-size:12px;color:var(--text2);flex-shrink:0;margin-left:4px;">GPA</div>
-      <input type="number" value="${c.gpa}" min="0" max="4" step="1"
+      <input type="number" value="${c.gpa}" min="0" max="4" step="0.5"
         style="width:56px;text-align:center;font-weight:700;padding:5px;font-size:13px;border-radius:8px;"
         onchange="gradeCriteria[${i}].gpa=parseFloat(this.value);localStorage.setItem('grade_criteria',JSON.stringify(gradeCriteria));">
     </div>
@@ -5267,7 +5213,7 @@ function renderPrimaryGrade() {
     // คะแนนชิ้นงาน
     let hwTotal=0, hwMax=0;
     hws.forEach(h => {
-      const sub = DB.submissions[subKey(s.id,h.num,h.room)];
+      const sub = DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];
       if(sub?.score!=null){const ms=authMaxScore(h,sub);hwTotal+=Math.min(parseFloat(sub.score)||0,ms);hwMax+=ms;}
       else hwMax+=parseFloat(h.maxScore||100);
     });
@@ -5331,7 +5277,7 @@ async function exportPrimaryGradeExcel() {
   const wsData=[['ลำดับ','รหัส','ชื่อ','ห้อง','คะแนนงาน%','คะแนนสอบ','รวม','เกรด','GPA'],
     ...students.map((s,i)=>{
       let hwTotal=0,hwMax=0;
-      hws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);hwTotal+=Math.min(parseFloat(sub.score)||0,ms);hwMax+=ms;}else hwMax+=parseFloat(h.maxScore||100);});
+      hws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);hwTotal+=Math.min(parseFloat(sub.score)||0,ms);hwMax+=ms;}else hwMax+=parseFloat(h.maxScore||100);});
       const hwPct=hwMax>0?(hwTotal/hwMax)*100:0;
       const exam=examMatched[s.id]??null;
       const total=exam!==null?(hwPct*0.5+exam*0.5):hwPct;
@@ -5395,12 +5341,12 @@ function renderSecGrade() {
   const rows=students.map(s=>{
     // คะแนนก่อนกลาง
     let pre=0,preMax=0;
-    preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
+    preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
     const prePct=preMax>0?(pre/preMax)*100:0;
 
     // คะแนนหลังกลาง
     let post=0,postMax=0;
-    postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
+    postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
     const postPct=postMax>0?(post/postMax)*100:0;
 
     const midScore=midMatched[s.id]??null;
@@ -5475,9 +5421,9 @@ async function exportSecGradeExcel() {
   const wb=XLSX.utils.book_new();
   const wsData=[['ลำดับ','รหัส','ชื่อ','ห้อง','ก่อนกลาง%','กลางภาค','หลังกลาง%','ปลายภาค','รวม','เกรด','GPA'],
     ...students.map((s,i)=>{
-      let pre=0,preMax=0; preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
+      let pre=0,preMax=0; preHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);pre+=Math.min(parseFloat(sub.score)||0,ms);preMax+=ms;}else preMax+=parseFloat(h.maxScore||100);});
       const prePct=preMax>0?(pre/preMax)*100:0;
-      let post=0,postMax=0; postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
+      let post=0,postMax=0; postHws.forEach(h=>{const sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)];if(sub?.score!=null){const ms=authMaxScore(h,sub);post+=Math.min(parseFloat(sub.score)||0,ms);postMax+=ms;}else postMax+=parseFloat(h.maxScore||100);});
       const postPct=postMax>0?(post/postMax)*100:0;
       const mid=midMatched[s.id]??null; const fin=finMatched[s.id]??null;
       let total=prePct*wPre+postPct*wPost+(mid!==null?mid*wMid:0)+(fin!==null?fin*wFin:0);
@@ -5609,7 +5555,7 @@ function renderScanHistory() {
 function openEditScoreById(sid, hwNum) {
   const stu = DB.students.find(s => s.id === sid);
   const hw = DB.homeworks.find(h => h.num === hwNum && (!stu || !h.room || h.room===stu.room));
-  const sub = DB.submissions[subKey(sid, hwNum, stu?stu.room:'')];
+  const sub = DB.submissions[subKey(sid, hwNum, stu?stu.room:'', DB.currentTerm||1)];
   if(!stu || !sub) return;
   openEditScore({
     sid, hwNum,
@@ -5690,7 +5636,7 @@ async function deleteSubmission() {
       if(error) throw error;
       await reloadSubmissions();
     } else {
-      const key = subKey(sid, hwNum, room);
+      const key = subKey(sid, hwNum, room, DB.currentTerm||1);
       delete DB.submissions[key];
       saveDB();
     }
@@ -6189,8 +6135,7 @@ function _gsRender(){
     thr.appendChild(th);
   });
   var tht=document.createElement('th');tht.style.cssText='background:#FAF5FF;border-bottom:2px solid #DDD6FE;width:72px;min-width:72px;text-align:center;font-size:11px;color:#7C3AED;font-weight:700;padding:6px 4px;';tht.innerHTML='รวม<br><span style="font-weight:400;font-size:10px;">/'+totalMax+'</span>';
-  var thg=document.createElement('th');thg.style.cssText='background:#FAF5FF;border-bottom:2px solid #DDD6FE;width:56px;min-width:56px;text-align:center;font-size:11px;color:#7C3AED;font-weight:700;padding:6px 4px;';thg.textContent='เกรด';
-  thr.appendChild(tht);thr.appendChild(thg);thead.appendChild(thr);
+  thr.appendChild(tht);thead.appendChild(thr);
   var tbody=document.createElement('tbody');
   var stMap={'withdrawn':'⛔','transferred':'🔄','leave':'💤'};
   stus.forEach(function(s,i){
@@ -6204,8 +6149,8 @@ function _gsRender(){
     tdNm.appendChild(stBtn);tdNm.appendChild(nm);tdNm.appendChild(id2);tr.appendChild(tdN);tr.appendChild(tdNm);
     var rowTotal=0;
     hws.forEach(function(h){
-      var key=subKey(s.id,h.num,h.room);
-      var sub=DB.submissions[key]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];
+      var key=subKey(s.id, h.num, h.room, h.term||1);
+      var sub=DB.submissions[key]||DB.submissions[subKey(s.id, h.num, room, h.term||DB.currentTerm||1)]||DB.submissions[subKey(s.id, h.num, '', h.term||DB.currentTerm||1)];
       var chg=_gsChanges[key];
       var stored=sub?(sub.score!==null&&sub.score!==undefined?Number(sub.score):(h.maxScore||100)):null;
       var cur=chg!==undefined?chg:stored;
@@ -6213,19 +6158,15 @@ function _gsRender(){
       var td=document.createElement('td');td.style.cssText='border-bottom:1px solid #E2E8F0;border-right:1px solid #E2E8F0;width:'+CW+'px;min-width:'+CW+'px;padding:1px;text-align:center;vertical-align:middle;background:'+(cur!==null?'#F0FDF4':'#fff')+';';
       var inp=document.createElement('input');inp.type='number';inp.min='0';inp.max=String(h.maxScore||100);inp.value=cur!==null?String(cur):'';inp.placeholder='-';
       inp.style.cssText='width:100%;height:42px;border:none;text-align:center;font-size:14px;font-weight:700;background:transparent;outline:none;font-family:Sarabun,sans-serif;color:'+(cur!==null?(Number(cur)>=(h.maxScore||100)*0.5?'#16A34A':'#F59E0B'):'#CBD5E1')+';';
-      inp.inputMode='decimal';inp.dataset.sid=s.id;inp.dataset.hwnum=h.num;inp.dataset.room=h.room||room;inp.dataset.max=h.maxScore||100;inp.dataset.htitle=h.title;inp.setAttribute('enterkeyhint','next');inp.className='gs-score-inp';
-      inp.oninput=function(){var k=subKey(this.dataset.sid,this.dataset.hwnum,this.dataset.room);var v=this.value===''?null:parseFloat(this.value);_gsChanges[k]={sid:this.dataset.sid,hwNum:parseInt(this.dataset.hwnum),hwTitle:this.dataset.htitle,room:this.dataset.room,score:v,maxScore:parseInt(this.dataset.max)};var max=parseInt(this.dataset.max);this.style.color=v!==null?(v>=max*0.5?'#16A34A':'#F59E0B'):'#CBD5E1';this.parentElement.style.background=v!==null?'#F0FDF4':'#fff';_gsUpdateTot(this.dataset.sid);_gsDirty();};
+      inp.inputMode='decimal';inp.dataset.sid=s.id;inp.dataset.hwnum=h.num;inp.dataset.room=h.room||room;inp.dataset.term=h.term||DB.currentTerm||1;inp.dataset.max=h.maxScore||100;inp.dataset.htitle=h.title;inp.setAttribute('enterkeyhint','next');inp.className='gs-score-inp';
+      inp.oninput=function(){var k=subKey(this.dataset.sid,this.dataset.hwnum,this.dataset.room,parseInt(this.dataset.term)||DB.currentTerm||1);var v=this.value===''?null:parseFloat(this.value);_gsChanges[k]={sid:this.dataset.sid,hwNum:parseInt(this.dataset.hwnum),hwTitle:this.dataset.htitle,room:this.dataset.room,score:v,maxScore:parseInt(this.dataset.max)};var max=parseInt(this.dataset.max);this.style.color=v!==null?(v>=max*0.5?'#16A34A':'#F59E0B'):'#CBD5E1';this.parentElement.style.background=v!==null?'#F0FDF4':'#fff';_gsUpdateTot(this.dataset.sid);_gsDirty();};
       inp.onfocus=function(){this.style.color='#0F172A';this.parentElement.style.boxShadow='inset 0 0 0 2px #2563EB';};
       inp.onblur=function(){var v=this.value===''?null:parseFloat(this.value);var max=parseInt(this.dataset.max);this.style.color=v!==null?(v>=max*0.5?'#16A34A':'#F59E0B'):'#CBD5E1';this.parentElement.style.boxShadow='';};
       inp.onkeydown=function(e){if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();var all=[].slice.call(document.querySelectorAll('#gs-tbl .gs-score-inp'));var idx=all.indexOf(this);if(idx>=0&&idx<all.length-1)all[idx+1].focus();}};
       td.appendChild(inp);tr.appendChild(td);
     });
     var tdt=document.createElement('td');tdt.id='gstot_'+s.id;tdt.style.cssText='border-bottom:1px solid #DDD6FE;width:72px;min-width:72px;text-align:center;font-weight:700;font-size:13px;color:#7C3AED;background:#FAF5FF;vertical-align:middle;padding:4px;';tdt.textContent=rowTotal+'/'+totalMax;
-    var _gp=totalMax>0?Math.round(rowTotal/totalMax*100):0;
-    var _gv=totalMax>=100?calcGrade(_gp):'—';var _gC=totalMax>=100?gradeColor(calcGrade(_gp)):'#94A3B8';var _gB=totalMax>=100?gradeBg(calcGrade(_gp)):'#F1F5F9';
-    var _tg=document.createElement('td');_tg.id='gsgrade_'+s.id;
-    _tg.style.cssText='border-bottom:1px solid #DDD6FE;width:56px;min-width:56px;text-align:center;font-weight:800;font-size:14px;color:'+_gC+';background:'+_gB+';vertical-align:middle;padding:4px;';
-    _tg.textContent=_gv;tr.appendChild(tdt);tr.appendChild(_tg);tbody.appendChild(tr);
+    tr.appendChild(tdt);tbody.appendChild(tr);
   });
   tbl.innerHTML='';tbl.appendChild(thead);tbl.appendChild(tbody);
   var q=document.getElementById('gs-search');_gsFilterRows(q?q.value:'');
@@ -6244,13 +6185,11 @@ function _gsUpdateTot(sid){
     var inp=document.querySelector('#gs-tbl input[data-sid="'+sid+'"][data-hwnum="'+h.num+'"]');
     if(inp&&inp.value!=='')total+=parseFloat(inp.value)||0;
     else{
-      var sub=DB.submissions[subKey(sid,h.num,h.room)]||DB.submissions[subKey(sid,h.num,room)]||DB.submissions[subKey(sid,h.num,'')];
+      var sub=DB.submissions[subKey(sid, h.num, h.room, h.term||1)]||DB.submissions[subKey(sid, h.num, room, h.term||DB.currentTerm||1)]||DB.submissions[subKey(sid, h.num, '', h.term||DB.currentTerm||1)];
       if(sub&&sub.score!==null&&sub.score!==undefined)total+=Number(sub.score);
     }
   });
   var el=document.getElementById('gstot_'+sid);if(el)el.textContent=total+'/'+totalMax;
-  var eg=document.getElementById('gsgrade_'+sid);
-  if(eg){if(totalMax>=100){var _p=totalMax>0?Math.round(total/totalMax*100):0;var _gv=calcGrade(_p);eg.textContent=_gv;eg.style.color=gradeColor(_gv);eg.style.background=gradeBg(_gv);}else{eg.textContent='—';eg.style.color='#94A3B8';eg.style.background='#F1F5F9';}}
 }
 function _gsColFill(hwNum,defMax){
   var fi=document.getElementById('gsfi_'+hwNum);var v=fi&&fi.value!==''?parseFloat(fi.value):defMax;
@@ -6258,7 +6197,7 @@ function _gsColFill(hwNum,defMax){
     var tr=inp.closest('tr');if(tr&&tr.style.display==='none')return;
     inp.value=String(v);var max=parseInt(inp.dataset.max)||100;
     inp.style.color=v>=max*0.5?'#16A34A':'#F59E0B';inp.parentElement.style.background='#F0FDF4';
-    var k=subKey(inp.dataset.sid,inp.dataset.hwnum,inp.dataset.room);
+    var k=subKey(inp.dataset.sid,inp.dataset.hwnum,inp.dataset.room,parseInt(inp.dataset.term)||DB.currentTerm||1);
     _gsChanges[k]={sid:inp.dataset.sid,hwNum:parseInt(inp.dataset.hwnum),hwTitle:inp.dataset.htitle,room:inp.dataset.room,score:v,maxScore:max};
     _gsUpdateTot(inp.dataset.sid);
   });_gsDirty();
@@ -6279,7 +6218,7 @@ function _gsRefreshIfOpen(){var ov=document.getElementById('gs-ov');if(ov&&ov.st
 
 
 /* ===== STUDENT FILTER ===== */
-var _sfPct=60,_sfScore=0,_sfGrade=0,_sfRoom='all',_sfMode='below',_sfType='pct';
+var _sfPct=60,_sfScore=0,_sfRoom='all',_sfMode='below',_sfType='pct';
 function openStudentFilter(){
   if(!document.getElementById('sf-ov')) _sfBuild();
   var ov=document.getElementById('sf-ov');ov.style.display='flex';
@@ -6298,35 +6237,17 @@ function _sfBuild(){
   function mkG(lbl){var g=document.createElement('div');g.style.cssText='display:flex;flex-direction:column;gap:4px;';var l=document.createElement('div');l.style.cssText='font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;';l.textContent=lbl;g.appendChild(l);return g;}
   function chip(txt,act){var b=document.createElement('button');b.style.cssText='padding:7px 13px;border-radius:20px;border:1.5px solid '+(act?'#F59E0B':'#E2E8F0')+';font-size:12px;font-weight:700;cursor:pointer;background:'+(act?'#F59E0B':'#fff')+';color:'+(act?'#fff':'#475569')+';font-family:Sarabun,sans-serif;';b.textContent=txt;return b;}
   var rg=mkG('ห้อง');var rdd=document.createElement('select');rdd.id='sf-room-dd';rdd.style.cssText='padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:Sarabun,sans-serif;background:#F8FAFC;cursor:pointer;';rdd.onchange=function(){_sfRoom=this.value;_sfRun();};rg.appendChild(rdd);ctrl.appendChild(rg);
-  var mg=mkG('แสดงนักเรียน');mg.id='sf-mode-group';var mw=document.createElement('div');mw.style.cssText='display:flex;gap:6px;';
+  var mg=mkG('แสดงนักเรียน');var mw=document.createElement('div');mw.style.cssText='display:flex;gap:6px;';
   [['below','ต่ำกว่า'],['above','สูงกว่า']].forEach(function(p){var b=chip(p[1],_sfMode===p[0]);b.dataset.mode=p[0];b.onclick=function(){_sfMode=this.dataset.mode;mw.querySelectorAll('button').forEach(function(x){var a=x.dataset.mode===_sfMode;x.style.background=a?'#F59E0B':'#fff';x.style.borderColor=a?'#F59E0B':'#E2E8F0';x.style.color=a?'#fff':'#475569';});_sfRun();};mw.appendChild(b);});mg.appendChild(mw);ctrl.appendChild(mg);
   var tg=mkG('เงื่อนไข');var tw=document.createElement('div');tw.style.cssText='display:flex;gap:6px;';
   var ppanel,spanel;
-  [['pct','%'],['score','คะแนน'],['grade','เกรด']].forEach(function(p){var b=chip(p[1],_sfType===p[0]);b.dataset.type=p[0];b.onclick=function(){_sfType=this.dataset.type;tw.querySelectorAll('button').forEach(function(x){var a=x.dataset.type===_sfType;x.style.background=a?'#F59E0B':'#fff';x.style.borderColor=a?'#F59E0B':'#E2E8F0';x.style.color=a?'#fff':'#475569';});if(ppanel)ppanel.style.display=_sfType==='pct'?'flex':'none';if(spanel)spanel.style.display=_sfType==='score'?'flex':'none';var gp=document.getElementById('sf-grade-panel');if(gp)gp.style.display=_sfType==='grade'?'flex':'none';_sfRun();};tw.appendChild(b);});tg.appendChild(tw);ctrl.appendChild(tg);
+  [['pct','%'],['score','คะแนน']].forEach(function(p){var b=chip(p[1],_sfType===p[0]);b.dataset.type=p[0];b.onclick=function(){_sfType=this.dataset.type;tw.querySelectorAll('button').forEach(function(x){var a=x.dataset.type===_sfType;x.style.background=a?'#F59E0B':'#fff';x.style.borderColor=a?'#F59E0B':'#E2E8F0';x.style.color=a?'#fff':'#475569';});if(ppanel)ppanel.style.display=_sfType==='pct'?'flex':'none';if(spanel)spanel.style.display=_sfType==='score'?'flex':'none';_sfRun();};tw.appendChild(b);});tg.appendChild(tw);ctrl.appendChild(tg);
   var pg=mkG('เปอร์เซ็นต์');pg.style.display='flex';var pw=document.createElement('div');pw.style.cssText='display:flex;gap:6px;flex-wrap:wrap;align-items:center;';
   [50,60,70,80,90].forEach(function(p){var b=chip(p+'%',_sfPct===p);b.dataset.pct=p;b.onclick=function(){_sfPct=parseInt(this.dataset.pct);pw.querySelectorAll('[data-pct]').forEach(function(x){var a=parseInt(x.dataset.pct)===_sfPct;x.style.background=a?'#F59E0B':'#fff';x.style.borderColor=a?'#F59E0B':'#E2E8F0';x.style.color=a?'#fff':'#475569';});pci.value='';_sfRun();};pw.appendChild(b);});
   var pci=document.createElement('input');pci.type='number';pci.min='0';pci.max='100';pci.placeholder='?';pci.style.cssText='width:48px;padding:7px 8px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-weight:700;text-align:center;font-family:Sarabun,sans-serif;';pci.oninput=function(){var v=parseInt(this.value);if(!isNaN(v)&&v>=0&&v<=100){_sfPct=v;pw.querySelectorAll('[data-pct]').forEach(function(x){x.style.background='#fff';x.style.borderColor='#E2E8F0';x.style.color='#475569';});_sfRun();}};pw.appendChild(pci);pg.appendChild(pw);ctrl.appendChild(pg);ppanel=pg;
   var sg=mkG('คะแนน');sg.style.display='none';var sw=document.createElement('div');sw.style.cssText='display:flex;gap:6px;flex-wrap:wrap;align-items:center;';
   [20,40,60,80].forEach(function(sc){var b=chip(sc+' คะแนน',_sfScore===sc);b.dataset.sc=sc;b.onclick=function(){_sfScore=parseInt(this.dataset.sc);sw.querySelectorAll('[data-sc]').forEach(function(x){var a=parseInt(x.dataset.sc)===_sfScore;x.style.background=a?'#F59E0B':'#fff';x.style.borderColor=a?'#F59E0B':'#E2E8F0';x.style.color=a?'#fff':'#475569';});sci.value='';_sfRun();};sw.appendChild(b);});
   var sci=document.createElement('input');sci.type='number';sci.min='0';sci.placeholder='กรอก';sci.style.cssText='width:60px;padding:7px 8px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-weight:700;text-align:center;font-family:Sarabun,sans-serif;';sci.oninput=function(){var v=parseFloat(this.value);if(!isNaN(v)&&v>=0){_sfScore=v;sw.querySelectorAll('[data-sc]').forEach(function(x){x.style.background='#fff';x.style.borderColor='#E2E8F0';x.style.color='#475569';});_sfRun();}};sw.appendChild(sci);sg.appendChild(sw);ctrl.appendChild(sg);spanel=sg;
-
-  // grade panel
-  var gpanel=document.createElement('div');gpanel.id='sf-grade-panel';gpanel.style.cssText='display:none;flex-direction:column;gap:4px;';
-  var gl=document.createElement('div');gl.style.cssText='font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;';gl.textContent='เลือกเกรด';
-  var gw=document.createElement('div');gw.style.cssText='display:flex;gap:6px;flex-wrap:wrap;';
-  [[4,'4 ดีเยี่ยม'],[3.5,'3.5'],[3,'3 ดี'],[2.5,'2.5'],[2,'2 ปานกลาง'],[1.5,'1.5'],[1,'1 ผ่าน'],[0,'0 ไม่ผ่าน']].forEach(function(gr){
-    var b=chip('เกรด '+gr[0],_sfGrade===gr[0]);b.dataset.gr=gr[0];b.title=gr[1];
-    b.onclick=function(){
-      _sfGrade=parseFloat(this.dataset.gr);
-      gw.querySelectorAll('[data-gr]').forEach(function(x){
-        var a=parseFloat(x.dataset.gr)===_sfGrade;
-        x.style.background=a?'#7C3AED':'#fff';x.style.borderColor=a?'#7C3AED':'#E2E8F0';x.style.color=a?'#fff':'#475569';
-      });_sfRun();
-    };
-    gw.appendChild(b);
-  });
-  gpanel.appendChild(gl);gpanel.appendChild(gw);ctrl.appendChild(gpanel);
-
   ov.appendChild(ctrl);
   var sm=document.createElement('div');sm.id='sf-summary';sm.style.cssText='padding:10px 14px;background:#FEF3C7;border-bottom:1.5px solid #FCD34D;font-size:13px;color:#92400E;font-weight:600;display:none;flex-shrink:0;';ov.appendChild(sm);
   var list=document.createElement('div');list.id='sf-list';list.style.cssText='flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px 80px;';ov.appendChild(list);
@@ -6338,29 +6259,23 @@ function _sfRun(){
   var results=[];
   DB.students.forEach(function(s){
     if(_sfRoom!=='all'&&s.room!==_sfRoom)return;
-    if(s.status&&s.status!=='active')return; // ข้ามนักเรียนที่ลาออก/ย้ายออก
-    var hws=(DB&&DB.homeworks?DB.homeworks:[]).filter(function(h){return !h.room||h.room===s.room;});
+    var hws=DB.homeworks.filter(function(h){return !h.room||h.room===s.room;});
     if(!hws.length)return;
     var totalMax=hws.reduce(function(sum,h){return sum+(h.maxScore||100);},0);
     var totalScore=0;var done=0;
-    hws.forEach(function(h){var sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,s.room)]||DB.submissions[subKey(s.id,h.num,'')];if(sub){done++;totalScore+=(sub.score!==null&&sub.score!==undefined)?Number(sub.score):(h.maxScore||100);}});
+    hws.forEach(function(h){var sub=DB.submissions[subKey(s.id, h.num, h.room, h.term||1)]||DB.submissions[subKey(s.id,h.num,s.room,h.term||DB.currentTerm||1)]||DB.submissions[subKey(s.id, h.num, '', h.term||DB.currentTerm||1)];if(sub){done++;totalScore+=(sub.score!==null&&sub.score!==undefined)?Number(sub.score):(h.maxScore||100);}});
     var pct=totalMax>0?Math.round(totalScore/totalMax*100):0;
-    var gv=totalMax>=100?calcGrade(pct):null;
-    var ok=_sfType==='grade'?(gv!==null&&gv===_sfGrade):_sfType==='score'?(_sfMode==='below'?totalScore<_sfScore:totalScore>=_sfScore):(_sfMode==='below'?pct<_sfPct:pct>=_sfPct);
+    var ok=_sfType==='score'?(_sfMode==='below'?totalScore<_sfScore:totalScore>=_sfScore):(_sfMode==='below'?pct<_sfPct:pct>=_sfPct);
     if(ok)results.push({s:s,totalScore:totalScore,totalMax:totalMax,pct:pct,done:done,total:hws.length});
   });
   results.sort(function(a,b){return _sfMode==='below'?a.pct-b.pct:b.pct-a.pct;});
-  var condTxt=_sfType==='grade'?(_sfMode==='below'?'เกรดต่ำกว่า '+_sfGrade:'เกรดสูงกว่าหรือเท่ากับ '+_sfGrade):_sfType==='score'?(_sfMode==='below'?'ต่ำกว่า '+_sfScore+' คะแนน':'สูงกว่า '+_sfScore+' คะแนน'):(_sfMode==='below'?'ต่ำกว่า '+_sfPct+'%':'สูงกว่า '+_sfPct+'%');
+  var condTxt=_sfType==='score'?(_sfMode==='below'?'ต่ำกว่า '+_sfScore+' คะแนน':'สูงกว่า '+_sfScore+' คะแนน'):(_sfMode==='below'?'ต่ำกว่า '+_sfPct+'%':'สูงกว่า '+_sfPct+'%');
   if(sm){sm.style.display='block';sm.innerHTML=results.length?'พบ <b>'+results.length+' คน</b> ที่คะแนน<b>'+condTxt+'</b>':'✅ ไม่พบนักเรียนตามเงื่อนไขนี้';}
   list.innerHTML='';
   if(!results.length){list.innerHTML='<div style="text-align:center;padding:40px;color:#94A3B8;font-size:14px;">✅ ไม่พบนักเรียนตามเงื่อนไขนี้</div>';return;}
   results.forEach(function(r,i){var bc=r.pct<50?'#FFF5F5':r.pct<75?'#FFFBEB':'#F0FDF4';var bc2=r.pct<50?'#FCA5A5':r.pct<75?'#FCD34D':'#86EFAC';var pc=r.pct<50?'#DC2626':r.pct<75?'#D97706':'#16A34A';var rbc=r.pct<50?'#FEE2E2;color:#DC2626':r.pct<75?'#FEF3C7;color:#B45309':'#DCFCE7;color:#15803D';
     var card=document.createElement('div');card.style.cssText='background:'+bc+';border:1.5px solid '+bc2+';border-radius:14px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;';
-    var stLblSF={'withdrawn':'⛔ ลาออก','transferred':'🔄 ย้ายออก','leave':'💤 ลาพัก'};
-    var sfIsOut=r.s.status&&r.s.status!=='active';
-    var sfStBadge=sfIsOut?'<span style="background:#FEE2E2;color:#DC2626;font-size:10px;font-weight:700;padding:1px 8px;border-radius:20px;margin-left:6px;vertical-align:middle;">'+(stLblSF[r.s.status]||r.s.status)+'</span>':'';
-    if(sfIsOut){card.style.opacity='0.5';card.style.textDecoration='line-through';card.style.background='#F8FAFC';card.style.borderColor='#CBD5E1';}
-    card.innerHTML='<div style="width:28px;height:28px;border-radius:50%;background:'+(sfIsOut?'#94A3B8':rbc)+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">'+(i+1)+'</div><div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:'+(sfIsOut?'#94A3B8':'#0F172A')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.s.name+sfStBadge+'</div><div style="font-size:12px;color:#64748B;margin-top:2px;">'+r.s.id+' · ห้อง '+r.s.room+' · ส่ง '+r.done+'/'+r.total+' ชิ้น</div><div style="margin-top:6px;background:#E2E8F0;border-radius:6px;height:6px;overflow:hidden;"><div style="width:'+r.pct+'%;height:100%;border-radius:6px;background:'+pc+';"></div></div></div><div style="text-align:right;flex-shrink:0;"><div style="font-size:18px;font-weight:800;color:#0F172A;">'+r.totalScore+'</div><div style="font-size:11px;color:#94A3B8;">จาก '+r.totalMax+'</div><div style="padding:3px 10px;border-radius:20px;font-size:13px;font-weight:800;background:'+rbc+';">'+r.pct+'%</div><div style="margin-top:4px;padding:2px 10px;border-radius:20px;font-size:15px;font-weight:900;color:'+(r.totalMax>=100?gradeColor(calcGrade(r.pct)):'#64748B')+';background:'+(r.totalMax>=100?gradeBg(calcGrade(r.pct)):'#F1F5F9')+';">'+(r.totalMax>=100?'เกรด '+calcGrade(r.pct):'ยังไม่ถึง 100')+'</div></div>';
+    card.innerHTML='<div style="width:28px;height:28px;border-radius:50%;background:'+rbc+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">'+(i+1)+'</div><div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.s.name+'</div><div style="font-size:12px;color:#64748B;margin-top:2px;">'+r.s.id+' · ห้อง '+r.s.room+' · ส่ง '+r.done+'/'+r.total+' ชิ้น</div><div style="margin-top:6px;background:#E2E8F0;border-radius:6px;height:6px;overflow:hidden;"><div style="width:'+r.pct+'%;height:100%;border-radius:6px;background:'+pc+';"></div></div></div><div style="text-align:right;flex-shrink:0;"><div style="font-size:18px;font-weight:800;color:#0F172A;">'+r.totalScore+'</div><div style="font-size:11px;color:#94A3B8;">จาก '+r.totalMax+'</div><div style="padding:3px 10px;border-radius:20px;font-size:13px;font-weight:800;background:'+rbc+';">'+r.pct+'%</div></div>';
     list.appendChild(card);
   });
 }
@@ -6371,1058 +6286,46 @@ var _stuStatusMap={'active':'✅ ปกติ','withdrawn':'⛔ ลาออก'
 async function updateStudentStatus(sid,ns){var s=DB.students.find(function(x){return x.id===sid;});if(!s)return;s.status=ns;if(USE_SUPABASE){const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';try{await SB.from('students').update({status:ns}).eq('id',sid).eq('teacher_id',tid);toast('อัพเดต '+s.name+' ✅');}catch(e){toast('ไม่สำเร็จ','err');}}if(typeof _gsRender==='function')_gsRender();}
 function openStatusMenu(sid){var ex=document.getElementById('_smov');if(ex)ex.remove();var s=DB.students.find(function(x){return x.id===sid;});if(!s)return;var ov=document.createElement('div');ov.id='_smov';ov.style.cssText='position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';var box=document.createElement('div');box.style.cssText='background:#fff;border-radius:18px;padding:20px;min-width:240px;max-width:300px;width:100%;font-family:Sarabun,sans-serif;';var ti=document.createElement('div');ti.style.cssText='font-size:15px;font-weight:800;color:#0F172A;margin-bottom:12px;';ti.textContent='สถานะ: '+s.name;box.appendChild(ti);[['active','✅ ปกติ','#DCFCE7','#15803D'],['leave','💤 ลาพัก','#FEF3C7','#B45309'],['transferred','🔄 ย้ายออก','#DBEAFE','#1D4ED8'],['withdrawn','⛔ ลาออก','#FEE2E2','#DC2626']].forEach(function(opt){var btn=document.createElement('button');btn.style.cssText='width:100%;padding:10px 14px;margin-bottom:8px;border:'+(s.status===opt[0]?'2.5px solid '+opt[3]:'1.5px solid transparent')+';border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;background:'+opt[2]+';color:'+opt[3]+';text-align:left;';btn.textContent=opt[1];btn.onclick=function(){updateStudentStatus(sid,opt[0]);ov.remove();};box.appendChild(btn);});var cx=document.createElement('button');cx.style.cssText='width:100%;padding:10px;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:Sarabun,sans-serif;background:#F1F5F9;color:#64748B;font-weight:600;';cx.textContent='ยกเลิก';cx.onclick=function(){ov.remove();};box.appendChild(cx);ov.appendChild(box);ov.onclick=function(e){if(e.target===ov)ov.remove();};document.body.appendChild(ov);}
 
+// ===== TERM SYSTEM =====
+if(typeof DB === 'undefined') window.DB = {};
+DB.currentTerm = 1;
 
-function calcGrade(pct){if(pct>=80)return 4;if(pct>=75)return 3.5;if(pct>=70)return 3;if(pct>=65)return 2.5;if(pct>=60)return 2;if(pct>=55)return 1.5;if(pct>=50)return 1;return 0;}
-function gradeColor(g){if(g>=3.5)return'#16A34A';if(g>=2.5)return'#2563EB';if(g>=1.5)return'#F59E0B';if(g>=1)return'#EA580C';return'#DC2626';}
-function gradeBg(g){if(g>=3.5)return'#DCFCE7';if(g>=2.5)return'#DBEAFE';if(g>=1.5)return'#FEF3C7';if(g>=1)return'#FFEDD5';return'#FEE2E2';}
-
-function renderGradeTab(){
-  var rooms=DB.rooms.slice().sort();
-  if(!rooms.length) return '<div style="text-align:center;padding:40px;color:#94A3B8;font-size:14px;">ยังไม่มีห้องเรียน</div>';
-  setTimeout(function(){document.querySelectorAll('.grb').forEach(function(b){b.onclick=function(){openGradeStats(this.dataset.r);};});},50);
-  return '<div style="padding:8px 0;">'
-    +rooms.map(function(room){
-      var stus=DB.students.filter(function(s){return s.room===room;});
-      var activeStus=stus.filter(function(s){return !s.status||s.status==='active';});
-      var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;});
-      var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
-      var hasGrade=totalMax>=100;
-      return '<button data-r="'+room+'" class="grb" style="width:100%;text-align:left;padding:14px 16px;margin-bottom:10px;background:#fff;border:1.5px solid #E2E8F0;border-radius:14px;cursor:pointer;font-family:Sarabun,sans-serif;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.04);">'
-        +'<div style="font-size:28px;">🏫</div>'
-        +'<div style="flex:1;">'
-        +'<div style="font-size:15px;font-weight:800;color:#0F172A;">'+room+'</div>'
-        +'<div style="font-size:12px;color:#64748B;margin-top:2px;">'+activeStus.length+' คน (active) · คะแนนเต็มรวม '+totalMax+(hasGrade?' · ✅ พร้อมดูเกรด':' · ⚠️ คะแนนยังไม่ถึง 100')+'</div>'
-        +'</div>'
-        +'<div style="color:#94A3B8;font-size:18px;">›</div>'
-        +'</button>';
-    }).join('')
-    +'</div>';
+function updateTermToggleUI() {
+  const ct = DB.currentTerm||1;
+  const b1 = document.getElementById('term-btn-1');
+  const b2 = document.getElementById('term-btn-2');
+  if(!b1||!b2) return;
+  b1.style.background = ct===1?'#fff':'transparent';
+  b1.style.color = ct===1?'#6366f1':'rgba(255,255,255,0.8)';
+  b2.style.background = ct===2?'#fff':'transparent';
+  b2.style.color = ct===2?'#6366f1':'rgba(255,255,255,0.8)';
 }
 
-function openGradeStats(room){
-  var stus=DB.students.filter(function(s){return s.room===room;});
-  var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;});
-  var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
-
-  // คำนวณเกรดแต่ละคน
-  var gradeCount={0:0,1:0,1.5:0,2:0,2.5:0,3:0,3.5:0,4:0};
-  var gradeList=[4,3.5,3,2.5,2,1.5,1,0];
-  var total=stus.length;
-  stus.forEach(function(s){
-    if(s.status&&s.status!=='active')return;
-    var score=0;
-    hws.forEach(function(h){
-      var sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];
-      if(sub)score+=(sub.score!==null&&sub.score!==undefined?Number(sub.score):(h.maxScore||100));
-    });
-    var pct=totalMax>0?Math.round(score/totalMax*100):0;
-    var g=totalMax>=100?calcGrade(pct):null;
-    if(g!==null) gradeCount[g]=(gradeCount[g]||0)+1;
-  });
-  var activeTotal=stus.filter(function(s){return !s.status||s.status==='active';}).length;
-  var grade34=( gradeCount[3]||0)+(gradeCount[3.5]||0)+(gradeCount[4]||0);
-  var pct34=activeTotal>0?Math.round(grade34/activeTotal*100):0;
-  var maxCount=Math.max.apply(null,gradeList.map(function(g){return gradeCount[g]||0;}));
-
-  var modal=document.getElementById('_gmov');
-  if(!modal){modal=document.createElement('div');modal.id='_gmov';modal.style.cssText='position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.5);display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;';document.body.appendChild(modal);}
-  modal.onclick=function(e){if(e.target===modal)modal.style.display='none';};
-
-  var gColors={4:'#16A34A',3.5:'#22C55E',3:'#2563EB',2.5:'#60A5FA',2:'#F59E0B',1.5:'#FB923C',1:'#EA580C',0:'#DC2626'};
-  var html='<div style="background:#fff;border-radius:20px;width:100%;max-width:500px;padding:24px;font-family:Sarabun,sans-serif;margin:auto;">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">'
-    +'<div><div style="font-size:18px;font-weight:800;color:#0F172A;">📊 สถิติเกรด — '+room+'</div>'
-    +'<div style="font-size:12px;color:#64748B;margin-top:2px;">นักเรียน '+activeTotal+' คน · คะแนนเต็มรวม '+totalMax+'</div></div>'
-    +'<button id="_gmcl" style="width:34px;height:34px;border-radius:50%;border:1.5px solid #E2E8F0;background:#F8FAFC;cursor:pointer;font-size:16px;">✕</button>'
-    +'</div>';
-
-  if(totalMax<100){
-    html+='<div style="text-align:center;padding:30px;color:#F59E0B;font-size:14px;">⚠️ คะแนนเต็มรวมยังไม่ถึง 100 ยังไม่สามารถคำนวณเกรดได้</div></div>';
-    modal.innerHTML=html;modal.style.display='flex';return;
+async function setTerm(t) {
+  DB.currentTerm = t;
+  updateTermToggleUI();
+  // บันทึกลง settings
+  if(USE_SUPABASE && SB && CURRENT_TEACHER) {
+    const tid = CURRENT_TEACHER.id;
+    await SB.from('settings').upsert({key:'current_term_'+tid, value:t, teacher_id:tid},{onConflict:'key'});
   }
-
-  // Bar chart
-  html+='<div style="margin-bottom:20px;">';
-  gradeList.forEach(function(g){
-    var cnt=gradeCount[g]||0;
-    var barPct=maxCount>0?Math.round(cnt/maxCount*100):0;
-    var pctOfClass=activeTotal>0?Math.round(cnt/activeTotal*100):0;
-    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
-      +'<div style="width:44px;text-align:right;font-size:13px;font-weight:700;color:'+gColors[g]+';flex-shrink:0;">เกรด '+g+'</div>'
-      +'<div style="flex:1;background:#F1F5F9;border-radius:6px;height:28px;overflow:hidden;">'
-      +'<div style="width:'+barPct+'%;height:100%;background:'+gColors[g]+';border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;transition:width .3s;">'
-      +(barPct>20?'<span style="color:#fff;font-size:12px;font-weight:700;">'+cnt+' คน</span>':'')
-      +'</div></div>'
-      +(barPct<=20?'<div style="font-size:12px;font-weight:700;color:'+gColors[g]+';width:50px;">'+cnt+' คน</div>':'<div style="width:50px;"></div>')
-      +'<div style="width:36px;text-align:right;font-size:11px;color:#64748B;">'+pctOfClass+'%</div>'
-      +'</div>';
+  // update toggle UI
+  document.querySelectorAll('.term-toggle-btn').forEach(b=>{
+    b.classList.toggle('term-active', parseInt(b.dataset.term)===t);
   });
-  html+='</div>';
-
-  // Summary stats
-  html+='<div style="background:#F8FAFC;border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
-    +'<div style="text-align:center;padding:10px;background:#DCFCE7;border-radius:10px;">'
-    +'<div style="font-size:22px;font-weight:900;color:#16A34A;">'+pct34+'%</div>'
-    +'<div style="font-size:11px;color:#15803D;margin-top:2px;">เกรด 3-4<br>('+grade34+' คน)</div></div>'
-    +'<div style="text-align:center;padding:10px;background:#FEE2E2;border-radius:10px;">'
-    +'<div style="font-size:22px;font-weight:900;color:#DC2626;">'+(gradeCount[0]||0)+'</div>'
-    +'<div style="font-size:11px;color:#991B1B;margin-top:2px;">ไม่ผ่าน (เกรด 0)<br>('+(activeTotal>0?Math.round((gradeCount[0]||0)/activeTotal*100):0)+'%)</div></div>'
-    +'</div>';
-
-  // Grade distribution
-  html+='<div style="margin-top:14px;"><div style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:8px;">สัดส่วนแต่ละเกรด</div><div style="display:flex;border-radius:8px;overflow:hidden;height:20px;">';
-  gradeList.slice().reverse().forEach(function(g){
-    var cnt=gradeCount[g]||0;
-    var pctBar=activeTotal>0?Math.round(cnt/activeTotal*100):0;
-    if(pctBar>0) html+='<div style="width:'+pctBar+'%;background:'+gColors[g]+';height:100%;" title="เกรด '+g+': '+pctBar+'%"></div>';
-  });
-  html+='</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">';
-  gradeList.slice().reverse().forEach(function(g){
-    var pctBar=activeTotal>0?Math.round((gradeCount[g]||0)/activeTotal*100):0;
-    if(pctBar>0||gradeCount[g]>0) html+='<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:'+gColors[g]+'22;color:'+gColors[g]+';font-weight:700;">เกรด '+g+': '+pctBar+'%</span>';
-  });
-  html+='</div></div></div>';
-  modal.innerHTML=html;modal.style.display='flex';
-  var cl=document.getElementById('_gmcl');if(cl)cl.onclick=function(){modal.style.display='none';};
+  // reload data
+  await reloadHomeworks();
+  renderDash();
+  renderManage();
+  toast('เปลี่ยนเป็นเทอม '+t+' ✅');
 }
 
-
-function openStatusList(statusKey){
-  var labels={withdrawn:'⛔ ลาออก',transferred:'🔄 ย้ายออก',leave:'💤 ลาพัก'};
-  var colors={withdrawn:'#DC2626',transferred:'#1D4ED8',leave:'#B45309'};
-  var bgs={withdrawn:'#FEE2E2',transferred:'#DBEAFE',leave:'#FEF3C7'};
-  var stus=DB.students.filter(function(s){return (s.status||'active')===statusKey;});
-  var modal=document.getElementById('_stlmod');
-  if(!modal){modal=document.createElement('div');modal.id='_stlmod';modal.style.cssText='position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px;';document.body.appendChild(modal);}
-  modal.onclick=function(e){if(e.target===modal)modal.style.display='none';};
-  var title=labels[statusKey]||statusKey;
-  var color=colors[statusKey]||'#475569';
-  var bg=bgs[statusKey]||'#F1F5F9';
-  var html='<div style="background:#fff;border-radius:20px;width:100%;max-width:420px;max-height:80vh;display:flex;flex-direction:column;font-family:Sarabun,sans-serif;">'
-    +'<div style="padding:18px 20px;border-bottom:1.5px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">'
-    +'<div><div style="font-size:16px;font-weight:800;color:'+color+';">'+title+'</div>'
-    +'<div style="font-size:12px;color:#64748B;margin-top:2px;">'+stus.length+' คน</div></div>'
-    +'<button id="_stlcl" style="width:34px;height:34px;border-radius:50%;border:1.5px solid #E2E8F0;background:#F8FAFC;cursor:pointer;font-size:16px;">✕</button>'
-    +'</div>'
-    +'<div style="overflow-y:auto;padding:12px 16px;flex:1;">';
-  if(!stus.length){
-    html+='<div style="text-align:center;padding:30px;color:#94A3B8;font-size:14px;">ไม่มีนักเรียนในสถานะนี้</div>';
-  } else {
-    stus.sort(function(a,b){return a.room.localeCompare(b.room)||a.id.localeCompare(b.id);});
-    var curRoom='';
-    stus.forEach(function(s,i){
-      if(s.room!==curRoom){
-        if(curRoom) html+='</div>';
-        html+='<div style="font-size:11px;font-weight:700;color:#64748B;margin:'+(i>0?'12px':'0')+'px 0 6px;text-transform:uppercase;">ห้อง '+s.room+'</div><div>';
-        curRoom=s.room;
-      }
-      html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:'+bg+';border-radius:10px;margin-bottom:6px;">'
-        +'<div style="width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">'+s.name.substring(0,1)+'</div>'
-        +'<div><div style="font-size:13px;font-weight:700;color:#0F172A;">'+escapeHtml(s.name)+'</div>'
-        +'<div style="font-size:11px;color:#64748B;">'+s.id+'</div></div></div>';
-    });
-    if(curRoom) html+='</div>';
-  }
-  html+='</div></div>';
-  modal.innerHTML=html;modal.style.display='flex';
-  var cl=document.getElementById('_stlcl');if(cl)cl.onclick=function(){modal.style.display='none';};
-}
-
-
-/* ===== SGS: ลงระบบ SGS ===== */
-var _sgsRoom='';
-var _sgsCfg={
-  sections:[
-    {id:'pre',  name:'ก่อนกลางภาค', max:20, hws:[], minScore:0},
-    {id:'mid',  name:'กลางภาค',      max:30, hws:[], minScore:0},
-    {id:'post', name:'หลังกลางภาค', max:20, hws:[], minScore:0},
-    {id:'final',name:'ปลายภาค',      max:30, hws:[], minScore:0},
-  ]
-};
-var _sgsScores={}; // {sid: {pre:X, mid:Y, post:Z, final:W}}
-
-var _sgsTargetId='sgs-content';
-function openSGSTo(targetId){
-  _sgsTargetId=targetId||'sgs-content';
-  openSGS();
-}
-function openSGS(){
-  var el=document.getElementById(_sgsTargetId||'sgs-content');
-  if(!el){console.error('sgs-content not found');return;}
-  var rooms=DB&&DB.rooms?DB.rooms:[];
-  if(!_sgsRoom&&rooms.length)_sgsRoom=rooms[0];
-  if(!rooms.length){
-    el.innerHTML='<div style="text-align:center;padding:40px;color:#94A3B8;font-size:14px;">⚠️ ยังไม่มีห้องเรียน</div>';return;
-  }
-  // แสดง loading + โหลด config จาก DB
-  el.innerHTML='<div style="text-align:center;padding:40px;color:#64748B;font-size:14px;">⏳ กำลังโหลดตั้งค่า SGS...</div>';
-  _sgsLoadCfg(_sgsRoom).then(function(loaded){
-    _sgsOpenWithRoom(_sgsRoom,el,loaded);
-  });
-}
-
-function _sgsOpenWithRoom(room,el,cfgLoaded){
-  var errs=_sgsValidateHW();
-  if(!cfgLoaded||errs.length>0){
-    // ยังไม่มี config หรือ config ไม่ valid → แสดง prompt ไปตั้งค่า
-    el.innerHTML='<div style="text-align:center;padding:40px;">'
-      +'<div style="font-size:48px;margin-bottom:12px;">⚙️</div>'
-      +'<div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:8px;">'+(cfgLoaded?'ตั้งค่า SGS ไม่ครบ':'ยังไม่มีตั้งค่า SGS สำหรับห้อง '+room)+'</div>'
-      +'<div style="font-size:13px;color:#64748B;margin-bottom:16px;">'+(errs.length?errs.join('<br>'):'กรุณาตั้งค่าก่อนใช้งาน')+'</div>'
-      +'<button onclick="openSGSConfig()" style="padding:12px 24px;background:#2563EB;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">⚙️ ไปตั้งค่า SGS</button>'
-      +'</div>';
-    return;
-  }
-  // config ดี → pre-fill + render table
-  _sgsPreFillFromHW();
-  _sgsRenderTable();
-}
-
-function _sgsBuildSetup(){
-  var rooms=(DB&&DB.rooms)?DB.rooms:[];
-  var roomOpts=rooms.map(function(r){return '<option value="'+r+'"'+(r===_sgsRoom?' selected':'')+'>'+r+'</option>';}).join('');
-  var totalMax=_sgsCfg.sections.reduce(function(s,sec){return s+Number(sec.max);},0);
-  var totalOk=totalMax===100;
-
-  var setupHtml='<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1.5px solid #E2E8F0;">'
-    +'<div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:12px;">🎯 ตั้งค่าคะแนนเต็ม SGS</div>'
-    +'<div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;">'
-    +'<label style="font-size:13px;font-weight:600;color:#475569;">ห้องเรียน:</label>'
-    +'<select id="sgs-room-sel" style="padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:Sarabun,sans-serif;background:#F8FAFC;">'+roomOpts+'</select>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
-
-  _sgsCfg.sections.forEach(function(sec){
-    var hws=DB.homeworks.filter(function(h){return !h.room||h.room===_sgsRoom;}).sort(function(a,b){return a.num-b.num;});
-    var hwOpts=hws.map(function(h){
-      var sel=sec.hws.indexOf(h.num)>=0;
-      return '<option value="'+h.num+'"'+(sel?' selected':'')+'>งาน '+h.num+': '+h.title.substring(0,12)+'... (เต็ม '+(h.maxScore||100)+')</option>';
-    }).join('');
-    var selHwMax=sec.hws.reduce(function(s,n){var h=hws.find(function(x){return x.num===n;});return s+(h?h.maxScore||100:0);},0);
-    var secOk=selHwMax===sec.max;var secOver=selHwMax>sec.max;
-    var valColor=sec.hws.length===0?'#94A3B8':secOk?'#16A34A':secOver?'#DC2626':'#F59E0B';
-    var valMsg=sec.hws.length===0?'ยังไม่ได้เลือกงาน':secOk?'✅ ครบ '+selHwMax+'/'+sec.max:secOver?'❌ เกิน ('+selHwMax+'/'+sec.max+')':'⚠️ ยังขาด ('+selHwMax+'/'+sec.max+')';
-    setupHtml+='<div style="background:#F8FAFC;border-radius:12px;padding:12px;border:1.5px solid '+(secOk&&sec.hws.length?'#86EFAC':'#E2E8F0')+';">'
-      +'<div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">'+sec.name+'</div>'
-      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">'
-      +'<span style="font-size:12px;color:#64748B;">เต็ม</span>'
-      +'<input type="number" class="sgs-max-inp" data-sec="'+sec.id+'" value="'+sec.max+'" min="0" max="100" style="width:60px;padding:5px 8px;border:1.5px solid #BFDBFE;border-radius:8px;font-size:14px;font-weight:700;text-align:center;font-family:Sarabun,sans-serif;">'
-      +'<span style="font-size:12px;color:#64748B;">คะแนน</span>'
-      +'<span style="font-size:11px;font-weight:700;color:'+valColor+';">'+valMsg+'</span>'
-      +'</div>'
-      +'<div style="font-size:11px;color:#64748B;margin-bottom:4px;">เลือกงาน (กด Ctrl/Cmd ค้าง):</div>'
-      +'<select multiple class="sgs-hw-sel" data-sec="'+sec.id+'" style="width:100%;height:80px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:Sarabun,sans-serif;padding:4px;">'+hwOpts+'</select>'
-      +'</div>';
-  });
-
-  setupHtml+='</div>'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;">'
-    +'<div style="font-size:13px;font-weight:700;">รวมคะแนนเต็ม: <span id="sgs-total-max" style="color:'+(totalOk?'#16A34A':'#DC2626')+';">'+totalMax+'/100</span></div>'
-    +(function(){
-      var hws2=(DB&&DB.homeworks?DB.homeworks:[]).filter(function(h){return !h.room||h.room===_sgsRoom;});
-      var hwErrs=_sgsCfg.sections.filter(function(sec){
-        var sel=sec.hws.reduce(function(s,n){var h=hws2.find(function(x){return x.num===n;});return s+(h?h.maxScore||100:0);},0);
-        return sel!==sec.max;
-      });
-      var allOk=totalOk&&hwErrs.length===0;
-      var errMsg=!totalOk?'⚠️ คะแนนเต็มต้องรวม = 100':hwErrs.length?'❌ '+hwErrs.map(function(s){return s.name+': เลือกงานไม่ตรง';}).join(', '):'📋 ดูตาราง SGS';
-      return '<button onclick="_sgsRenderTableWithHW()" style="padding:10px 20px;background:'+(allOk?'#2563EB':'#94A3B8')+';color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">'+errMsg+'</button>';
-    })()
-    +'</div></div>';
-
-  return setupHtml;
-}
-
-function _sgsAttachSetup(){
-  // room select
-  var rsel=document.getElementById('sgs-room-sel');
-  if(rsel)rsel.onchange=function(){_sgsRoom=this.value;openSGS();};
-
-  // max score inputs
-  document.querySelectorAll('.sgs-max-inp').forEach(function(inp){
-    inp.oninput=function(){
-      var sec=_sgsCfg.sections.find(function(s){return s.id===inp.dataset.sec;});
-      if(sec) sec.max=Number(inp.value)||0;
-      var total=_sgsCfg.sections.reduce(function(s,x){return s+x.max;},0);
-      var el=document.getElementById('sgs-total-max');
-      if(el){el.textContent=total+'/100';el.style.color=total===100?'#16A34A':'#DC2626';}
-    };
-  });
-
-  // hw multi-select
-  document.querySelectorAll('.sgs-hw-sel').forEach(function(sel){
-    sel.onchange=function(){
-      var sec=_sgsCfg.sections.find(function(s){return s.id===sel.dataset.sec;});
-      if(sec) sec.hws=[].slice.call(sel.selectedOptions).map(function(o){return Number(o.value);});
-    };
-    // restore selection
-    var sec=_sgsCfg.sections.find(function(s){return s.id===sel.dataset.sec;});
-    if(sec)[].slice.call(sel.options).forEach(function(o){o.selected=sec.hws.indexOf(Number(o.value))>=0;});
-    // ป้องกัน scroll bubble ขึ้นหน้า
-    sel.addEventListener('wheel',function(e){
-      var atTop=this.scrollTop===0;
-      var atBottom=this.scrollTop+this.clientHeight>=this.scrollHeight;
-      if(!(atTop&&e.deltaY<0)&&!(atBottom&&e.deltaY>0)) e.stopPropagation();
-    },{passive:false});
-  });
-}
-
-function _sgsCalcActual(sid){
-  // คำนวณคะแนนจริงนักเรียนจาก DB
-  var room=_sgsRoom;
-  var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;});
-  var totalMax=hws.reduce(function(s,h){return s+(h.maxScore||100);},0);
-  var totalScore=0;
-  hws.forEach(function(h){
-    var sub=DB.submissions[subKey(sid,h.num,h.room)]||DB.submissions[subKey(sid,h.num,room)]||DB.submissions[subKey(sid,h.num,'')];
-    if(sub) totalScore+=(sub.score!==null&&sub.score!==undefined?Number(sub.score):(h.maxScore||100));
-  });
-  // scale เป็น 100
-  return totalMax>0?Math.round(totalScore/totalMax*100*10)/10:0;
-}
-
-function _sgsAutoDistribute(sid){
-  var actual=Math.round(_sgsCalcActual(sid));
-  if(!_sgsScores[sid]) _sgsScores[sid]={};
-  var secs=_sgsCfg.sections;
-  // Step1: สัดส่วน largest-remainder → integer
-  var raw=secs.map(function(sec){return actual*(sec.max/100);});
-  var floors=raw.map(function(v){return Math.floor(v);});
-  var leftover=actual-floors.reduce(function(s,v){return s+v;},0);
-  raw.map(function(v,i){return {i:i,r:v-floors[i]};}).sort(function(a,b){return b.r-a.r;}).forEach(function(o,k){if(k<leftover)floors[o.i]++;});
-  var scores=floors.slice();
-  // Step2: apply minScore → เพิ่ม locked, ลด free
-  var freeIdx=[];var forcedExtra=0;
-  secs.forEach(function(sec,i){
-    var mn=sec.minScore||0;
-    if(mn>0&&scores[i]<mn){forcedExtra+=mn-scores[i];scores[i]=mn;}
-    else freeIdx.push(i);
-  });
-  if(forcedExtra>0&&freeIdx.length>0){
-    var remaining=forcedExtra;
-    freeIdx.forEach(function(i,fi){
-      var cut=fi<freeIdx.length-1?Math.min(scores[i],Math.round(forcedExtra*(scores[i]/Math.max(1,freeIdx.reduce(function(s,j){return s+scores[j];},0))))):remaining;
-      cut=Math.min(cut,scores[i]);scores[i]-=cut;remaining-=cut;
-    });
-  }
-  // Step3: fix rounding → sum = actual
-  var sum=scores.reduce(function(s,v){return s+v;},0);
-  var diff=actual-sum;
-  if(diff!==0){var ai=freeIdx.length>0?freeIdx[freeIdx.length-1]:secs.length-1;scores[ai]=Math.max(0,scores[ai]+diff);}
-  secs.forEach(function(sec,i){_sgsScores[sid][sec.id]=scores[i];});
-  return _sgsScores[sid];
-}
-
-
-function _sgsRenderTable(){
-  var totalMax=_sgsCfg.sections.reduce(function(s,sec){return s+sec.max;},0);
-  if(totalMax!==100){alert('คะแนนเต็มรวมต้องเท่ากับ 100 (ตอนนี้ '+totalMax+')');return;}
-  var el=document.getElementById(_sgsTargetId||'sgs-content');if(!el){console.error('[SGS] el not found:',_sgsTargetId);return;}
-  var stus=DB.students.filter(function(s){return s.room===_sgsRoom;}).sort(function(a,b){return a.id.localeCompare(b.id);});
-  console.log('[SGS] room='+_sgsRoom+' stus='+stus.length+' el='+( el?el.id:'null')+' targetId='+_sgsTargetId);
-  if(!stus.length){
-    el.innerHTML='<div style="text-align:center;padding:40px;"><div style="font-size:40px;margin-bottom:12px;">🔍</div><div style="font-size:14px;font-weight:700;color:#94A3B8;">ไม่พบนักเรียนในห้อง: '+_sgsRoom+'</div><div style="font-size:12px;color:#CBD5E1;margin-top:6px;">ห้องที่มีในระบบ: '+((DB&&DB.rooms)||[]).join(', ')+'</div><button onclick="openSGS()" style="margin-top:14px;padding:8px 16px;background:#EFF6FF;color:#2563EB;border:1.5px solid #BFDBFE;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">← กลับตั้งค่า</button></div>';
-    return;
-  }
-
-  // ปุ่ม action
-  var html='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
-    +'<button onclick="_sgsAutoAll()" style="padding:9px 16px;background:#2563EB;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">✨ เกลี่ยทุกคนอัตโนมัติ</button>'
-    +'<button onclick="_sgsCopyTable()" style="padding:9px 16px;background:#059669;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">📋 คัดลอกตาราง</button>'
-    +'<button onclick="_sgsPrint()" style="padding:9px 16px;background:#7C3AED;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">🖨️ พิมพ์</button>'
-    +'<button onclick="openSGS()" style="padding:9px 16px;background:#F1F5F9;color:#475569;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">⚙️ แก้ตั้งค่า</button>'
-    +'<button onclick="_sgsResetScores()" style="padding:9px 16px;background:#FEE2E2;color:#DC2626;border:1.5px solid #FECACA;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">🗑️ รีเซตคะแนน</button>'
-    +'<button onclick="_sgsRenderTable()" style="padding:9px 16px;background:#F0FDF4;color:#16A34A;border:1.5px solid #BBF7D0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">🔄 รีเฟรชคะแนน</button>'
-    +'</div>';
-
-  // table
-  html+='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:14px;border:1.5px solid #E2E8F0;">'
-    +'<table style="border-collapse:collapse;min-width:100%;font-size:13px;font-family:Sarabun,sans-serif;">'
-    +'<thead><tr style="background:#EFF6FF;">'
-    +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;min-width:34px;">#</th>'
-    +'<th style="padding:10px 10px;border-bottom:2px solid #BFDBFE;text-align:left;min-width:140px;">ชื่อ-นามสกุล</th>'
-    +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;color:#7C3AED;">คะแนนจริง<br><span style="font-size:10px;font-weight:400;">/100</span></th>';
-  _sgsCfg.sections.forEach(function(sec){
-    html+='<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;">'+sec.name+'<br><span style="font-size:10px;font-weight:400;color:#64748B;">เต็ม '+sec.max+'</span></th>';
-  });
-  html+='<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;background:#F0FDF4;">รวม SGS</th>'
-    +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;background:#DCFCE7;color:#16A34A;white-space:nowrap;">อ่าน-คิด<br>วิเคราะห์<br><span style=\"font-size:9px;font-weight:400;\">/3</span></th>'
-    +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;">สถานะ</th>'
-    +'<th style="padding:10px 8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;">เกลี่ย</th>'
-    +'</tr>'
-    +'<tr style="background:#FFF7ED;">'
-    +'<td colspan="3" style="padding:6px 10px;font-size:12px;font-weight:700;color:#B45309;text-align:right;">คะแนนขั้นต่ำ:</td>';
-  _sgsCfg.sections.forEach(function(sec){
-    html+='<td style="padding:3px;text-align:center;"><input type="number" class="sgs-min-inp" data-sec="'+sec.id+'" min="0" max="'+sec.max+'" value="'+(sec.minScore||'')+'" placeholder="0" style="width:58px;height:28px;border:1.5px solid #FCD34D;border-radius:7px;text-align:center;font-size:12px;font-weight:700;font-family:Sarabun,sans-serif;background:#FFFBEB;outline:none;"></td>';
-  });
-  html+='<td colspan="3" style="padding:6px;font-size:10px;color:#B45309;text-align:center;">เกลี่ยจะไม่ลดต่ำกว่านี้</td>'
-    +'</tr>'
-    +'</thead><tbody>';
-  stus.forEach(function(s,i){
-    var actual=Math.round(_sgsCalcActual(s.id));
-    if(!_sgsScores[s.id]) _sgsScores[s.id]={};
-    var sgsTotal=_sgsCfg.sections.reduce(function(sum,sec){return sum+(Number(_sgsScores[s.id][sec.id])||0);},0);
-    sgsTotal=Math.round(sgsTotal*100)/100;
-    var ok=Math.abs(sgsTotal-actual)<0.01;
-    var isInactive=s.status&&s.status!=='active';
-    var rowBg=isInactive?'#F8FAFC':i%2===0?'#fff':'#FAFBFF';
-
-    html+='<tr data-sid="'+s.id+'" style="background:'+rowBg+(isInactive?';opacity:.55':'')+';">'
-      +'<td style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;color:#94A3B8;font-size:11px;">'+(i+1)+'</td>'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;font-weight:600;color:'+( isInactive?'#94A3B8':'#0F172A')+';'+(isInactive?'text-decoration:line-through;':'')+'">'+s.name+'<div style="font-size:10px;color:#94A3B8;font-weight:400;">'+s.id+'</div></td>'
-      +'<td style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;font-weight:700;color:#7C3AED;">'+actual+'</td>';
-
-    _sgsCfg.sections.forEach(function(sec){
-      var val=_sgsScores[s.id][sec.id]!=null?_sgsScores[s.id][sec.id]:'';
-      html+='<td style="padding:2px;border-bottom:1px solid #F1F5F9;text-align:center;">'
-        +'<input type="number" class="sgs-inp" data-sid="'+s.id+'" data-sec="'+sec.id+'" data-max="'+sec.max+'" min="0" max="'+sec.max+'" step="1" value="'+val+'" placeholder="-"'
-        +' style="width:70px;height:36px;border:1.5px solid #E2E8F0;border-radius:8px;text-align:center;font-size:13px;font-weight:700;font-family:Sarabun,sans-serif;outline:none;background:#F8FAFC;">'
-        +'</td>';
-    });
-
-    var totColor=ok?'#16A34A':'#DC2626';
-    html+='<td id="sgstot_'+s.id+'" style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;font-weight:800;font-size:14px;color:'+totColor+';background:#F0FDF4;">'+( sgsTotal||'-')+'</td>'
-      +'<td id="sgsrta_'+s.id+'" style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;font-weight:800;font-size:16px;background:#DCFCE7;color:'+rtaColor(calcRTA(actual))+';">'+calcRTA(actual)+'</td>'
-      +'<td id="sgsok_'+s.id+'"" style="padding:8px;border-bottom:1px solid #F1F5F9;text-align:center;font-size:16px;">'+(ok&&sgsTotal>0?'✅':'⚠️')+'</td>'
-      +'<td style="padding:4px;border-bottom:1px solid #F1F5F9;text-align:center;">'
-      +'<button onclick="_sgsAutoSingle(\''+s.id+'\')" style="padding:4px 8px;background:#EFF6FF;color:#2563EB;border:1.5px solid #BFDBFE;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">เกลี่ย</button>'
-      +'</td></tr>';
-  });
-
-  html+='</tbody></table></div>';
-  el.innerHTML=html;
-
-  // attach input events
-  document.querySelectorAll('.sgs-inp').forEach(function(inp){
-    inp.oninput=function(){
-      var sid=this.dataset.sid;var sec=this.dataset.sec;var max=parseFloat(this.dataset.max);
-      var v=this.value===''?null:parseFloat(this.value);
-      if(v!==null&&v>max){v=max;this.value=max;}
-      if(!_sgsScores[sid])_sgsScores[sid]={};
-      _sgsScores[sid][sec]=v;
-      _sgsUpdateRow(sid);
-    };
-    inp.onfocus=function(){this.style.borderColor='#2563EB';this.style.background='#EFF6FF';};
-    inp.onblur=function(){this.style.borderColor='#E2E8F0';this.style.background='#F8FAFC';};
-    inp.onkeydown=function(e){
-      if(e.key==='Enter'||e.key==='Tab'){
-        e.preventDefault();
-        var all=[].slice.call(document.querySelectorAll('.sgs-inp'));
-        var idx=all.indexOf(this);if(idx>=0&&idx<all.length-1)all[idx+1].focus();
-      }
-    };
-  });
-
-  document.querySelectorAll('.sgs-min-inp').forEach(function(inp){
-    inp.oninput=function(){
-      var sid=this.dataset.sec;
-      var sec=_sgsCfg.sections.find(function(s){return s.id===sid;});
-      if(sec){sec.minScore=this.value===''?0:parseInt(this.value)||0;this.style.borderColor=sec.minScore>0?'#F59E0B':'#FCD34D';}
-    };
-  });
-}
-
-function _sgsUpdateRow(sid){
-  var actual=Math.round(_sgsCalcActual(sid));
-  var sgsTotal=_sgsCfg.sections.reduce(function(sum,sec){return sum+(Number(_sgsScores[sid]&&_sgsScores[sid][sec.id])||0);},0);
-  sgsTotal=Math.round(sgsTotal*100)/100;
-  var ok=Math.abs(sgsTotal-actual)<0.01;
-  var totEl=document.getElementById('sgstot_'+sid);
-  var okEl=document.getElementById('sgsok_'+sid);
-  if(totEl){totEl.textContent=sgsTotal||'-';totEl.style.color=ok?'#16A34A':'#DC2626';}
-  if(okEl)okEl.textContent=ok&&sgsTotal>0?'✅':'⚠️';
-  var rtaEl=document.getElementById("sgsrta_"+sid);if(rtaEl){rtaEl.textContent=calcRTA(actual);rtaEl.style.color=rtaColor(calcRTA(actual));}
-}
-
-function _sgsAutoSingle(sid){
-  _sgsAutoDistribute(sid);
-  // อัพเดต inputs
-  _sgsCfg.sections.forEach(function(sec){
-    var inp=document.querySelector('.sgs-inp[data-sid="'+sid+'"][data-sec="'+sec.id+'"]');
-    if(inp) inp.value=_sgsScores[sid][sec.id]!=null?_sgsScores[sid][sec.id]:'';
-  });
-  _sgsUpdateRow(sid);
-}
-
-function _sgsAutoAll(){
-  var stus=DB.students.filter(function(s){return s.room===_sgsRoom;});
-  stus.forEach(function(s){_sgsAutoSingle(s.id);});
-}
-
-function _sgsCopyTable(){
-  var stus=DB.students.filter(function(s){return s.room===_sgsRoom;}).sort(function(a,b){return a.id.localeCompare(b.id);});
-  var header=['เลขที่','รหัส','ชื่อ-นามสกุล','คะแนนจริง'].concat(_sgsCfg.sections.map(function(s){return s.name+'('+s.max+')';})).concat(['รวมSGS','อ่าน-คิด-วิเคราะห์','สถานะ']);
-  var rows=[header.join('\t')];
-  stus.forEach(function(s,i){
-    var actual=_sgsCalcActual(s.id);
-    var vals=_sgsCfg.sections.map(function(sec){return _sgsScores[s.id]&&_sgsScores[s.id][sec.id]!=null?_sgsScores[s.id][sec.id]:'-';});
-    var tot=_sgsCfg.sections.reduce(function(sum,sec){return sum+(Number(_sgsScores[s.id]&&_sgsScores[s.id][sec.id])||0);},0);
-    tot=Math.round(tot*100)/100;
-    var ok=Math.abs(tot-actual)<0.01;
-    rows.push([(i+1),s.id,s.name,actual].concat(vals).concat([tot,calcRTA(actual),ok?'✓':'✗']).join('\t'));
-  });
-  if(navigator.clipboard){
-    navigator.clipboard.writeText(rows.join('\n')).then(function(){if(typeof toast==='function')toast('คัดลอกตารางแล้ว ✅');});
-  }
-}
-
-
-function _sgsPrint(){
-  var stus=DB.students.filter(function(s){return s.room===_sgsRoom;}).sort(function(a,b){return a.id.localeCompare(b.id);});
-  var now=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
-  var secHeaders=_sgsCfg.sections.map(function(sec){return '<th style="padding:8px 6px;border:1px solid #ccc;text-align:center;font-size:11px;white-space:nowrap;">'+sec.name+'<br><span style="font-weight:400;font-size:10px;">เต็ม '+sec.max+'</span></th>';}).join('');
-  var rows=stus.map(function(s,i){
-    var actual=Math.round(_sgsCalcActual(s.id));
-    var secCells=_sgsCfg.sections.map(function(sec){
-      var v=_sgsScores[s.id]&&_sgsScores[s.id][sec.id]!=null?_sgsScores[s.id][sec.id]:'-';
-      return '<td style="padding:6px;border:1px solid #ccc;text-align:center;font-weight:700;">'+v+'</td>';
-    }).join('');
-    var sgsTotal=_sgsCfg.sections.reduce(function(sum,sec){return sum+(Number(_sgsScores[s.id]&&_sgsScores[s.id][sec.id])||0);},0);
-    var ok=Math.abs(sgsTotal-actual)<0.01;
-    var isInactive=s.status&&s.status!=='active';
-    var stLabel={'withdrawn':'(ลาออก)','transferred':'(ย้ายออก)','leave':'(ลาพัก)'};
-    return '<tr style="'+(i%2===0?'background:#fff':'background:#F8FAFF')+(isInactive?';opacity:.6':'')+'">'+
-      '<td style="padding:6px;border:1px solid #ccc;text-align:center;color:#999;font-size:11px;">'+(i+1)+'</td>'+
-      '<td style="padding:6px;border:1px solid #ccc;font-size:11px;color:#999;">'+(s.id)+'</td>'+
-      '<td style="padding:6px 8px;border:1px solid #ccc;font-weight:600;'+(isInactive?'text-decoration:line-through;color:#94A3B8;':'')+'">'+s.name+(isInactive?' '+(stLabel[s.status]||''):'')+'</td>'+
-      '<td style="padding:6px;border:1px solid #ccc;text-align:center;font-weight:700;color:#7C3AED;">'+actual+'</td>'+
-      secCells+
-      '<td style="padding:6px;border:1px solid #ccc;text-align:center;font-weight:800;font-size:14px;color:'+(ok?'#16A34A':'#DC2626')+';">'+sgsTotal+'</td>'+
-      '<td style="padding:6px;border:1px solid #ccc;text-align:center;font-weight:800;font-size:15px;color:'+rtaColor(calcRTA(actual))+';">'+calcRTA(actual)+'</td>'+
-      '<td style="padding:6px;border:1px solid #ccc;text-align:center;">'+(ok&&sgsTotal>0?'✓':'✗')+'</td>'+
-      '</tr>';
-  }).join('');
-
-  var win=window.open('','_blank');
-  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8">'+
-    '<title>SGS — '+_sgsRoom+'</title>'+
-    '<style>@page{size:A4 landscape;margin:15mm;}body{font-family:Sarabun,sans-serif;font-size:13px;color:#0F172A;}'+
-    'h2{margin:0 0 4px;font-size:16px;}p{margin:0 0 12px;font-size:12px;color:#64748B;}'+
-    'table{border-collapse:collapse;width:100%;}th{background:#EFF6FF;padding:8px 6px;border:1px solid #ccc;font-size:11px;}'+
-    '@media print{button{display:none!important;}}'+
-    '</style></head><body>'+
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">'+
-    '<div><h2>📊 ตาราง SGS — ห้อง '+_sgsRoom+'</h2><p>พิมพ์วันที่ '+now+' · นักเรียน '+stus.length+' คน</p></div>'+
-    '<div style="text-align:right;font-size:11px;color:#64748B;">'+
-    _sgsCfg.sections.map(function(s){return s.name+': เต็ม '+s.max;}).join(' · ')+'<br>รวมทั้งหมด: 100 คะแนน</div>'+
-    '</div>'+
-    '<table><thead><tr>'+
-    '<th style="padding:8px 6px;border:1px solid #ccc;width:36px;text-align:center;">#</th>'+
-    '<th style="padding:8px 6px;border:1px solid #ccc;width:80px;text-align:center;">รหัส</th>'+
-    '<th style="padding:8px 6px;border:1px solid #ccc;text-align:left;min-width:140px;">ชื่อ-นามสกุล</th>'+
-    '<th style="padding:8px 6px;border:1px solid #ccc;text-align:center;color:#7C3AED;">คะแนนจริง<br><span style="font-weight:400;">/100</span></th>'+
-    secHeaders+
-    '<th style="padding:8px 6px;border:1px solid #ccc;text-align:center;background:#F0FDF4;color:#16A34A;">รวม SGS</th>'+
-    '<th style="padding:8px 6px;border:1px solid #ccc;text-align:center;color:#16A34A;">อ่าน-คิด-วิเคราะห์<br>/3</th>'+'<th style="padding:8px 6px;border:1px solid #ccc;text-align:center;width:40px;">✓</th>'+
-    '</tr></thead><tbody>'+rows+'</tbody></table>'+
-    '<div style="margin-top:16px;display:flex;gap:20px;font-size:11px;color:#64748B;">'+
-    '<span>✓ = คะแนน SGS รวมตรงกับคะแนนจริง</span>'+
-    '<span>✗ = คะแนน SGS ยังไม่สมบูรณ์</span></div>'+
-    '<div style="margin-top:24px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:#7C3AED;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ พิมพ์เอกสาร</button></div>'+
-    '</body></html>');
-  win.document.close();
-}
-
-
-/* ===== SGS Import from Excel ===== */
-var _sgsImportData = []; // [{name, score}]
-var _sgsImportScores = {}; // {name: {pre,mid,post,final}}
-
-function openSGSImport(){
-  // switch to import page
-  document.querySelectorAll('#s-admin .page').forEach(function(p){p.classList.remove('on');p.style.display='none';});
-  var pg = document.getElementById('ap-sgs-import');
-  if(pg){pg.classList.add('on');pg.style.display='block';}
-  document.querySelectorAll('.bnav-btn').forEach(function(b){b.classList.remove('on');});
-  _renderSGSImportSetup();
-}
-
-function _renderSGSImportSetup(){
-  var el=document.getElementById('sgs-import-content');if(!el)return;
-  var totalMax=_sgsCfg.sections.reduce(function(s,sec){return s+sec.max;},0);
-  var totalOk=totalMax===100;
-
-  el.innerHTML='<div style="background:#FAF5FF;border-radius:14px;padding:16px;margin-bottom:14px;border:1.5px solid #DDD6FE;">'
-    +'<div style="font-size:14px;font-weight:800;color:#7C3AED;margin-bottom:8px;">⚙️ ตั้งค่าคะแนนเต็มแต่ละช่อง (ใช้ร่วมกับ SGS ปกติ)</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
-    +_sgsCfg.sections.map(function(sec){
-      return '<div style="background:#fff;border-radius:10px;padding:10px;border:1.5px solid #E2E8F0;">'
-        +'<div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">'+sec.name+'</div>'
-        +'<div style="display:flex;align-items:center;gap:6px;">'
-        +'<span style="font-size:12px;color:#64748B;">เต็ม</span>'
-        +'<input type="number" class="sgs-max-inp" data-sec="'+sec.id+'" value="'+sec.max+'" min="0" max="100" '
-        +'style="width:60px;padding:5px 8px;border:1.5px solid #BFDBFE;border-radius:8px;font-size:14px;font-weight:700;text-align:center;font-family:Sarabun,sans-serif;">'
-        +'<span style="font-size:12px;color:#64748B;">คะแนน</span></div></div>';
-    }).join('')
-    +'</div>'
-    +'<div style="font-size:12px;color:'+(totalOk?'#16A34A':'#DC2626')+';font-weight:700;">รวมคะแนนเต็ม: '+totalMax+'/100 '+(totalOk?'✅':'⚠️ ต้องรวม = 100')+'</div>'
-    +'</div>'
-
-    // upload area
-    +'<div style="background:#fff;border-radius:14px;padding:20px;border:2px dashed #BFDBFE;text-align:center;margin-bottom:14px;" id="sgs-drop-zone">'
-    +'<div style="font-size:36px;margin-bottom:8px;">📂</div>'
-    +'<div style="font-size:14px;font-weight:700;color:#1E40AF;margin-bottom:6px;">เลือกไฟล์ Excel (.xlsx / .xls / .csv)</div>'
-    +'<div style="font-size:12px;color:#64748B;margin-bottom:14px;">ไฟล์ต้องมีคอลัมน์: <b>ชื่อ</b> และ <b>คะแนน</b> (เต็ม 100)</div>'
-    +'<input type="file" id="sgs-file-inp" accept=".xlsx,.xls,.csv" style="display:none;" onchange="_sgsHandleFile(this.files[0])">'
-    +'<button id="sgs-pick-btn" style="padding:10px 24px;background:#2563EB;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">เลือกไฟล์</button>'
-    +'</div>'
-
-    // preview area
-    +'<div id="sgs-import-preview"></div>';
-
-  // pick file button
-  setTimeout(function(){var pb=document.getElementById('sgs-pick-btn');if(pb)pb.onclick=function(){document.getElementById('sgs-file-inp').click();};},50);
-  // attach max-score events
-  document.querySelectorAll('.sgs-max-inp').forEach(function(inp){
-    inp.oninput=function(){
-      var sec=_sgsCfg.sections.find(function(s){return s.id===inp.dataset.sec;});
-      if(sec) sec.max=Number(inp.value)||0;
-      _renderSGSImportSetup();
-    };
-  });
-
-  // drag-drop
-  var dz=document.getElementById('sgs-drop-zone');
-  if(dz){
-    dz.ondragover=function(e){e.preventDefault();this.style.background='#EFF6FF';};
-    dz.ondragleave=function(){this.style.background='#fff';};
-    dz.ondrop=function(e){e.preventDefault();this.style.background='#fff';var f=e.dataTransfer.files[0];if(f)_sgsHandleFile(f);};
-  }
-}
-
-function _sgsHandleFile(file){
-  if(!file)return;
-  var ext=file.name.split('.').pop().toLowerCase();
-  if(ext==='csv'){
-    var reader=new FileReader();
-    reader.onload=function(e){_sgsParseCsv(e.target.result);};
-    reader.readAsText(file,'utf-8');
-  } else {
-    // xlsx via SheetJS (loaded dynamically)
-    var reader=new FileReader();
-    reader.onload=function(e){
-      try{
-        var data=new Uint8Array(e.target.result);
-        var wb=XLSX.read(data,{type:'array'});
-        var ws=wb.Sheets[wb.SheetNames[0]];
-        var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-        _sgsParsRows(rows);
-      }catch(err){
-        document.getElementById('sgs-import-preview').innerHTML='<div style="color:#DC2626;padding:12px;">❌ อ่านไฟล์ไม่ได้: '+err.message+'</div>';
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  }
-}
-
-function _sgsParseCsv(text){
-  var lines=text.split('\n').filter(function(l){return l.trim();});
-  var rows=lines.map(function(l){return l.split(',').map(function(c){return c.trim().replace(/^"|"$/g,'');});});
-  _sgsParsRows(rows);
-}
-
-function _sgsParsRows(rows){
-  if(!rows.length){_showImportError('ไฟล์ว่างเปล่า');return;}
-  var header=rows[0].map(function(h){return String(h).trim().toLowerCase();});
-  // หา column ชื่อ และ คะแนน
-  var nameCol=-1, scoreCol=-1;
-  header.forEach(function(h,i){
-    if(nameCol<0 && (h.includes('ชื่อ')||h.includes('name')||h==='ชื่อ-นามสกุล')) nameCol=i;
-    if(scoreCol<0 && (h.includes('คะแนน')||h.includes('score')||h.includes('รวม')||h.includes('total'))) scoreCol=i;
-  });
-  if(nameCol<0||scoreCol<0){
-    // ลองใช้ column แรก=ชื่อ, สอง=คะแนน
-    if(rows.length>1 && rows[0].length>=2){
-      nameCol=0; scoreCol=1;
-    } else {
-      _showImportError('ไม่พบคอลัมน์ "ชื่อ" และ "คะแนน" — กรุณาตรวจสอบ header ของไฟล์'); return;
-    }
-  }
-  var data=[];
-  for(var i=1;i<rows.length;i++){
-    var row=rows[i];
-    var name=String(row[nameCol]||'').trim();
-    var score=parseFloat(row[scoreCol]);
-    if(name && !isNaN(score) && score>=0) data.push({name:name,score:Math.min(100,score)});
-  }
-  if(!data.length){_showImportError('ไม่พบข้อมูลนักเรียน');return;}
-  _sgsImportData=data;
-  _sgsImportScores={};
-  _renderImportPreview();
-}
-
-function _showImportError(msg){
-  var el=document.getElementById('sgs-import-preview');
-  if(el) el.innerHTML='<div style="background:#FEE2E2;border-radius:12px;padding:14px;color:#DC2626;font-size:13px;font-weight:700;">❌ '+msg+'</div>';
-}
-
-function _renderImportPreview(){
-  var el=document.getElementById('sgs-import-preview');if(!el)return;
-  var totalMax=_sgsCfg.sections.reduce(function(s,sec){return s+sec.max;},0);
-  if(totalMax!==100){_showImportError('คะแนนเต็มรวมต้องเท่ากับ 100 (ตอนนี้ '+totalMax+')');return;}
-  var data=_sgsImportData;
-
-  var html='<div style="background:#F0FDF4;border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">'
-    +'<div style="font-size:13px;font-weight:700;color:#16A34A;">✅ อ่านไฟล์สำเร็จ — พบ '+data.length+' คน</div>'
-    +'<div style="display:flex;gap:8px;">'
-    +'<button onclick="_sgsImportAutoAll()" style="padding:8px 14px;background:#2563EB;color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">✨ เกลี่ยทุกคน</button>'
-    +'<button onclick="_sgsImportPrint()" style="padding:8px 14px;background:#7C3AED;color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">🖨️ พิมพ์</button>'
-    +'<button onclick="_sgsImportCopy()" style="padding:8px 14px;background:#059669;color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">📋 คัดลอก</button>'
-    +'</div></div>';
-
-  // min-score setup
-  html+='<div style="background:#FFF7ED;border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
-    +'<span style="font-size:12px;font-weight:700;color:#B45309;">คะแนนขั้นต่ำ:</span>'
-    +_sgsCfg.sections.map(function(sec){
-      return '<div style="display:flex;align-items:center;gap:5px;">'
-        +'<span style="font-size:11px;color:#92400E;">'+sec.name+':</span>'
-        +'<input type="number" class="sgs-imp-min" data-sec="'+sec.id+'" min="0" max="'+sec.max+'" value="'+(sec.minScore||'')+'" placeholder="0" '
-        +'style="width:52px;height:28px;border:1.5px solid #FCD34D;border-radius:8px;text-align:center;font-size:12px;font-weight:700;font-family:Sarabun,sans-serif;background:#FFFBEB;outline:none;">'
-        +'</div>';
-    }).join('')
-    +'</div>';
-
-  // table
-  var secTh=_sgsCfg.sections.map(function(sec){
-    return '<th style="padding:8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;">'+sec.name+'<br><span style="font-size:10px;font-weight:400;color:#64748B;">เต็ม '+sec.max+'</span></th>';
-  }).join('');
-
-  html+='<div style="overflow-x:auto;border-radius:12px;border:1.5px solid #E2E8F0;">'
-    +'<table style="border-collapse:collapse;min-width:100%;font-size:13px;font-family:Sarabun,sans-serif;">'
-    +'<thead><tr style="background:#EFF6FF;">'
-    +'<th style="padding:8px;border-bottom:2px solid #BFDBFE;text-align:center;width:36px;">#</th>'
-    +'<th style="padding:8px 10px;border-bottom:2px solid #BFDBFE;text-align:left;min-width:140px;">ชื่อ</th>'
-    +'<th style="padding:8px;border-bottom:2px solid #BFDBFE;text-align:center;color:#7C3AED;">คะแนน<br><span style="font-size:10px;font-weight:400;">/100</span></th>'
-    +secTh
-    +'<th style="padding:8px;border-bottom:2px solid #BFDBFE;text-align:center;background:#F0FDF4;">รวม</th>'
-    +'<th style="padding:8px;border-bottom:2px solid #BFDBFE;text-align:center;width:40px;">✓</th>'
-    +'<th style="padding:8px;border-bottom:2px solid #BFDBFE;text-align:center;white-space:nowrap;">เกลี่ย</th>'
-    +'</tr></thead><tbody>';
-
-  data.forEach(function(d,i){
-    var sc=_sgsImportScores[d.name]||{};
-    var tot=_sgsCfg.sections.reduce(function(s,sec){return s+(Number(sc[sec.id])||0);},0);
-    var actual=Math.round(d.score);
-    var ok=Math.abs(tot-actual)<0.01&&tot>0;
-    html+='<tr style="background:'+(i%2===0?'#fff':'#FAFBFF')+'">'
-      +'<td style="padding:7px;border-bottom:1px solid #F1F5F9;text-align:center;color:#94A3B8;font-size:11px;">'+(i+1)+'</td>'
-      +'<td style="padding:7px 10px;border-bottom:1px solid #F1F5F9;font-weight:600;">'+d.name+'</td>'
-      +'<td style="padding:7px;border-bottom:1px solid #F1F5F9;text-align:center;font-weight:700;color:#7C3AED;">'+actual+'</td>';
-    _sgsCfg.sections.forEach(function(sec){
-      var v=sc[sec.id]!=null?sc[sec.id]:'';
-      html+='<td style="padding:2px;border-bottom:1px solid #F1F5F9;text-align:center;">'
-        +'<input type="number" class="sgs-imp-inp" data-name="'+d.name+'" data-sec="'+sec.id+'" data-max="'+sec.max+'" min="0" max="'+sec.max+'" step="1" value="'+v+'" placeholder="-"'
-        +' style="width:64px;height:34px;border:1.5px solid #E2E8F0;border-radius:8px;text-align:center;font-size:13px;font-weight:700;font-family:Sarabun,sans-serif;outline:none;background:#F8FAFC;">'
-        +'</td>';
-    });
-    html+='<td id="sgsimp_tot_'+i+'" style="padding:7px;border-bottom:1px solid #F1F5F9;text-align:center;font-weight:800;font-size:14px;color:'+(ok?'#16A34A':'#DC2626')+';background:#F0FDF4;">'+(tot||'-')+'</td>'
-      +'<td id="sgsimp_ok_'+i+'" style="padding:7px;border-bottom:1px solid #F1F5F9;text-align:center;font-size:15px;">'+(ok?'✅':'⚠️')+'</td>'
-      +'<td style="padding:4px;border-bottom:1px solid #F1F5F9;text-align:center;">'
-      +'<button onclick="_sgsImportAutoOne('+i+')" style="padding:3px 8px;background:#EFF6FF;color:#2563EB;border:1.5px solid #BFDBFE;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">เกลี่ย</button>'
-      +'</td></tr>';
-  });
-  html+='</tbody></table></div>';
-  el.innerHTML=html;
-
-  // events: min inputs
-  document.querySelectorAll('.sgs-imp-min').forEach(function(inp){
-    inp.oninput=function(){
-      var sec=_sgsCfg.sections.find(function(s){return s.id===this.dataset.sec;}.bind(this));
-      if(sec) sec.minScore=parseInt(this.value)||0;
-    };
-  });
-  // events: score inputs
-  document.querySelectorAll('.sgs-imp-inp').forEach(function(inp,idx2){
-    inp.oninput=function(){
-      var name=this.dataset.name;var sec=this.dataset.sec;var max=parseFloat(this.dataset.max);
-      var v=this.value===''?null:Math.min(parseFloat(this.value),max);
-      if(!_sgsImportScores[name])_sgsImportScores[name]={};
-      _sgsImportScores[name][sec]=v;
-      _sgsImportUpdateRow(name);
-    };
-    inp.onfocus=function(){this.style.borderColor='#2563EB';this.style.background='#EFF6FF';};
-    inp.onblur=function(){this.style.borderColor='#E2E8F0';this.style.background='#F8FAFC';};
-  });
-}
-
-function _sgsImportCalcDist(score){
-  var actual=Math.round(score);
-  var secs=_sgsCfg.sections;
-  var raw=secs.map(function(sec){return actual*(sec.max/100);});
-  var floors=raw.map(function(v){return Math.floor(v);});
-  var leftover=actual-floors.reduce(function(s,v){return s+v;},0);
-  raw.map(function(v,i){return {i:i,r:v-floors[i]};}).sort(function(a,b){return b.r-a.r;}).forEach(function(o,k){if(k<leftover)floors[o.i]++;});
-  var scores=floors.slice();
-  var freeIdx=[];var forcedExtra=0;
-  secs.forEach(function(sec,i){var mn=sec.minScore||0;if(mn>0&&scores[i]<mn){forcedExtra+=mn-scores[i];scores[i]=mn;}else freeIdx.push(i);});
-  if(forcedExtra>0&&freeIdx.length>0){
-    var rem=forcedExtra;
-    freeIdx.forEach(function(i,fi){var cut=fi<freeIdx.length-1?Math.min(scores[i],Math.round(forcedExtra*(scores[i]/Math.max(1,freeIdx.reduce(function(s,j){return s+scores[j];},0))))):rem;cut=Math.min(cut,scores[i]);scores[i]-=cut;rem-=cut;});
-  }
-  var sum=scores.reduce(function(s,v){return s+v;},0);var diff=actual-sum;
-  if(diff!==0){var ai=freeIdx.length>0?freeIdx[freeIdx.length-1]:secs.length-1;scores[ai]=Math.max(0,scores[ai]+diff);}
-  var result={};
-  secs.forEach(function(sec,i){result[sec.id]=scores[i];});
-  return result;
-}
-
-function _sgsImportAutoOne(idx){
-  var d=_sgsImportData[idx];if(!d)return;
-  var dist=_sgsImportCalcDist(d.score);
-  if(!_sgsImportScores[d.name])_sgsImportScores[d.name]={};
-  Object.assign(_sgsImportScores[d.name],dist);
-  // อัพเดต inputs
-  _sgsCfg.sections.forEach(function(sec){
-    var inp=document.querySelector('.sgs-imp-inp[data-name="'+d.name+'"][data-sec="'+sec.id+'"]');
-    if(inp){inp.value=dist[sec.id]!=null?dist[sec.id]:'';}
-  });
-  _sgsImportUpdateRow(d.name);
-}
-
-function _sgsImportAutoAll(){
-  _sgsImportData.forEach(function(d,i){_sgsImportAutoOne(i);});
-}
-
-function _sgsImportUpdateRow(name){
-  var idx=_sgsImportData.findIndex(function(d){return d.name===name;});
-  if(idx<0)return;
-  var sc=_sgsImportScores[name]||{};
-  var tot=_sgsCfg.sections.reduce(function(s,sec){return s+(Number(sc[sec.id])||0);},0);
-  var actual=Math.round(_sgsImportData[idx].score);
-  var ok=Math.abs(tot-actual)<0.01&&tot>0;
-  var te=document.getElementById('sgsimp_tot_'+idx);var oe=document.getElementById('sgsimp_ok_'+idx);
-  if(te){te.textContent=tot||'-';te.style.color=ok?'#16A34A':'#DC2626';}
-  if(oe)oe.textContent=ok?'✅':'⚠️';
-}
-
-function _sgsImportCopy(){
-  var header=['#','ชื่อ','คะแนน'].concat(_sgsCfg.sections.map(function(s){return s.name+'('+s.max+')';})).concat(['รวม','✓']);
-  var rows=[header.join('	')];
-  _sgsImportData.forEach(function(d,i){
-    var sc=_sgsImportScores[d.name]||{};
-    var tot=_sgsCfg.sections.reduce(function(s,sec){return s+(Number(sc[sec.id])||0);},0);
-    var ok=Math.abs(tot-Math.round(d.score))<0.01&&tot>0;
-    var vals=_sgsCfg.sections.map(function(sec){return sc[sec.id]!=null?sc[sec.id]:'-';});
-    rows.push([(i+1),d.name,Math.round(d.score)].concat(vals).concat([tot,ok?'✓':'✗']).join('	'));
-  });
-  if(navigator.clipboard) navigator.clipboard.writeText(rows.join('\n')).then(function(){if(typeof toast==='function')toast('คัดลอกแล้ว ✅');});
-}
-
-function _sgsImportPrint(){
-  var now=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
-  var secTh=_sgsCfg.sections.map(function(sec){return '<th style="padding:7px 5px;border:1px solid #ccc;font-size:11px;text-align:center;">'+sec.name+'<br><span style="font-weight:400;font-size:10px;">เต็ม '+sec.max+'</span></th>';}).join('');
-  var rows=_sgsImportData.map(function(d,i){
-    var sc=_sgsImportScores[d.name]||{};
-    var tot=_sgsCfg.sections.reduce(function(s,sec){return s+(Number(sc[sec.id])||0);},0);
-    var ok=Math.abs(tot-Math.round(d.score))<0.01&&tot>0;
-    var cells=_sgsCfg.sections.map(function(sec){return '<td style="padding:6px;border:1px solid #ccc;text-align:center;font-weight:700;">'+(sc[sec.id]!=null?sc[sec.id]:'-')+'</td>';}).join('');
-    return '<tr style="background:'+(i%2===0?'#fff':'#F8FAFF')+'"><td style="padding:6px;border:1px solid #ccc;text-align:center;color:#999;font-size:11px;">'+(i+1)+'</td><td style="padding:6px 8px;border:1px solid #ccc;font-weight:600;">'+d.name+'</td><td style="padding:6px;border:1px solid #ccc;text-align:center;font-weight:700;color:#7C3AED;">'+Math.round(d.score)+'</td>'+cells+'<td style="padding:6px;border:1px solid #ccc;text-align:center;font-weight:800;color:'+(ok?'#16A34A':'#DC2626')+';">'+tot+'</td><td style="padding:6px;border:1px solid #ccc;text-align:center;">'+(ok&&tot>0?'✓':'✗')+'</td></tr>';
-  }).join('');
-  var win=window.open('','_blank');
-  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>SGS Import</title><style>@page{size:A4 landscape;margin:15mm;}body{font-family:Sarabun,sans-serif;font-size:13px;}table{border-collapse:collapse;width:100%;}th{background:#EFF6FF;padding:7px 5px;border:1px solid #ccc;}@media print{button{display:none!important;}}</style></head><body><div style="display:flex;justify-content:space-between;margin-bottom:12px;"><div><h2 style="margin:0;font-size:16px;">📊 ตาราง SGS (จากไฟล์ภายนอก)</h2><p style="margin:4px 0 0;font-size:12px;color:#64748B;">พิมพ์วันที่ '+now+' · '+_sgsImportData.length+' คน</p></div></div><table><thead><tr><th style="border:1px solid #ccc;width:36px;">#</th><th style="border:1px solid #ccc;text-align:left;min-width:140px;">ชื่อ</th><th style="border:1px solid #ccc;text-align:center;color:#7C3AED;">คะแนน/100</th>'+secTh+'<th style="border:1px solid #ccc;text-align:center;background:#F0FDF4;color:#16A34A;">รวม</th><th style="border:1px solid #ccc;width:36px;">✓</th></tr></thead><tbody>'+rows+'</tbody></table><div style="margin-top:24px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:#7C3AED;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ พิมพ์เอกสาร</button></div></body></html>');
-  win.document.close();
-}
-
-
-function _sgsResetScores(){
-  if(!confirm('ล้างคะแนน SGS ทั้งหมดในห้อง '+_sgsRoom+' ใช่ไหม?')) return;
-  var stus=DB.students.filter(function(s){return s.room===_sgsRoom;});
-  stus.forEach(function(s){_sgsScores[s.id]={};});
-  _sgsRenderTable();
-}
-
-
-function calcRTA(s){return s>=70?3:s>=60?2:s>=40?1:0;}
-function rtaColor(v){return v>=3?"#16A34A":v>=2?"#2563EB":v>=1?"#F59E0B":"#DC2626";}
-
-function _sgsValidateHW(){
-  var hws=(DB&&DB.homeworks?DB.homeworks:[]).filter(function(h){return !h.room||h.room===_sgsRoom;});
-  var errs=[];
-  _sgsCfg.sections.forEach(function(sec){
-    var selMax=sec.hws.reduce(function(s,n){var h=hws.find(function(x){return x.num===n;});return s+(h?h.maxScore||100:0);},0);
-    if(selMax!==sec.max) errs.push(sec.name+': เลือกงานรวมเต็ม '+selMax+' แต่กำหนดไว้ '+sec.max);
-  });
-  return errs;
-}
-
-function _sgsPreFillFromHW(){
-  var room=_sgsRoom;
-  var stus=DB.students.filter(function(s){return s.room===room;});
-  var hws=DB.homeworks.filter(function(h){return !h.room||h.room===room;});
-  stus.forEach(function(s){
-    if(!_sgsScores[s.id])_sgsScores[s.id]={};
-    _sgsCfg.sections.forEach(function(sec){
-      var secHWs=hws.filter(function(h){return sec.hws.indexOf(h.num)>=0;});
-      var score=secHWs.reduce(function(sum,h){
-        var sub=DB.submissions[subKey(s.id,h.num,h.room)]||DB.submissions[subKey(s.id,h.num,room)]||DB.submissions[subKey(s.id,h.num,'')];
-        if(sub) return sum+(sub.score!==null&&sub.score!==undefined?Number(sub.score):(h.maxScore||100));
-        return sum;
-      },0);
-      _sgsScores[s.id][sec.id]=Math.round(score);
-    });
-  });
-}
-
-function _sgsRenderTableWithHW(){
-  var totalMax=_sgsCfg.sections.reduce(function(s,sec){return s+sec.max;},0);
-  if(totalMax!==100){alert('คะแนนเต็มรวมต้องเท่ากับ 100 (ตอนนี้ '+totalMax+')');return;}
-  var errs=_sgsValidateHW();
-  if(errs.length>0){
-    alert('❌ ไม่สามารถดูตารางได้ เพราะคะแนนงานที่เลือกไม่ตรงกับที่กำหนด:\n\n'+errs.join('\n')+'\n\nกรุณาเลือกงานให้คะแนนเต็มรวมตรงกันก่อน');
-    return;
-  }
-  // Pre-fill จากชิ้นงานจริง
-  _sgsPreFillFromHW();
-  _sgsRenderTable();
-}
-
-
-/* ===== SGS Config (Save/Load per room) ===== */
-var _sgsCfgCache = {}; // {room: {sections:[...]}}
-
-function openSGSConfig(){
-  document.querySelectorAll('#s-admin .page').forEach(function(p){p.classList.remove('on');p.style.display='none';});
-  var pg=document.getElementById('ap-sgs-config');
-  if(pg){pg.classList.add('on');pg.style.display='block';}
-  document.querySelectorAll('.bnav-btn,.sidebar-nav-item').forEach(function(b){b.classList.remove('on');});
-  _renderSGSConfig();
-}
-
-function _renderSGSConfig(){
-  var el=document.getElementById('sgs-config-content');if(!el)return;
-  var rooms=(DB&&DB.rooms)?DB.rooms:[];
-  if(!rooms.length){el.innerHTML='<div style="text-align:center;padding:40px;color:#94A3B8;">ยังไม่มีห้องเรียน</div>';return;}
-  if(!_sgsRoom&&rooms.length)_sgsRoom=rooms[0];
-
-  var roomOpts=rooms.map(function(r){return '<option value="'+r+'"'+(r===_sgsRoom?' selected':'')+'>'+r+'</option>';}).join('');
-  var hws=(DB&&DB.homeworks?DB.homeworks:[]).filter(function(h){return !h.room||h.room===_sgsRoom;}).sort(function(a,b){return a.num-b.num;});
-  var totalMax=_sgsCfg.sections.reduce(function(s,sec){return s+sec.max;},0);
-  var totalOk=totalMax===100;
-
-  var html='<div style="background:#F8FAFC;border-radius:14px;padding:14px;margin-bottom:12px;border:1.5px solid #E2E8F0;">'
-    +'<div style="font-size:13px;font-weight:700;color:#475569;margin-bottom:8px;">เลือกห้องเรียน</div>'
-    +'<select id="sgscfg-room" style="width:100%;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:Sarabun,sans-serif;background:#fff;">'+roomOpts+'</select>'
-    +'</div>';
-
-  // sections
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">';
-  _sgsCfg.sections.forEach(function(sec){
-    var selMax=sec.hws.reduce(function(s,n){var h=hws.find(function(x){return x.num===n;});return s+(h?h.maxScore||100:0);},0);
-    var secOk=sec.hws.length>0&&selMax===sec.max;
-    var valColor=sec.hws.length===0?'#94A3B8':secOk?'#16A34A':selMax>sec.max?'#DC2626':'#F59E0B';
-    var valMsg=sec.hws.length===0?'ยังไม่ได้เลือก':secOk?'✅ ครบ':selMax>sec.max?'❌ เกิน '+selMax+'/'+sec.max:'⚠️ ขาด '+selMax+'/'+sec.max;
-    var hwOpts=hws.map(function(h){
-      return '<option value="'+h.num+'"'+(sec.hws.indexOf(h.num)>=0?' selected':'')+'>งาน '+h.num+' (เต็ม '+(h.maxScore||100)+') - '+h.title.substring(0,15)+'</option>';
-    }).join('');
-    html+='<div style="background:#fff;border-radius:12px;padding:12px;border:1.5px solid '+(secOk?'#86EFAC':'#E2E8F0')+';box-shadow:0 1px 4px rgba(0,0,0,.04);">'
-      +'<div style="font-size:13px;font-weight:800;color:#0F172A;margin-bottom:8px;">'+sec.name+'</div>'
-      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">'
-      +'<span style="font-size:12px;color:#64748B;">เต็ม</span>'
-      +'<input type="number" class="sgscfg-max" data-sec="'+sec.id+'" value="'+sec.max+'" min="0" max="100" '
-      +'style="width:58px;padding:5px;border:1.5px solid #BFDBFE;border-radius:8px;font-size:14px;font-weight:700;text-align:center;font-family:Sarabun,sans-serif;">'
-      +'<span style="font-size:11px;font-weight:700;color:'+valColor+';">'+valMsg+'</span>'
-      +'</div>'
-      +'<div style="font-size:11px;color:#64748B;margin-bottom:4px;">เลือกงาน (Ctrl/Cmd ค้าง):</div>'
-      +'<select multiple class="sgscfg-hw" data-sec="'+sec.id+'" style="width:100%;height:90px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:Sarabun,sans-serif;padding:4px;">'+hwOpts+'</select>'
-      +'</div>';
-  });
-  html+='</div>';
-
-  // validate total + save
-  var allSecOk=_sgsCfg.sections.every(function(sec){
-    var sm=sec.hws.reduce(function(s,n){var h=hws.find(function(x){return x.num===n;});return s+(h?h.maxScore||100:0);},0);
-    return sec.hws.length>0&&sm===sec.max;
-  });
-  var canSave=totalOk&&allSecOk;
-  html+='<div style="background:#F8FAFC;border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">'
-    +'<div style="font-size:13px;font-weight:700;color:'+(totalOk?'#16A34A':'#DC2626')+';"> รวมคะแนนเต็ม: '+totalMax+'/100</div>'
-    +'<div style="font-size:12px;color:'+(canSave?'#16A34A':'#F59E0B')+';font-weight:700;">'+(canSave?'✅ พร้อมบันทึก':allSecOk?'':'⚠️ บางช่องยังไม่ครบ')+'</div>'
-    +'</div>'
-    +'<div style="display:flex;gap:8px;">'
-    +'<button id="sgscfg-save-btn" onclick="_sgsSaveCfg()" style="flex:1;padding:12px;background:'+(canSave?'#2563EB':'#94A3B8')+';color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Sarabun,sans-serif;">'+(canSave?'💾 บันทึกตั้งค่า':'⚠️ กรุณาตั้งค่าให้ครบก่อน')+'</button>'
-    +'</div>';
-
-  el.innerHTML=html;
-
-  // events
-  document.getElementById('sgscfg-room').onchange=function(){_sgsRoom=this.value;_renderSGSConfig();};
-  document.querySelectorAll('.sgscfg-max').forEach(function(inp){
-    inp.oninput=function(){
-      var sec=_sgsCfg.sections.find(function(s){return s.id===inp.dataset.sec;});
-      if(sec){sec.max=parseInt(inp.value)||0;_renderSGSConfig();}
-    };
-  });
-  document.querySelectorAll('.sgscfg-hw').forEach(function(sel){
-    sel.onchange=function(){
-      var sec=_sgsCfg.sections.find(function(s){return s.id===sel.dataset.sec;});
-      if(sec){sec.hws=[].slice.call(sel.selectedOptions).map(function(o){return parseInt(o.value);});_renderSGSConfig();}
-    };
-    var sec=_sgsCfg.sections.find(function(s){return s.id===sel.dataset.sec;});
-    if(sec)[].slice.call(sel.options).forEach(function(o){o.selected=sec.hws.indexOf(parseInt(o.value))>=0;});
-    sel.addEventListener('wheel',function(e){
-      var atTop=this.scrollTop===0;
-      var atBottom=this.scrollTop+this.clientHeight>=this.scrollHeight;
-      if(!(atTop&&e.deltaY<0)&&!(atBottom&&e.deltaY>0)) e.stopPropagation();
-    },{passive:false});
-  });
-}
-
-async function _sgsSaveCfg(){
-  if(!CURRENT_TEACHER)return;
-  var room=_sgsRoom;
-  var key='sgs_cfg_'+room+'_'+CURRENT_TEACHER.id;
-  var val={sections:_sgsCfg.sections.map(function(s){return {id:s.id,name:s.name,max:s.max,hws:s.hws.slice(),minScore:s.minScore||0};})};
-  try{
-    var btn=document.getElementById('sgscfg-save-btn');
-    if(btn){btn.textContent='⏳ กำลังบันทึก...';btn.disabled=true;}
-    var {data:ex}=await SB.from('settings').select('key').eq('key',key).maybeSingle();
-    if(ex){await SB.from('settings').update({value:val}).eq('key',key);}
-    else{await SB.from('settings').insert({key:key,value:val});}
-    _sgsCfgCache[room]=val;
-    if(typeof toast==='function')toast('บันทึกตั้งค่า SGS สำเร็จ ✅');
-    _renderSGSConfig();
-  }catch(err){
-    alert('บันทึกไม่สำเร็จ: '+err.message);
-    _renderSGSConfig();
-  }
-}
-
-async function _sgsLoadCfg(room){
-  if(!CURRENT_TEACHER||!room)return false;
-  if(_sgsCfgCache[room]){
-    _applySGSCfg(_sgsCfgCache[room]);return true;
-  }
-  var key='sgs_cfg_'+room+'_'+CURRENT_TEACHER.id;
-  try{
-    var {data}=await SB.from('settings').select('value').eq('key',key).maybeSingle();
-    if(data&&data.value&&data.value.sections){
-      _sgsCfgCache[room]=data.value;
-      _applySGSCfg(data.value);return true;
-    }
-  }catch(e){}
-  return false;
-}
-
-function _applySGSCfg(cfg){
-  _sgsCfg.sections.forEach(function(sec){
-    var saved=cfg.sections.find(function(s){return s.id===sec.id;});
-    if(saved){sec.max=saved.max;sec.hws=saved.hws.slice();sec.minScore=saved.minScore||0;}
-  });
-}
-
-
-function _sgsSwitchRoom(room){
-  _sgsRoom=room;
-  var sel=document.getElementById('sgs-room-selector');
-  if(sel){
-    sel.querySelectorAll('.sgs-room-tab').forEach(function(b){
-      var r=b.textContent.trim();
-      b.style.background=r===room?'#2563EB':'#fff';
-      b.style.color=r===room?'#fff':'#475569';
-      b.style.borderColor=r===room?'#2563EB':'#E2E8F0';
-    });
-  }
-  openSGSTo('sgs-content-main');
+function renderTermToggle() {
+  const ct = DB.currentTerm||1;
+  return `<div class="term-toggle" style="display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.15);border-radius:20px;padding:3px;">
+    <button class="term-toggle-btn${ct===1?' term-active':''}" data-term="1" onclick="setTerm(1)" style="border:none;padding:4px 12px;border-radius:16px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;background:${ct===1?'#fff':'transparent'};color:${ct===1?'#6366f1':'rgba(255,255,255,0.8)'};">เทอม 1</button>
+    <button class="term-toggle-btn${ct===2?' term-active':''}" data-term="2" onclick="setTerm(2)" style="border:none;padding:4px 12px;border-radius:16px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;background:${ct===2?'#fff':'transparent'};color:${ct===2?'#6366f1':'rgba(255,255,255,0.8)'};">เทอม 2</button>
+  </div>`;
 }
 
 window.addEventListener('load', () => {
