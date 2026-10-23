@@ -6304,17 +6304,16 @@ function updateTermToggleUI() {
 async function setTerm(t) {
   DB.currentTerm = t;
   updateTermToggleUI();
-  // บันทึกลง settings
+  // บันทึกลง settings (wrapped ใน try/catch เผื่อ constraint ไม่ตรง)
   if(USE_SUPABASE && SB && CURRENT_TEACHER) {
-    const tid = CURRENT_TEACHER.id;
-    await SB.from('settings').upsert({key:'current_term_'+tid, value:t, teacher_id:tid},{onConflict:'key'});
+    try {
+      const tid = CURRENT_TEACHER.id;
+      await SB.from('settings').upsert({key:'current_term_'+tid, value:String(t), teacher_id:tid},{onConflict:'key'});
+    } catch(e) { console.warn('setTerm save failed', e); }
   }
-  // update toggle UI
-  document.querySelectorAll('.term-toggle-btn').forEach(b=>{
-    b.classList.toggle('term-active', parseInt(b.dataset.term)===t);
-  });
-  // reload data
+  // reload both homeworks AND submissions for new term
   await reloadHomeworks();
+  await reloadSubmissions();
   renderDash();
   renderManage();
   toast('เปลี่ยนเป็นเทอม '+t+' ✅');
