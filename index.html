@@ -1814,7 +1814,10 @@ CREATE POLICY "teachers_delete_admin_only" ON teachers FOR DELETE
     <button class="logout-btn" onclick="logout()">ออก</button>
   </div>
   <div class="toast-slot"><div id="toast-stu" class="tbar"></div></div>
-  <div style="padding:16px 16px 80px;" id="stu-content"></div>
+  <div style="padding:16px 16px 80px;">
+    <div id="stu-term-tab-bar" style="display:flex;gap:8px;margin-bottom:12px;"></div>
+    <div id="stu-content"></div>
+  </div>
 </div>
 
 

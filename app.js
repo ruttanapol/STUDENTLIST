@@ -381,13 +381,20 @@ function termHWs(arr) {
 async function setTerm(t) {
   DB.currentTerm = t;
   try { localStorage.setItem('hw_currentTerm', t); } catch(e) {}
-  // อัพเดต UI ปุ่มเทอม
   document.querySelectorAll('.term-tab').forEach(b => {
     b.classList.toggle('on', parseInt(b.dataset.term) === t);
   });
   renderDashboard();
   renderManage();
   populateHWDropdown();
+}
+function setStudentTerm(t) {
+  DB.currentTerm = t;
+  try { localStorage.setItem('hw_currentTerm', t); } catch(e) {}
+  document.querySelectorAll('.term-tab').forEach(b => {
+    b.classList.toggle('on', parseInt(b.dataset.term) === t);
+  });
+  if(_currentStuDB) renderStudentView(_currentStuDB.student, _currentStuDB);
 }
 
 function loadDB(){const d=lsGet('hwdb5');if(d)DB=d;try{const t=localStorage.getItem('hw_currentTerm');if(t)DB.currentTerm=parseInt(t)||1;}catch(e){}if(!DB.currentTerm)DB.currentTerm=1;}
@@ -1902,6 +1909,18 @@ function calcGradeConversion(){
 
 function renderStudentView(s, stuDB){
   const db=stuDB||{student:s,homeworks:DB.homeworks,submissions:DB.submissions};
+  // render term tab bar สำหรับนักเรียน
+  const stuTermBar=document.getElementById('stu-term-tab-bar');
+  if(stuTermBar){
+    const allTerms=[...new Set((db.homeworks||[]).map(h=>h.term||1))].sort();
+    if(allTerms.length>1){
+      stuTermBar.style.display='flex';
+      stuTermBar.innerHTML=allTerms.map(t=>`<button class="term-tab${(DB.currentTerm||1)===t?' on':''}" data-term="${t}" onclick="setStudentTerm(${t})">เทอม ${t}</button>`).join('');
+    } else {
+      stuTermBar.style.display='none';
+      stuTermBar.innerHTML='';
+    }
+  }
   const roomHWs=termHWs(db.homeworks).filter(h=>!h.room||h.room===s.room);
   const teacher = _currentStuTeacher;
   document.getElementById('stu-avatar').textContent=s.name.substring(0,2);
