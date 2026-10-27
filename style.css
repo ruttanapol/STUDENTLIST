@@ -13,6 +13,21 @@
   --radius:16px; --radius-sm:10px;
   --sidebar-w: 260px;
   --topbar-h: 64px;
+  /* ── Term theme tokens ── */
+  --term-primary:#7C3AED; --term-primary-lt:#EDE9FE;
+  --term-topbar:linear-gradient(135deg,#4F8EF7,#7C3AED);
+  --term-hero:linear-gradient(135deg,#4F8EF7,#7C3AED);
+  --term-badge-bg:#FFF7ED; --term-badge-color:#C2410C; --term-badge-border:#FED7AA;
+}
+/* ===== เทอม 2 — ธีมส้ม/อำพัน ===== */
+:root[data-term="2"] {
+  --blue:#F59E0B; --blue-light:#FEF3C7; --blue-dark:#D97706;
+  --purple:#EA580C; --purple-light:#FED7AA;
+  --bg:#FFFBEB; --border:#FDE68A;
+  --term-primary:#D97706; --term-primary-lt:#FEF3C7;
+  --term-topbar:linear-gradient(135deg,#F59E0B,#EA580C);
+  --term-hero:linear-gradient(135deg,#F59E0B,#EA580C);
+  --term-badge-bg:#EFF6FF; --term-badge-color:#1D4ED8; --term-badge-border:#BFDBFE;
 }
 
 html, body { height: 100%; }
@@ -85,7 +100,7 @@ body { background:var(--bg); overscroll-behavior:none; }
   display:flex; align-items:center; justify-content:space-between;
   padding:0 20px;
   height: var(--topbar-h);
-  background:linear-gradient(135deg,var(--blue),#7C3AED);
+  background:var(--term-topbar);
   box-shadow:0 2px 12px rgba(79,142,247,0.3);
   flex-shrink: 0;
 }
@@ -238,7 +253,7 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,1
 .stats2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;}
 /* ===== [21] RESPONSIVE BREAKPOINTS ===== */
 @media(min-width:768px){.stats2{grid-template-columns:repeat(4,1fr);}}
-.score-hero{border-radius:18px;padding:22px 18px;text-align:center;position:relative;overflow:hidden;background:linear-gradient(135deg,#4F8EF7,#7C3AED);box-shadow:0 8px 24px rgba(124,58,237,0.3);margin-bottom:14px;}
+.score-hero{border-radius:18px;padding:22px 18px;text-align:center;position:relative;overflow:hidden;background:var(--term-hero);box-shadow:0 8px 24px rgba(124,58,237,0.3);margin-bottom:14px;}
 .score-hero::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.08);}
 .score-hero::after{content:'';position:absolute;bottom:-40px;left:-20px;width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.06);}
 .score-hero-lbl{font-size:13px;font-weight:700;color:rgba(255,255,255,0.85);letter-spacing:.3px;position:relative;z-index:1;}
@@ -655,3 +670,27 @@ a[download]:active { transform:scale(0.96); }
   0%, 100% { box-shadow: 0 0 0 3px rgba(34,197,94,.3); }
   50% { box-shadow: 0 0 0 7px rgba(34,197,94,.1); }
 }
+
+/* ===== TERM SELECT MODAL ===== */
+#term-select-overlay{position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.7);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px;}
+#term-select-overlay.open{display:flex;}
+.term-select-box{background:#fff;border-radius:28px;padding:36px 28px 28px;max-width:380px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,0.35);text-align:center;}
+.term-select-title{font-size:20px;font-weight:900;color:var(--text);margin-bottom:6px;}
+.term-select-sub{font-size:14px;color:var(--text2);margin-bottom:28px;}
+.term-select-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:0;}
+.term-sel-card{border-radius:20px;padding:22px 14px;cursor:pointer;transition:all .2s;border:2.5px solid var(--border);background:#fff;position:relative;overflow:hidden;}
+.term-sel-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.12);}
+.term-sel-card.t1{border-color:#C4B5FD;}
+.term-sel-card.t1:hover{background:var(--purple-light);border-color:#8B5CF6;}
+.term-sel-card.t2{border-color:#FCD34D;}
+.term-sel-card.t2:hover{background:#FEF3C7;border-color:#F59E0B;}
+.term-sel-card .tsc-num{font-size:44px;margin-bottom:8px;}
+.term-sel-card .tsc-label{font-size:17px;font-weight:900;}
+.term-sel-card .tsc-hint{font-size:11px;color:var(--text2);margin-top:4px;}
+.term-sel-card.t1 .tsc-label{color:#7C3AED;}
+.term-sel-card.t2 .tsc-label{color:#D97706;}
+
+/* ===== TERM INDICATOR BANNER ===== */
+.term-indicator-banner{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;border-radius:40px;font-size:13px;font-weight:700;margin-bottom:12px;border:1.5px solid;}
+.term-indicator-banner.t1{background:var(--purple-light);color:#7C3AED;border-color:#C4B5FD;}
+.term-indicator-banner.t2{background:#FEF3C7;color:#D97706;border-color:#FCD34D;}

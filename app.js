@@ -217,10 +217,11 @@ await checkAndNotifyExpiry(teacher);
     populateScanSelects();
     await checkAndDowngradePremium();
     checkLockedDataOnLoad();
-    renderDashboard();
+    applyTermTheme(DB.currentTerm||1);
+    showTermSelectModal('teacher', (t) => { renderDashboard(); });
     await checkAndNotifyExpiry(teacher);
     return true;
-  }catch(e){ 
+  }catch(e){
     console.error('[tryRestoreSession]', e);
     return false; 
   }
@@ -378,9 +379,15 @@ function termHWs(arr) {
   const t = DB.currentTerm || 1;
   return (arr || DB.homeworks).filter(h => (h.term || 1) === t);
 }
+// ── ใช้ data-term บน <html> เพื่อ switch CSS theme ──
+function applyTermTheme(t) {
+  document.documentElement.dataset.term = t || 1;
+}
+
 async function setTerm(t) {
   DB.currentTerm = t;
   try { localStorage.setItem('hw_currentTerm', t); } catch(e) {}
+  applyTermTheme(t);
   document.querySelectorAll('.term-tab').forEach(b => {
     b.classList.toggle('on', parseInt(b.dataset.term) === t);
   });
@@ -391,13 +398,41 @@ async function setTerm(t) {
 function setStudentTerm(t) {
   DB.currentTerm = t;
   try { localStorage.setItem('hw_currentTerm', t); } catch(e) {}
+  applyTermTheme(t);
   document.querySelectorAll('.term-tab').forEach(b => {
     b.classList.toggle('on', parseInt(b.dataset.term) === t);
   });
   if(_currentStuDB) renderStudentView(_currentStuDB.student, _currentStuDB);
 }
 
-function loadDB(){const d=lsGet('hwdb5');if(d)DB=d;try{const t=localStorage.getItem('hw_currentTerm');if(t)DB.currentTerm=parseInt(t)||1;}catch(e){}if(!DB.currentTerm)DB.currentTerm=1;}
+// ── Term Select Modal ──
+let _termSelectCallback = null; // function(term) เรียกเมื่อเลือกเทอมเสร็จ
+function showTermSelectModal(role, callback) {
+  _termSelectCallback = callback;
+  const iconEl = document.getElementById('term-select-icon');
+  const titleEl = document.getElementById('term-select-title');
+  const subEl = document.getElementById('term-select-sub');
+  if(iconEl) iconEl.textContent = role === 'student' ? '🎒' : '👨‍🏫';
+  if(titleEl) titleEl.textContent = 'เลือกภาคเรียน';
+  if(subEl) subEl.textContent = role === 'student'
+    ? 'กรุณาเลือกภาคเรียนที่ต้องการตรวจสอบคะแนน'
+    : 'กรุณาเลือกภาคเรียนก่อนใช้งาน เพื่อป้องกันการแสกนงานผิดภาคเรียน';
+  const overlay = document.getElementById('term-select-overlay');
+  if(overlay) overlay.classList.add('open');
+}
+function confirmTermSelect(t) {
+  const overlay = document.getElementById('term-select-overlay');
+  if(overlay) overlay.classList.remove('open');
+  DB.currentTerm = t;
+  try { localStorage.setItem('hw_currentTerm', t); } catch(e) {}
+  applyTermTheme(t);
+  document.querySelectorAll('.term-tab').forEach(b => {
+    b.classList.toggle('on', parseInt(b.dataset.term) === t);
+  });
+  if(_termSelectCallback) { const cb = _termSelectCallback; _termSelectCallback = null; cb(t); }
+}
+
+function loadDB(){const d=lsGet('hwdb5');if(d)DB=d;try{const t=localStorage.getItem('hw_currentTerm');if(t)DB.currentTerm=parseInt(t)||1;}catch(e){}if(!DB.currentTerm)DB.currentTerm=1;applyTermTheme(DB.currentTerm);}
 function saveDB(){if(!USE_SUPABASE)lsSet('hwdb5',DB);}
 
 async function loadFromSupabase() {
@@ -965,9 +1000,8 @@ async function loginTeacher(){
     document.getElementById('teacher-pw-input').value='';
     showScreen('s-admin');
     populateScanSelects();
-    renderDashboard();
-    renderPlanBanner();
-    startExpiryCountdown(teacher.expires_at);
+    applyTermTheme(DB.currentTerm||1);
+    showTermSelectModal('teacher', (t) => { renderDashboard(); renderPlanBanner(); startExpiryCountdown(teacher.expires_at); });
   }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
 }
 
@@ -1057,9 +1091,8 @@ async function registerTeacher(){
     document.getElementById('teacher-pw-input').value='';
     showScreen('s-admin');
     populateScanSelects();
-    renderDashboard();
-    renderPlanBanner();
-
+    applyTermTheme(DB.currentTerm||1);
+    showTermSelectModal('teacher', (t) => { renderDashboard(); renderPlanBanner(); });
   }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
 }
 
@@ -1852,7 +1885,7 @@ async function loginStudent(){
     const {data:hwData}=await SB.from('homeworks').select('*').eq('teacher_id',tid).eq('room',stuData.room).order('num');
     const stuDB={
       student:{id:stuData.id,name:stuData.name,room:stuData.room},
-      homeworks:(hwData||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||'',fileUrl:r.file_url||'',fileName:r.file_name||'',room:r.room||''})),
+      homeworks:(hwData||[]).map(r=>({num:r.num,title:r.title,subject:r.subject||'',maxScore:r.max_score||100,deadline:r.deadline||'',fileUrl:r.file_url||'',fileName:r.file_name||'',room:r.room||'',term:r.term||1})),
       submissions:{}
     };
     (subData||[]).forEach(r=>{
@@ -1867,7 +1900,17 @@ async function loginStudent(){
     _currentStuTeacher=STU_SELECTED_TEACHER;
     showScreen('s-stu');
     document.getElementById('stu-id').value='';
-    renderStudentView(stuDB.student,stuDB);
+    // ตรวจว่ามีหลายเทอมไหม
+    const stuTerms=[...new Set(stuDB.homeworks.map(h=>h.term||1))].sort();
+    if(stuTerms.length>1){
+      showTermSelectModal('student',(t)=>{ applyTermTheme(t); renderStudentView(stuDB.student,stuDB); });
+    } else {
+      const onlyTerm=stuTerms[0]||1;
+      DB.currentTerm=onlyTerm;
+      try{localStorage.setItem('hw_currentTerm',onlyTerm);}catch(e){}
+      applyTermTheme(onlyTerm);
+      renderStudentView(stuDB.student,stuDB);
+    }
   }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
 }
 
@@ -1909,18 +1952,19 @@ function calcGradeConversion(){
 
 function renderStudentView(s, stuDB){
   const db=stuDB||{student:s,homeworks:DB.homeworks,submissions:DB.submissions};
-  // render term tab bar สำหรับนักเรียน
+  // render term tab bar + indicator สำหรับนักเรียน
   const stuTermBar=document.getElementById('stu-term-tab-bar');
+  const allStuTerms=[...new Set((db.homeworks||[]).map(h=>h.term||1))].sort();
   if(stuTermBar){
-    const allTerms=[...new Set((db.homeworks||[]).map(h=>h.term||1))].sort();
-    if(allTerms.length>1){
+    if(allStuTerms.length>1){
       stuTermBar.style.display='flex';
-      stuTermBar.innerHTML=allTerms.map(t=>`<button class="term-tab${(DB.currentTerm||1)===t?' on':''}" data-term="${t}" onclick="setStudentTerm(${t})">เทอม ${t}</button>`).join('');
+      stuTermBar.innerHTML=allStuTerms.map(t=>`<button class="term-tab${(DB.currentTerm||1)===t?' on':''}" data-term="${t}" onclick="setStudentTerm(${t})">เทอม ${t}</button>`).join('');
     } else {
       stuTermBar.style.display='none';
       stuTermBar.innerHTML='';
     }
   }
+  const curTerm=DB.currentTerm||1;
   const roomHWs=termHWs(db.homeworks).filter(h=>!h.room||h.room===s.room);
   const teacher = _currentStuTeacher;
   document.getElementById('stu-avatar').textContent=s.name.substring(0,2);
@@ -1949,7 +1993,30 @@ function renderStudentView(s, stuDB){
   // เก็บไว้ใช้ในตัวแปลงคะแนน (ทดลองเทียบเป็นคะแนนเต็มอื่น)
   _stuTotalScore=totalScore; _stuTotalMax=totalMax;
 
-  let html=`<div class="score-hero">
+  // ── Term indicator banner ──
+  const termLabel=curTerm===1?'☀️ ภาคเรียนที่ 1':'🍂 ภาคเรียนที่ 2';
+  const termClass=curTerm===1?'t1':'t2';
+
+  // ── ตรวจว่านักเรียนลงทะเบียนในเทอมนี้ไหม ──
+  const allHWsInRoom=(db.homeworks||[]).filter(h=>!h.room||h.room===s.room);
+  const hasAnyHWInThisTerm=allHWsInRoom.some(h=>(h.term||1)===curTerm);
+  const hasHWInOtherTerm=allHWsInRoom.some(h=>(h.term||1)!==curTerm);
+
+  if(!hasAnyHWInThisTerm && allHWsInRoom.length>0){
+    // มีงานเทอมอื่นแต่ไม่มีเทอมนี้ → ไม่ได้ลงทะเบียนเทอมนี้
+    document.getElementById('stu-content').innerHTML=`
+      <div class="term-indicator-banner ${termClass}">${termLabel}</div>
+      <div style="text-align:center;padding:40px 20px;">
+        <div style="font-size:52px;margin-bottom:16px;">📭</div>
+        <div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px;">ไม่พบข้อมูลการเรียน</div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;">ท่านไม่ได้ลงทะเบียนเรียน<br>ในภาคเรียนที่ ${curTerm}</div>
+        ${hasHWInOtherTerm?`<button onclick="setStudentTerm(${curTerm===1?2:1})" style="margin-top:20px;padding:12px 28px;border-radius:20px;border:none;background:var(--term-topbar);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">ดูภาคเรียนที่ ${curTerm===1?2:1} แทน</button>`:''}
+      </div>`;
+    return;
+  }
+
+  let html=`<div class="term-indicator-banner ${termClass}">${termLabel}</div>
+  <div class="score-hero">
     <div class="score-hero-lbl">🏆 คะแนนรวมทั้งหมด</div>
     <div class="score-hero-num">${totalScore}<span>/${totalMax}</span></div>
     <div class="score-hero-sub">${done.length?`ได้ ${scorePct}% จากงานที่ส่งแล้ว ${done.length} ชิ้น${pendingCount?` (รอตรวจ ${pendingCount} ชิ้น)`:''}`:'ยังไม่มีงานที่ส่ง'}</div>
