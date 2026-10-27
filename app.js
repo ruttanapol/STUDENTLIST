@@ -385,9 +385,15 @@ function applyTermTheme(t) {
   document.documentElement.dataset.term = t || 1;
 }
 
+function _sgsResetCfg() {
+  // รีเซ็ต _sgsCfg กลับเป็น default (เพื่อไม่ให้ข้อมูลเทอมเก่าค้างในฟอร์ม)
+  _sgsCfg.sections.forEach(function(s){s.hws=[];s.max=s.id==='mid'||s.id==='final'?30:20;s.minScore=0;});
+}
+
 async function setTerm(t) {
   DB.currentTerm = t;
   _sgsCfgCache = {}; // clear SGS cache on term change
+  _sgsResetCfg();    // reset SGS form data on term change
   try { localStorage.setItem('hw_currentTerm', t); } catch(e) {}
   applyTermTheme(t);
   document.querySelectorAll('.term-tab').forEach(b => {
@@ -427,6 +433,7 @@ function confirmTermSelect(t) {
   if(overlay){ overlay.style.display='none'; overlay.classList.remove('open'); }
   DB.currentTerm = t;
   _sgsCfgCache = {}; // clear SGS cache on term change
+  _sgsResetCfg();    // reset SGS form data on term change
   try { localStorage.setItem('hw_currentTerm', t); } catch(e) {}
   applyTermTheme(t);
   updateTopbarTermBadge(t);
@@ -681,6 +688,8 @@ async function sbUpdateStudent(oldId, stu) {
       }
     }
     await reloadStudents();
+    // รีโหลด submissions เพื่ออัพเดต key ใน DB.submissions ให้ตรงกับ ID ใหม่
+    try { await reloadSubmissions(); } catch(e) {}
   } else {
     const s = DB.students.find(x => x.id === oldId);
     if(s) { s.id=stu.id; s.name=stu.name; s.room=stu.room; }
@@ -5771,10 +5780,12 @@ function renderScanHistory() {
 
   // รวบรวม submissions เฉพาะเทอมปัจจุบัน
   const subs = Object.entries(DB.submissions).map(([key, sub]) => {
-    const [sid, hwNum] = key.split('_');
+    // ใช้ข้อมูลจาก sub object โดยตรง (ไม่ parse key เพราะ ID อาจมี _)
+    const sid = sub.sid;
+    const hwNum = sub.hwNum;
     const stu = DB.students.find(s => s.id === sid);
-    const hw = DB.homeworks.find(h => h.num === parseInt(hwNum));
-    return { key, sid, hwNum: parseInt(hwNum), stu, hw, sub };
+    const hw = DB.homeworks.find(h => h.num === hwNum && (!h.room || h.room === (stu?.room||'')));
+    return { key, sid, hwNum, stu, hw, sub };
   }).filter(item => {
     if(!item.stu) return false;
     // กรองเฉพาะเทอมปัจจุบัน
@@ -7646,6 +7657,8 @@ async function _sgsLoadCfg(room){
       _applySGSCfg(data.value);return true;
     }
   }catch(e){}
+  // ไม่พบ config → รีเซ็ตค่าให้เป็น default ไม่ให้ค่าเทอมก่อนค้างอยู่
+  _sgsResetCfg();
   return false;
 }
 
