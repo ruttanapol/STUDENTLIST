@@ -418,11 +418,11 @@ function showTermSelectModal(role, callback) {
     ? 'กรุณาเลือกภาคเรียนที่ต้องการตรวจสอบคะแนน'
     : 'กรุณาเลือกภาคเรียนก่อนใช้งาน เพื่อป้องกันการแสกนงานผิดภาคเรียน';
   const overlay = document.getElementById('term-select-overlay');
-  if(overlay) overlay.classList.add('open');
+  if(overlay){ overlay.style.display='flex'; overlay.classList.add('open'); }
 }
 function confirmTermSelect(t) {
   const overlay = document.getElementById('term-select-overlay');
-  if(overlay) overlay.classList.remove('open');
+  if(overlay){ overlay.style.display='none'; overlay.classList.remove('open'); }
   DB.currentTerm = t;
   try { localStorage.setItem('hw_currentTerm', t); } catch(e) {}
   applyTermTheme(t);
@@ -1900,17 +1900,8 @@ async function loginStudent(){
     _currentStuTeacher=STU_SELECTED_TEACHER;
     showScreen('s-stu');
     document.getElementById('stu-id').value='';
-    // ตรวจว่ามีหลายเทอมไหม
-    const stuTerms=[...new Set(stuDB.homeworks.map(h=>h.term||1))].sort();
-    if(stuTerms.length>1){
-      showTermSelectModal('student',(t)=>{ applyTermTheme(t); renderStudentView(stuDB.student,stuDB); });
-    } else {
-      const onlyTerm=stuTerms[0]||1;
-      DB.currentTerm=onlyTerm;
-      try{localStorage.setItem('hw_currentTerm',onlyTerm);}catch(e){}
-      applyTermTheme(onlyTerm);
-      renderStudentView(stuDB.student,stuDB);
-    }
+    // โชว์ modal เลือกเทอมเสมอ
+    showTermSelectModal('student',(t)=>{ applyTermTheme(t); renderStudentView(stuDB.student,stuDB); });
   }catch(e){errEl.textContent='เกิดข้อผิดพลาด: '+e.message;}
 }
 
@@ -5064,7 +5055,8 @@ async function activateFreeTeacher() {
     await loadAnthropicKey();
     setTimeout(()=>setupRealtime(),500);
     showScreen('s-admin');
-    renderDashboard();
+    applyTermTheme(DB.currentTerm||1);
+    showTermSelectModal('teacher', (t) => { renderDashboard(); });
   } catch(e) {
     toast('เกิดข้อผิดพลาด: '+e.message, 'err');
   }
