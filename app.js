@@ -370,7 +370,8 @@ let DB = {
   students: [],
   homeworks: [],
   submissions: {},
-  currentTerm: 1
+  currentTerm: 1,
+  seqNums: {} // {room: {sid: seqNum}} เลขที่นักเรียน
 };
 
 // ── ระบบเทอม ──────────────────────────────────────
@@ -386,6 +387,7 @@ function applyTermTheme(t) {
 
 async function setTerm(t) {
   DB.currentTerm = t;
+  _sgsCfgCache = {}; // clear SGS cache on term change
   try { localStorage.setItem('hw_currentTerm', t); } catch(e) {}
   applyTermTheme(t);
   document.querySelectorAll('.term-tab').forEach(b => {
@@ -424,6 +426,7 @@ function confirmTermSelect(t) {
   const overlay = document.getElementById('term-select-overlay');
   if(overlay){ overlay.style.display='none'; overlay.classList.remove('open'); }
   DB.currentTerm = t;
+  _sgsCfgCache = {}; // clear SGS cache on term change
   try { localStorage.setItem('hw_currentTerm', t); } catch(e) {}
   applyTermTheme(t);
   updateTopbarTermBadge(t);
@@ -492,6 +495,9 @@ async function loadFromSupabase() {
   DB.rooms = [...new Set([...settingsRooms, ...studentRooms])].sort((a,b) =>
     a.localeCompare(b, 'th', {numeric:true, sensitivity:'base'})
   );
+  // โหลด seqNums (เลขที่นักเรียนในห้อง)
+  const seqNumsKey = tid ? 'seq_nums_'+tid : 'seq_nums';
+  DB.seqNums = settingsMap[seqNumsKey] || {}; // {room: {sid: seqNum}}
 }
 
 // ---- Realtime subscription ----
@@ -2638,9 +2644,14 @@ function openEditStu(id){
   document.getElementById('edit-stu-old-id').value=s.id;
   document.getElementById('edit-stu-id').value=s.id;
   document.getElementById('edit-stu-name').value=s.name;
-  document.getElementById('edit-stu-room').innerHTML=allRooms.length
-    ?allRooms.map(r=>`<option ${r===s.room?'selected':''}>${r}</option>`).join('')
-    :`<option>${s.room||'ไม่มีห้อง'}</option>`;
+  // แสดง option ห้อง — มีตัวเลือก "ไม่มีห้อง" เสมอ เพื่อรองรับนักเรียนที่ยังไม่ได้ระบุห้อง
+  document.getElementById('edit-stu-room').innerHTML=
+    `<option value="" ${!s.room?'selected':''}>— ไม่มีห้อง —</option>`+
+    allRooms.map(r=>`<option value="${r}" ${r===s.room?'selected':''}>${r}</option>`).join('');
+  // เลขที่นักเรียน
+  const curSeq=(DB.seqNums[s.room]||{})[s.id]||'';
+  const seqEl=document.getElementById('edit-stu-seq');
+  if(seqEl)seqEl.value=curSeq;
   document.getElementById('edit-stu-modal').style.display='flex';
 }
 function closeEditStu(){document.getElementById('edit-stu-modal').style.display='none';}
@@ -2650,12 +2661,25 @@ async function saveEditStu(){
   const newId=document.getElementById('edit-stu-id').value.trim();
   const newName=document.getElementById('edit-stu-name').value.trim();
   const newRoom=document.getElementById('edit-stu-room').value;
+  const seqVal=parseInt(document.getElementById('edit-stu-seq')?.value||'')||0;
   if(!newId||!newName){toast('กรอกให้ครบ','warn');return;}
   if(newId!==oldId&&DB.students.find(x=>x.id===newId)){toast('รหัสนี้มีอยู่แล้ว','warn');return;}
   try {
     await sbUpdateStudent(oldId,{id:newId,name:newName,room:newRoom});
+    // บันทึก seqNum
+    if(seqVal>0){
+      const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';
+      const seqKey='seq_nums_'+tid;
+      if(!DB.seqNums[newRoom])DB.seqNums[newRoom]={};
+      // ถ้าเปลี่ยนห้อง ลบเลขที่เดิมออกจากห้องเก่า
+      if(oldId!==newId||newRoom!==document.getElementById('edit-stu-old-id').dataset.room){
+        for(const rm in DB.seqNums){if(DB.seqNums[rm][oldId]){delete DB.seqNums[rm][oldId];}}
+      }
+      DB.seqNums[newRoom][newId]=seqVal;
+      try{await sbSaveSettings(seqKey,DB.seqNums);}catch(e){}
+    }
     closeEditStu();
-    actionPopupDone('แก้ไขเรียบร้อย ✅',newName+' · '+newRoom,'edit');
+    actionPopupDone('แก้ไขเรียบร้อย ✅',newName+(newRoom?' · '+newRoom:''),'edit');
     setTimeout(()=>{renderManage();if(_editStuFromRoom){viewRoomStudents(_editStuFromRoom);_editStuFromRoom='';}},100);
   } catch(e){toast('แก้ไขไม่สำเร็จ: '+e.message,'err');}
 }
@@ -2862,6 +2886,18 @@ async function delStu(id){
   showActionPopup('กำลังลบนักเรียน',s?s.name:id,'delete');
   try{await sbDeleteStudent(id);actionPopupDone('ลบนักเรียนแล้ว',s?s.name:id,'delete');renderManage();}
   catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}
+}
+
+async function confirmDeleteStudentFromList(id){
+  const s=DB.students.find(x=>x.id===id);
+  if(!s)return;
+  if(!confirm(`ลบ "${s.name}" (${s.id}) ออกจากระบบ?\n\nการลบจะลบข้อมูลทั้งหมดของนักเรียนคนนี้`))return;
+  showActionPopup('กำลังลบนักเรียน',s.name,'delete');
+  try{
+    await sbDeleteStudent(id);
+    actionPopupDone('ลบนักเรียนแล้ว',s.name,'delete');
+    renderManage();
+  }catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}
 }
 
 async function addSubject(){
@@ -3279,7 +3315,15 @@ function renderStudentsListManage(){
   const list=DB.students.filter(s=>
     (!roomFilter||s.room===roomFilter) &&
     (!q || s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q))
-  ).sort((a,b)=> (a.room||'').localeCompare(b.room||'','th',{numeric:true,sensitivity:'base'}) || a.id.localeCompare(b.id));
+  ).sort((a,b)=>{
+    const roomCmp=(a.room||'').localeCompare(b.room||'','th',{numeric:true,sensitivity:'base'});
+    if(roomCmp!==0)return roomCmp;
+    // เรียงตาม seqNum ภายในห้อง
+    const sa=(DB.seqNums[a.room]||{})[a.id]||999;
+    const sb=(DB.seqNums[b.room]||{})[b.id]||999;
+    if(sa!==sb)return sa-sb;
+    return a.id.localeCompare(b.id);
+  });
   const cnt=document.getElementById('manage-stu-count');
   if(cnt) cnt.textContent = list.length+' คน';
   if(!list.length){
@@ -3289,13 +3333,16 @@ function renderStudentsListManage(){
   tbody.innerHTML=list.map(s=>{
     const hws=termHWs().filter(h=>!h.room||h.room===s.room);
     const doneCount=hws.filter(h=>DB.submissions[subKey(s.id,h.num,h.room)]).length;
+    const seqNum=(DB.seqNums[s.room]||{})[s.id]||'';
     return `<tr>
+      <td style="font-size:12px;color:var(--text2);text-align:center;">${seqNum||'—'}</td>
       <td style="font-size:12px;color:var(--text2);">${escapeHtml(s.id)}</td>
       <td style="font-size:13px;font-weight:600;">${escapeHtml(s.name)}</td>
-      <td style="font-size:12px;color:var(--text2);">${escapeHtml(s.room||'-')}</td>
+      <td style="font-size:12px;color:var(--text2);">${escapeHtml(s.room||'—')}</td>
       <td style="white-space:nowrap;">
         <button onclick="openStudentScoreModal('${s.id}')" title="ค้นหา/แก้ไขคะแนนทุกชิ้นงาน" style="padding:5px 8px;font-size:11px;font-weight:700;border-radius:7px;border:1.5px solid var(--purple);background:var(--purple-light);color:var(--purple);cursor:pointer;">📊 ${doneCount}/${hws.length}</button>
         <button onclick="openEditStu('${s.id}')" title="แก้ไขข้อมูลนักเรียน" style="padding:5px 8px;font-size:11px;font-weight:700;border-radius:7px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;margin-left:4px;">✏️</button>
+        <button onclick="confirmDeleteStudentFromList('${s.id}')" title="ลบนักเรียน" style="padding:5px 8px;font-size:11px;font-weight:700;border-radius:7px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;margin-left:4px;">🗑️</button>
       </td>
     </tr>`;
   }).join('');
@@ -4333,7 +4380,11 @@ function getSubjectObj(name) {
 function getSubjectNames() {
   if(!Array.isArray(DB.subjects)) return [];
   if(typeof DB.subjects[0] === 'string') return DB.subjects;
-  return DB.subjects.map(s => s.name);
+  const curTerm = DB.currentTerm || 1;
+  // กรองเฉพาะวิชาของเทอมปัจจุบัน (วิชาเก่าที่ไม่มี term field → ถือเป็นเทอม 1)
+  return DB.subjects
+    .filter(s => (s.term||1) === curTerm)
+    .map(s => s.name);
 }
 
 // calcSubjScorePerHW removed — ไม่ใช้แล้ว
@@ -4355,11 +4406,11 @@ async function addSubjectFull() {
   const name = document.getElementById('ns-subj-name')?.value.trim();
   if(!name) { toast('กรอกชื่อวิชาด้วย','warn'); return; }
 
-  // ตรวจซ้ำ
+  // ตรวจซ้ำเฉพาะเทอมปัจจุบัน
   const names = getSubjectNames();
-  if(names.includes(name)) { toast('วิชานี้มีอยู่แล้ว','warn'); return; }
+  if(names.includes(name)) { toast('วิชานี้มีอยู่แล้วในเทอม '+(DB.currentTerm||1),'warn'); return; }
 
-  const subjObj = { name };
+  const subjObj = { name, term: DB.currentTerm||1 };
 
   // migrate: ถ้า subjects ยังเป็น string array ให้แปลงเป็น objects
   if(DB.subjects.length > 0 && typeof DB.subjects[0] === 'string') {
@@ -4382,10 +4433,16 @@ async function addSubjectFull() {
 }
 
 async function deleteSubjectFull(name) {
-  if(!confirm('ลบวิชา "' + name + '"?')) return;
+  const curTerm = DB.currentTerm || 1;
+  if(!confirm('ลบวิชา "' + name + '" (เทอม '+curTerm+')?')) return;
   const backup = [...DB.subjects];
   showActionPopup('กำลังลบวิชา',name,'delete');
-  DB.subjects = DB.subjects.filter(s => (typeof s === 'string' ? s : s.name) !== name);
+  // ลบเฉพาะวิชาที่มีชื่อตรงกัน + เป็นเทอมปัจจุบัน
+  DB.subjects = DB.subjects.filter(s => {
+    const sName = typeof s === 'string' ? s : s.name;
+    const sTerm = typeof s === 'string' ? 1 : (s.term||1);
+    return !(sName === name && sTerm === curTerm);
+  });
   try {
     await sbSaveSettings('subjects', DB.subjects);
     actionPopupDone('ลบวิชาแล้ว',name,'delete');
@@ -4413,24 +4470,27 @@ async function updateSubjectScore(name, total, hwCount) {
 function renderSubjectsFull() {
   const el = document.getElementById('subj-full-list');
   if(!el) return;
-  
+
   // migrate string to object
   if(DB.subjects.length > 0 && typeof DB.subjects[0] === 'string') {
-    DB.subjects = DB.subjects.map(s => ({name:s, total:100, hwCount:10}));
+    DB.subjects = DB.subjects.map(s => ({name:s, total:100, hwCount:10, term:1}));
   }
 
-  if(!DB.subjects.length) {
-    el.innerHTML = '<div class="empty">ยังไม่มีวิชา</div>';
+  const curTerm = DB.currentTerm || 1;
+  const curSubjects = DB.subjects.filter(s => (s.term||1) === curTerm);
+
+  if(!curSubjects.length) {
+    el.innerHTML = `<div class="empty" style="padding:20px 0;text-align:center;">ยังไม่มีวิชาในเทอม ${curTerm}<br><span style="font-size:12px;color:var(--text3);">เพิ่มวิชาด้านบนเพื่อเริ่มใช้งาน</span></div>`;
     return;
   }
 
-  el.innerHTML = DB.subjects.map(s => {
+  el.innerHTML = curSubjects.map(s => {
     const name = typeof s === 'string' ? s : s.name;
     const hwsInSubj = termHWs().filter(h=>h.subject===name);
     const actualMaxSum = hwsInSubj.reduce((sum,h)=>sum+(h.maxScore||100),0);
     return `<div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <div style="font-size:15px;font-weight:700;color:var(--text);">${name}</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);">${escapeHtml(name)}</div>
         <div style="display:flex;align-items:center;gap:6px;">
           <span style="font-size:11px;background:var(--blue-light);color:var(--blue-dark);padding:2px 8px;border-radius:20px;font-weight:700;">รวม ${actualMaxSum} คะแนน</span>
           <span style="font-size:11px;background:var(--green-light);color:var(--green-dark);padding:2px 8px;border-radius:20px;font-weight:700;">${hwsInSubj.length} ชิ้นงาน</span>
@@ -4521,8 +4581,57 @@ function filterRoomModal() {
   renderRoomModal(filtered);
 }
 
-function renderRoomModal(students){const el=document.getElementById('room-stu-list');if(!students.length){el.innerHTML='<div class="empty">ไม่พบนักเรียน</div>';return;}el.innerHTML=students.map((s,i)=>{const sh=termHWs().filter(h=>!h.room||h.room===s.room);const hc=sh.length;const dc=sh.filter(h=>DB.submissions[subKey(s.id,h.num,h.room)]).length;const pct=hc>0?Math.round(dc/hc*100):0;return `<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);"><div style="width:30px;height:30px;border-radius:50%;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--purple);flex-shrink:0;">${i+1}</div><div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:700;color:var(--text);">${escapeHtml(s.name)}</div><div style="font-size:12px;color:var(--text2);">🪪 ${escapeHtml(s.id)}</div></div><div style="text-align:right;flex-shrink:0;margin-right:6px;"><div style="font-size:13px;font-weight:700;color:${pct>=80?'var(--green-dark)':pct>=50?'#B45309':'var(--red)'};">${dc}/${hc}</div><div style="font-size:11px;color:var(--text3);">${pct}%</div></div><button onclick="openEditStuFromRoom('${s.id}')" style="padding:7px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;white-space:nowrap;flex-shrink:0;">✏️ แก้ไข</button></div>`;}).join('');}
+function renderRoomModal(students){
+  const el=document.getElementById('room-stu-list');
+  if(!el)return;
+  if(!students.length){el.innerHTML='<div class="empty">ไม่พบนักเรียน</div>';return;}
+  // เรียงตาม seqNum ถ้ามี
+  const room=students[0]&&students[0].room||'';
+  const seqMap=DB.seqNums[room]||{};
+  const sorted=[...students].sort((a,b)=>{
+    const sa=seqMap[a.id]||999,sb=seqMap[b.id]||999;
+    if(sa!==sb)return sa-sb;
+    return a.id.localeCompare(b.id);
+  });
+  el.innerHTML=sorted.map((s,i)=>{
+    const seq=seqMap[s.id]||'';
+    const sh=termHWs().filter(h=>!h.room||h.room===s.room);
+    const hc=sh.length;
+    const dc=sh.filter(h=>DB.submissions[subKey(s.id,h.num,h.room)]).length;
+    const pct=hc>0?Math.round(dc/hc*100):0;
+    const seqLabel=seq?seq:(i+1);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);">
+      <div style="width:30px;height:30px;border-radius:50%;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--purple);flex-shrink:0;">${seqLabel}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:15px;font-weight:700;color:var(--text);">${escapeHtml(s.name)}</div>
+        <div style="font-size:12px;color:var(--text2);">🪪 ${escapeHtml(s.id)}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-right:4px;">
+        <div style="font-size:13px;font-weight:700;color:${pct>=80?'var(--green-dark)':pct>=50?'#B45309':'var(--red)'};">${dc}/${hc}</div>
+        <div style="font-size:11px;color:var(--text3);">${pct}%</div>
+      </div>
+      <button onclick="openEditStuFromRoom('${s.id}')" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;white-space:nowrap;flex-shrink:0;">✏️</button>
+      <button onclick="deleteStudentFromRoom('${s.id}')" style="padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--red-light);background:var(--red-light);color:var(--red);cursor:pointer;white-space:nowrap;flex-shrink:0;">🗑️</button>
+    </div>`;
+  }).join('');
+}
 function openEditStuFromRoom(id){const t=document.getElementById('room-stu-modal-title');_editStuFromRoom=t?t.textContent.replace('🏫 ',''):'';closeRoomModal();openEditStu(id);}
+
+async function deleteStudentFromRoom(id){
+  const s=DB.students.find(x=>x.id===id);
+  if(!s)return;
+  if(!confirm(`ลบ "${s.name}" (${s.id}) ออกจากระบบ?\n\nการลบจะลบข้อมูลทั้งหมดของนักเรียนคนนี้`))return;
+  const room=s.room;
+  showActionPopup('กำลังลบนักเรียน',s.name,'delete');
+  closeRoomModal();
+  try{
+    await sbDeleteStudent(id);
+    actionPopupDone('ลบนักเรียนแล้ว',s.name,'delete');
+    renderManage();
+    // เปิด modal ห้องเดิมถ้าห้องยังมีอยู่
+    if(room)setTimeout(()=>viewRoomStudents(room),300);
+  }catch(e){actionPopupError('ลบไม่สำเร็จ: '+e.message);}
+}
 
 function closeRoomModal() {
   document.getElementById('room-stu-modal').style.display = 'none';
@@ -5620,11 +5729,11 @@ async function openScanHistory() {
   if(!modal) return;
   modal.style.display = 'flex';
 
-  // Populate HW filter
+  // Populate HW filter — show only current term HWs
   const hwFilter = document.getElementById('sh-hw-filter');
   if(hwFilter) {
     hwFilter.innerHTML = '<option value="">ทุกชิ้นงาน</option>' +
-      DB.homeworks.map(h => `<option value="${h.num}">ชิ้นที่ ${h.num}: ${escapeHtml(h.title)}</option>`).join('');
+      termHWs().map(h => `<option value="${h.num}">ชิ้นที่ ${h.num}: ${escapeHtml(h.title)}</option>`).join('');
   }
 
   // Populate room filter
@@ -5651,16 +5760,16 @@ function closeScanHistory() {
   if(modal) modal.style.display = 'none';
 }
 
-// ===== RENDER LIST =====
+// ===== RENDER CARD GRID =====
 function renderScanHistory() {
   const el = document.getElementById('sh-list');
   if(!el) return;
 
   const hwFilter = document.getElementById('sh-hw-filter')?.value || '';
   const roomFilter = document.getElementById('sh-room-filter')?.value || '';
-  const q = (document.getElementById('sh-search')?.value || '').toLowerCase();
+  const curTerm = DB.currentTerm || 1;
 
-  // รวบรวม submissions ทั้งหมด
+  // รวบรวม submissions เฉพาะเทอมปัจจุบัน
   const subs = Object.entries(DB.submissions).map(([key, sub]) => {
     const [sid, hwNum] = key.split('_');
     const stu = DB.students.find(s => s.id === sid);
@@ -5668,12 +5777,12 @@ function renderScanHistory() {
     return { key, sid, hwNum: parseInt(hwNum), stu, hw, sub };
   }).filter(item => {
     if(!item.stu) return false;
+    // กรองเฉพาะเทอมปัจจุบัน
+    if(item.hw && (item.hw.term||1) !== curTerm) return false;
     if(hwFilter && item.hwNum !== parseInt(hwFilter)) return false;
     if(roomFilter && item.stu.room !== roomFilter) return false;
-    if(q && !item.stu.name.toLowerCase().includes(q) && !item.sid.includes(q)) return false;
     return true;
   }).sort((a, b) => {
-    // เรียงตาม submitted_at ล่าสุดก่อน
     const ta = a.sub.submitted_at || a.sub.ts || '';
     const tb = b.sub.submitted_at || b.sub.ts || '';
     return tb.localeCompare(ta);
@@ -5681,40 +5790,47 @@ function renderScanHistory() {
 
   // อัพเดต subtitle
   const subtitle = document.getElementById('sh-subtitle');
-  if(subtitle) subtitle.textContent = subs.length + ' รายการ';
+  if(subtitle) subtitle.textContent = subs.length + ' รายการ (เทอม ' + curTerm + ')';
 
   if(!subs.length) {
-    el.innerHTML = '<div class="empty" style="padding:32px 0;">ไม่พบรายการ</div>';
+    el.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--text3);">ไม่พบรายการในเทอม ' + curTerm + '</div>';
     return;
   }
 
-  el.innerHTML = subs.map(({sid, hwNum, stu, hw, sub, key}) => {
-    const score = sub.score !== null && sub.score !== undefined ? sub.score : null;
-    const maxScore = authMaxScore(hw, sub);
-    const pct = score !== null ? Math.round(score/maxScore*100) : null;
-    const timeStr = sub.submitted_at
-      ? new Date(sub.submitted_at).toLocaleString('th-TH', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
-      : (sub.ts || '—');
-    const scoreColor = pct >= 80 ? 'var(--green-dark)' : pct >= 60 ? 'var(--blue)' : 'var(--red)';
+  // card grid layout
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;padding:4px 0;">` +
+    subs.map(({sid, hwNum, stu, hw, sub}) => {
+      const score = sub.score !== null && sub.score !== undefined ? sub.score : null;
+      const maxScore = authMaxScore(hw, sub);
+      const pct = score !== null ? Math.round(score/maxScore*100) : null;
+      const timeStr = sub.submitted_at
+        ? new Date(sub.submitted_at).toLocaleString('th-TH', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
+        : (sub.ts || '—');
+      const scoreColor = pct === null ? 'var(--text3)' : pct >= 80 ? 'var(--green-dark)' : pct >= 60 ? 'var(--blue)' : 'var(--red)';
+      const borderColor = pct === null ? 'var(--border)' : pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--blue)' : 'var(--red)';
+      const hwTitle = hw?.title || sub.hwTitle || '—';
 
-    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:14px;font-weight:700;color:var(--text);">${escapeHtml(stu.name)} <span class="room-pill">${escapeHtml(stu.room)}</span></div>
-        <div style="font-size:12px;color:var(--text2);margin-top:2px;">ชิ้นที่ ${hwNum}: ${hw?.title || sub.hwTitle || '—'}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:1px;">🕐 ${timeStr}</div>
-      </div>
-      <div style="text-align:center;flex-shrink:0;">
-        <div style="font-size:18px;font-weight:800;color:${score!==null?scoreColor:'var(--text3)'};">
-          ${score !== null ? score : '—'}
+      return `<div style="background:var(--card-bg,#fff);border:1.5px solid var(--border);border-radius:14px;padding:11px 11px 10px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:3px;">
+        <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:${borderColor};border-radius:4px 0 0 4px;"></div>
+        <div style="padding-left:6px;">
+          <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.3px;">ชิ้นที่ ${hwNum}</div>
+          <div style="font-size:12px;font-weight:700;color:var(--text);line-height:1.3;margin:2px 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(hwTitle)}</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:6px;">${escapeHtml(stu.name)}</div>
+          ${stu.room ? `<span style="font-size:10px;background:var(--purple-light);color:var(--purple);padding:2px 6px;border-radius:8px;font-weight:700;">${escapeHtml(stu.room)}</span>` : ''}
         </div>
-        <div style="font-size:10px;color:var(--text3);">/ ${maxScore}</div>
-      </div>
-<button onclick="openEditScoreById('${sid}',${hwNum})"
-        style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;white-space:nowrap;flex-shrink:0;">
-        ✏️ แก้ไข
-      </button>
-    </div>`;
-  }).join('');
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:6px;padding-left:6px;">
+          <div>
+            <div style="font-size:22px;font-weight:800;color:${scoreColor};line-height:1;">${score !== null ? score : '—'}</div>
+            <div style="font-size:10px;color:var(--text3);">/${maxScore}</div>
+          </div>
+          <div style="font-size:9px;color:var(--text3);text-align:right;">🕐 ${timeStr}</div>
+        </div>
+        <button onclick="openEditScoreById('${sid}',${hwNum})"
+          style="margin-top:6px;width:100%;padding:5px;font-size:11px;font-weight:700;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue-dark);cursor:pointer;">
+          ✏️ แก้ไข
+        </button>
+      </div>`;
+    }).join('') + `</div>`;
 }
 
 // ===== EDIT SCORE =====
@@ -5832,9 +5948,26 @@ async function initCalendarTab(){
   }
   const n=new Date(); _calYear=n.getFullYear(); _calMonth=n.getMonth();
   renderCalendar();
+  // auto-select today and show events
+  const todayStr=toCalDateStr(n);
+  _calSelectedDate=todayStr;
+  const fab=document.getElementById('cal-add-fab');if(fab)fab.style.display='flex';
+  renderCalDayEvents(todayStr);
   requestCalNotifyPermission();
   scheduleCalNotifyCheck();
   updateCalNavDot();
+}
+
+function calGoToday(){
+  const n=new Date();
+  _calYear=n.getFullYear();_calMonth=n.getMonth();
+  renderCalendar();
+  const todayStr=toCalDateStr(n);
+  _calSelectedDate=todayStr;
+  const s=document.querySelector('[data-date="'+todayStr+'"]');
+  if(s){document.querySelectorAll('.cal-day.selected').forEach(e=>e.classList.remove('selected'));s.classList.add('selected');}
+  renderCalDayEvents(todayStr);
+  const fab=document.getElementById('cal-add-fab');if(fab)fab.style.display='flex';
 }
 
 function toCalDateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -7482,7 +7615,7 @@ function _renderSGSConfig(){
 async function _sgsSaveCfg(){
   if(!CURRENT_TEACHER)return;
   var room=_sgsRoom;
-  var key='sgs_cfg_'+room+'_'+CURRENT_TEACHER.id;
+  var key='sgs_cfg_'+room+'_'+CURRENT_TEACHER.id+'_t'+(DB.currentTerm||1);
   var val={sections:_sgsCfg.sections.map(function(s){return {id:s.id,name:s.name,max:s.max,hws:s.hws.slice(),minScore:s.minScore||0};})};
   try{
     var btn=document.getElementById('sgscfg-save-btn');
@@ -7490,7 +7623,7 @@ async function _sgsSaveCfg(){
     var {data:ex}=await SB.from('settings').select('key').eq('key',key).maybeSingle();
     if(ex){await SB.from('settings').update({value:val}).eq('key',key);}
     else{await SB.from('settings').insert({key:key,value:val});}
-    _sgsCfgCache[room]=val;
+    _sgsCfgCache[room+'_t'+(DB.currentTerm||1)]=val;
     if(typeof toast==='function')toast('บันทึกตั้งค่า SGS สำเร็จ ✅');
     _renderSGSConfig();
   }catch(err){
@@ -7501,14 +7634,15 @@ async function _sgsSaveCfg(){
 
 async function _sgsLoadCfg(room){
   if(!CURRENT_TEACHER||!room)return false;
-  if(_sgsCfgCache[room]){
-    _applySGSCfg(_sgsCfgCache[room]);return true;
+  var cacheKey=room+'_t'+(DB.currentTerm||1);
+  if(_sgsCfgCache[cacheKey]){
+    _applySGSCfg(_sgsCfgCache[cacheKey]);return true;
   }
-  var key='sgs_cfg_'+room+'_'+CURRENT_TEACHER.id;
+  var key='sgs_cfg_'+room+'_'+CURRENT_TEACHER.id+'_t'+(DB.currentTerm||1);
   try{
     var {data}=await SB.from('settings').select('value').eq('key',key).maybeSingle();
     if(data&&data.value&&data.value.sections){
-      _sgsCfgCache[room]=data.value;
+      _sgsCfgCache[cacheKey]=data.value;
       _applySGSCfg(data.value);return true;
     }
   }catch(e){}
