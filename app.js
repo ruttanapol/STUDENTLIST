@@ -426,10 +426,17 @@ function confirmTermSelect(t) {
   DB.currentTerm = t;
   try { localStorage.setItem('hw_currentTerm', t); } catch(e) {}
   applyTermTheme(t);
+  updateTopbarTermBadge(t);
   document.querySelectorAll('.term-tab').forEach(b => {
     b.classList.toggle('on', parseInt(b.dataset.term) === t);
   });
   if(_termSelectCallback) { const cb = _termSelectCallback; _termSelectCallback = null; cb(t); }
+}
+function updateTopbarTermBadge(t) {
+  const iconEl = document.getElementById('topbar-term-icon');
+  const labelEl = document.getElementById('topbar-term-label');
+  if(iconEl) iconEl.textContent = t === 2 ? '🍂' : '☀️';
+  if(labelEl) labelEl.textContent = 'เทอม ' + t;
 }
 
 function loadDB(){const d=lsGet('hwdb5');if(d)DB=d;try{const t=localStorage.getItem('hw_currentTerm');if(t)DB.currentTerm=parseInt(t)||1;}catch(e){}if(!DB.currentTerm)DB.currentTerm=1;applyTermTheme(DB.currentTerm);}
@@ -2500,11 +2507,8 @@ function stopScan(){
 
 function renderDashboard(){
   renderPlanBanner();
-  // ── แสดง/อัพเดตปุ่มเทอม ────────────────────────────────
-  const termBar = document.getElementById('term-tab-bar');
-  if(termBar) {
-    termBar.innerHTML = [1,2].map(t=>`<button class="term-tab${(DB.currentTerm||1)===t?' on':''}" data-term="${t}" onclick="setTerm(${t})">เทอม ${t}</button>`).join('');
-  }
+  // ── อัพเดต topbar term badge ──
+  updateTopbarTermBadge(DB.currentTerm||1);
   const rooms=[...new Set(DB.students.map(s=>s.room))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th',{numeric:true,sensitivity:'base'}));
   // นับเฉพาะการส่งงานของเทอมปัจจุบัน
   const curTermHWNums = new Set(termHWs().map(h=>h.room+'|'+h.num));

@@ -694,3 +694,6 @@ a[download]:active { transform:scale(0.96); }
 .term-indicator-banner{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;border-radius:40px;font-size:13px;font-weight:700;margin-bottom:12px;border:1.5px solid;}
 .term-indicator-banner.t1{background:var(--purple-light);color:#7C3AED;border-color:#C4B5FD;}
 .term-indicator-banner.t2{background:#FEF3C7;color:#D97706;border-color:#FCD34D;}
+
+/* ===== TOPBAR TERM BADGE ===== */
+#topbar-term-badge:hover{background:rgba(255,255,255,0.28)!important;transform:scale(1.03);}

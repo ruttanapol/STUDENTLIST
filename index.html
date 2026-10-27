@@ -759,6 +759,11 @@ CREATE POLICY "teachers_delete_admin_only" ON teachers FOR DELETE
       </div>
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
+      <button id="topbar-term-badge" onclick="showTermSelectModal('teacher', t => { renderDashboard(); renderManage(); populateHWDropdown(); })" title="เปลี่ยนภาคเรียน" style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:20px;border:1.5px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:#fff;font-size:13px;font-weight:700;cursor:pointer;backdrop-filter:blur(4px);transition:all .15s;">
+        <span id="topbar-term-icon">☀️</span>
+        <span id="topbar-term-label">เทอม 1</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
       <button class="logout-btn tb-icon-btn" onclick="showProfileModal()" title="แก้ไขโปรไฟล์">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
       </button>
@@ -985,7 +990,6 @@ CREATE POLICY "teachers_delete_admin_only" ON teachers FOR DELETE
   <div id="ap-dash" class="page">
     <div id="plan-banner"></div>
     <!-- ── Term tab bar ── -->
-    <div id="term-tab-bar" style="display:flex;gap:8px;margin-bottom:12px;"></div>
     <div class="stats2" id="stats-grid"></div>
     <div style="display:flex;gap:8px;margin-bottom:12px;">
       <button class="export-btn export-btn-pdf" onclick="openExportModal('pdf')" style="flex:1;justify-content:center;">
