@@ -473,9 +473,9 @@ async function loadFromSupabase() {
   const subs = {};
   // สร้าง map: (hw_num + room) → term เพื่อแยก submissions ต่างเทอม
   const _hwTermMap = {};
-  (hwRes.data || []).forEach(r => { _hwTermMap[r.num + '_' + (r.room||'')] = r.term || 1; });
+  (hwRes.data || []).forEach(r => { _hwTermMap[r.num + '_' + (r.room||'') + '_t' + (r.term||1)] = r.term || 1; });
   (subRes.data || []).forEach(r => {
-    const _sTerm = r.term || _hwTermMap[r.hw_num + '_' + (r.room||'')] || 1;
+    const _sTerm = r.term || _hwTermMap[r.hw_num + '_' + (r.room||'') + '_t' + (r.term||1)] || 1;
     const key = subKey(r.student_id, r.hw_num, r.room, _sTerm);
     subs[key] = {
       sid: r.student_id, hwNum: r.hw_num, hwTitle: r.hw_title,
@@ -619,9 +619,9 @@ async function reloadSubmissions() {
   const subs = {};
   // สร้าง map: (hw_num + room) → term เพื่อแยก submissions ต่างเทอม
   const _hwTermMap2 = {};
-  (DB.homeworks||[]).forEach(h => { _hwTermMap2[h.num + '_' + (h.room||'')] = h.term || 1; });
+  (DB.homeworks||[]).forEach(h => { _hwTermMap2[h.num + '_' + (h.room||'') + '_t' + (h.term||1)] = h.term || 1; });
   (data||[]).forEach(r => {
-    const _sTerm = r.term || _hwTermMap2[r.hw_num + '_' + (r.room||'')] || 1;
+    const _sTerm = r.term || _hwTermMap2[r.hw_num + '_' + (r.room||'') + '_t' + (r.term||1)] || 1;
     const key = subKey(r.student_id, r.hw_num, r.room, _sTerm);
     subs[key] = {sid:r.student_id,hwNum:r.hw_num,hwTitle:r.hw_title,room:r.room,
       score: r.score !== null && r.score !== undefined ? Number(r.score) : null, maxScore:r.max_score||100, term:_sTerm,
@@ -2298,7 +2298,7 @@ async function recordScan(sid, scoreOverride){
   const stu=DB.students.find(s=>s.id===sid);
   // ใช้คะแนนเต็มจากข้อมูลชิ้นงานจริง (ตรงห้อง+เลขที่งาน) เป็นหลักเสมอ ไม่เชื่อค่าที่ค้างอยู่ในฟอร์ม/localStorage
   // เพราะ "เลขที่งาน" ซ้ำกันได้ข้ามห้อง ค่าเต็มที่ค้างมาจากห้องอื่นอาจไม่ตรงกับชิ้นงานจริงที่กำลังตรวจ
-  const hwRecord = stu ? DB.homeworks.find(h=>h.num===hwNum && h.room===stu.room) : null;
+  const hwRecord = stu ? (DB.homeworks.find(h=>h.num===hwNum && h.room===stu.room && (h.term||1)===(DB.currentTerm||1)) || DB.homeworks.find(h=>h.num===hwNum && h.room===stu.room)) : null;
   const maxScore = hwRecord ? (hwRecord.maxScore||100) : formMaxScore;
   const _scanTerm = hwRecord ? (hwRecord.term||1) : (DB.currentTerm||1);
   const key=subKey(sid,hwNum,stu?stu.room:'',_scanTerm);
@@ -3423,7 +3423,7 @@ async function saveOneStudentScore(num){
   const row=document.querySelector(`.ssm-row[data-num="${num}"]`);
   const input=row?.querySelector('.ssm-score-input');
   if(!input)return;
-  const hw=DB.homeworks.find(h=>h.num===num&&(!h.room||h.room===s.room));
+  const hw=DB.homeworks.find(h=>h.num===num&&(!h.room||h.room===s.room)&&(h.term||1)===(DB.currentTerm||1))||DB.homeworks.find(h=>h.num===num&&(!h.room||h.room===s.room));
   if(!hw){toast('ไม่พบชิ้นงานนี้','err');return;}
   const raw=input.value.trim();
   if(raw!==''){
@@ -3479,7 +3479,7 @@ async function saveAllStudentScores(){
   for(const row of changed){
     const num=parseInt(row.dataset.num);
     const input=row.querySelector('.ssm-score-input');
-    const hw=DB.homeworks.find(h=>h.num===num&&(!h.room||h.room===s.room));
+    const hw=DB.homeworks.find(h=>h.num===num&&(!h.room||h.room===s.room)&&(h.term||1)===(DB.currentTerm||1))||DB.homeworks.find(h=>h.num===num&&(!h.room||h.room===s.room));
     if(!hw){fail++;continue;}
     const raw=input.value.trim();
     if(raw!==''){
@@ -5800,7 +5800,7 @@ function renderScanHistory() {
     const sid = sub.sid;
     const hwNum = sub.hwNum;
     const stu = DB.students.find(s => s.id === sid);
-    const hw = DB.homeworks.find(h => h.num === hwNum && (!h.room || h.room === (stu?.room||'')));
+    const hw = DB.homeworks.find(h => h.num === hwNum && (!h.room || h.room === (stu?.room||'')) && (h.term||1)===(sub?.term||DB.currentTerm||1)) || DB.homeworks.find(h => h.num === hwNum && (!h.room || h.room === (stu?.room||'')));
     return { key, sid, hwNum, stu, hw, sub };
   }).filter(item => {
     if(!item.stu) return false;
@@ -5863,8 +5863,9 @@ function renderScanHistory() {
 // ===== EDIT SCORE =====
 function openEditScoreById(sid, hwNum) {
   const stu = DB.students.find(s => s.id === sid);
-  const hw = DB.homeworks.find(h => h.num === hwNum && (!stu || !h.room || h.room===stu.room));
-  const _esHw = DB.homeworks.find(h=>h.num===hwNum&&(!stu||!h.room||h.room===stu.room));
+  const _subTerm2 = sub?.term||DB.currentTerm||1;
+  const hw = DB.homeworks.find(h => h.num === hwNum && (!stu || !h.room || h.room===stu.room) && (h.term||1)===_subTerm2) || DB.homeworks.find(h => h.num === hwNum && (!stu || !h.room || h.room===stu.room));
+  const _esHw = hw;
   const sub = DB.submissions[subKey(sid, hwNum, stu?stu.room:'', _esHw?.term||DB.currentTerm||1)];
   if(!stu || !sub) return;
   openEditScore({
