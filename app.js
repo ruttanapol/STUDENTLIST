@@ -475,7 +475,7 @@ async function loadFromSupabase() {
   const _hwTermMap = {};
   (hwRes.data || []).forEach(r => { _hwTermMap[r.num + '_' + (r.room||'')] = r.term || 1; });
   (subRes.data || []).forEach(r => {
-    const _sTerm = _hwTermMap[r.hw_num + '_' + (r.room||'')] || 1;
+    const _sTerm = r.term || _hwTermMap[r.hw_num + '_' + (r.room||'')] || 1;
     const key = subKey(r.student_id, r.hw_num, r.room, _sTerm);
     subs[key] = {
       sid: r.student_id, hwNum: r.hw_num, hwTitle: r.hw_title,
@@ -621,7 +621,7 @@ async function reloadSubmissions() {
   const _hwTermMap2 = {};
   (DB.homeworks||[]).forEach(h => { _hwTermMap2[h.num + '_' + (h.room||'')] = h.term || 1; });
   (data||[]).forEach(r => {
-    const _sTerm = _hwTermMap2[r.hw_num + '_' + (r.room||'')] || 1;
+    const _sTerm = r.term || _hwTermMap2[r.hw_num + '_' + (r.room||'')] || 1;
     const key = subKey(r.student_id, r.hw_num, r.room, _sTerm);
     subs[key] = {sid:r.student_id,hwNum:r.hw_num,hwTitle:r.hw_title,room:r.room,
       score: r.score !== null && r.score !== undefined ? Number(r.score) : null, maxScore:r.max_score||100, term:_sTerm,
@@ -760,10 +760,11 @@ async function sbRecordSubmission(sub) {
   // sub = {sid, hwNum, hwTitle, room, score, maxScore}
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
-    await SB.from('submissions').delete().eq('student_id',sub.sid).eq('hw_num',sub.hwNum).eq('room',sub.room||'').eq('teacher_id',tid);
+    const _subTerm = sub.term || (DB.currentTerm||1);
+    await SB.from('submissions').delete().eq('student_id',sub.sid).eq('hw_num',sub.hwNum).eq('room',sub.room||'').eq('teacher_id',tid).eq('term',_subTerm);
     const {error} = await SB.from('submissions').insert({
       student_id: sub.sid, hw_num: sub.hwNum, hw_title: sub.hwTitle,
-      room: sub.room, score: sub.score, max_score: sub.maxScore, teacher_id: tid
+      room: sub.room, score: sub.score, max_score: sub.maxScore, teacher_id: tid, term: _subTerm
     });
     if(error) throw error;
 await reloadSubmissions();
@@ -777,10 +778,11 @@ renderDashboard();
   }
 }
 
-async function sbUpdateScore(sid, hwNum, score, room) {
+async function sbUpdateScore(sid, hwNum, score, room, term) {
   if(USE_SUPABASE) {
     const tid = CURRENT_TEACHER ? CURRENT_TEACHER.id : '';
-    let q = SB.from('submissions').update({score}).eq('student_id', sid).eq('hw_num', hwNum);
+    const _updTerm = term || (DB.currentTerm||1);
+    let q = SB.from('submissions').update({score}).eq('student_id', sid).eq('hw_num', hwNum).eq('term',_updTerm);
     if(room!==undefined) q = q.eq('room', room||'');
     if(tid) q = q.eq('teacher_id', tid);
     const {error} = await q;
@@ -2323,7 +2325,7 @@ async function recordScan(sid, scoreOverride){
     const now=ts();
     const scoreText=score!==null&&!isNaN(score)?score:maxScore; // ไม่กรอก → เต็ม maxScore
     try {
-      await sbRecordSubmission({sid,hwNum,hwTitle,room:stu.room,score:scoreText,maxScore});
+      await sbRecordSubmission({sid,hwNum,hwTitle,room:stu.room,score:scoreText,maxScore,term:_scanTerm});
       const scoreBadge=scoreText!==null?` · <b style="color:var(--purple);">${scoreText}/${maxScore||100}</b>`:'';
       item.innerHTML=`<div class="log-main"><div style="font-weight:700;">${escapeHtml(stu.name)} <span class="room-pill">${escapeHtml(stu.room)}</span></div><div class="log-sub">ชิ้นที่ ${hwNum}: ${escapeHtml(hwTitle)}${scoreBadge} · ${now}</div></div><span class="badge b-ok">✓ บันทึก</span>`;
       log.prepend(item);
@@ -3088,7 +3090,8 @@ async function restoreBackupFile(ev){
     // 4) การส่งงาน (ตัด id เดิมออก ให้ DB สร้าง UUID ใหม่)
     const subRows = (backup.submissions||[]).map(s=>({
       student_id:s.student_id, hw_num:s.hw_num, hw_title:s.hw_title||'', room:s.room||'',
-      score:s.score, max_score:s.max_score||100, teacher_id: tid, submitted_at:s.submitted_at||new Date().toISOString()
+      score:s.score, max_score:s.max_score||100, teacher_id: tid, submitted_at:s.submitted_at||new Date().toISOString(),
+      term: s.term||1
     }));
     for(let i=0;i<subRows.length;i+=CHUNK){
       const {error} = await SB.from('submissions').insert(subRows.slice(i,i+CHUNK));
@@ -3430,7 +3433,7 @@ async function saveOneStudentScore(num){
   }
   const score=raw===''?null:parseFloat(raw);
   try{
-    await sbRecordSubmission({sid:s.id,hwNum:num,hwTitle:hw.title,room:s.room,score,maxScore:hw.maxScore||100});
+    await sbRecordSubmission({sid:s.id,hwNum:num,hwTitle:hw.title,room:s.room,score,maxScore:hw.maxScore||100,term:hw.term||1});
     toast('บันทึกคะแนนแล้ว ✅');
     renderStudentScoreList();
     renderStudentsListManage();
@@ -3445,7 +3448,8 @@ async function clearOneStudentScore(num){
   try{
     if(USE_SUPABASE&&SB){
       const tid=CURRENT_TEACHER?CURRENT_TEACHER.id:'';
-      const{error}=await SB.from('submissions').delete().eq('student_id',s.id).eq('hw_num',num).eq('room',s.room||'').eq('teacher_id',tid);
+      const _hwTerm=(DB.homeworks||[]).find(h=>h.num===num&&(h.room||'')===(s.room||''))?.term||1;
+      const{error}=await SB.from('submissions').delete().eq('student_id',s.id).eq('hw_num',num).eq('room',s.room||'').eq('teacher_id',tid).eq('term',_hwTerm);
       if(error)throw error;
       await reloadSubmissions();
     }else{
@@ -3484,7 +3488,7 @@ async function saveAllStudentScores(){
     }
     const score=raw===''?null:parseFloat(raw);
     try{
-      await sbRecordSubmission({sid:s.id,hwNum:num,hwTitle:hw.title,room:s.room,score,maxScore:hw.maxScore||100});
+      await sbRecordSubmission({sid:s.id,hwNum:num,hwTitle:hw.title,room:s.room,score,maxScore:hw.maxScore||100,term:hw.term||1});
       ok++;
     }catch(e){fail++;}
   }
@@ -5911,7 +5915,7 @@ async function saveEditScore(){if(!_editingSubmission)return;const scoreInput=do
   try {
     await sbRecordSubmission({
       sid, hwNum, hwTitle, room: stu.room,
-      score: newScore, maxScore
+      score: newScore, maxScore, term: _editingSubmission.term||1
     });
     closeEditScoreModal();
     renderScanHistory();
@@ -5933,12 +5937,15 @@ async function deleteSubmission() {
   try {
     if(USE_SUPABASE && SB && CURRENT_TEACHER) {
       const tid = CURRENT_TEACHER.id;
+      const _delSub = Object.values(DB.submissions).find(s=>s.sid===sid&&s.hwNum===hwNum&&(s.room||'')===(room||''));
+      const _delTerm = _delSub ? (_delSub.term||1) : (DB.currentTerm||1);
       const {error} = await SB.from('submissions')
         .delete()
         .eq('student_id', sid)
         .eq('hw_num', hwNum)
         .eq('room', room||'')
-        .eq('teacher_id', tid);
+        .eq('teacher_id', tid)
+        .eq('term', _delTerm);
       if(error) throw error;
       await reloadSubmissions();
     } else {
@@ -6483,7 +6490,7 @@ function _gsRender(){
       var inp=document.createElement('input');inp.type='number';inp.min='0';inp.max=String(h.maxScore||100);inp.value=cur!==null?String(cur):'';inp.placeholder='-';
       inp.style.cssText='width:100%;height:42px;border:none;text-align:center;font-size:14px;font-weight:700;background:transparent;outline:none;font-family:Sarabun,sans-serif;color:'+(cur!==null?(Number(cur)>=(h.maxScore||100)*0.5?'#16A34A':'#F59E0B'):'#CBD5E1')+';';
       inp.inputMode='decimal';inp.dataset.sid=s.id;inp.dataset.hwnum=h.num;inp.dataset.room=h.room||room;inp.dataset.max=h.maxScore||100;inp.dataset.htitle=h.title;inp.setAttribute('enterkeyhint','next');inp.className='gs-score-inp';
-      inp.oninput=function(){var k=subKey(this.dataset.sid,this.dataset.hwnum,this.dataset.room,parseInt(this.dataset.term)||1);var v=this.value===''?null:parseFloat(this.value);_gsChanges[k]={sid:this.dataset.sid,hwNum:parseInt(this.dataset.hwnum),hwTitle:this.dataset.htitle,room:this.dataset.room,score:v,maxScore:parseInt(this.dataset.max)};var max=parseInt(this.dataset.max);this.style.color=v!==null?(v>=max*0.5?'#16A34A':'#F59E0B'):'#CBD5E1';this.parentElement.style.background=v!==null?'#F0FDF4':'#fff';_gsUpdateTot(this.dataset.sid);_gsDirty();};
+      inp.oninput=function(){var k=subKey(this.dataset.sid,this.dataset.hwnum,this.dataset.room,parseInt(this.dataset.term)||1);var v=this.value===''?null:parseFloat(this.value);_gsChanges[k]={sid:this.dataset.sid,hwNum:parseInt(this.dataset.hwnum),hwTitle:this.dataset.htitle,room:this.dataset.room,score:v,maxScore:parseInt(this.dataset.max),term:parseInt(this.dataset.term)||1};var max=parseInt(this.dataset.max);this.style.color=v!==null?(v>=max*0.5?'#16A34A':'#F59E0B'):'#CBD5E1';this.parentElement.style.background=v!==null?'#F0FDF4':'#fff';_gsUpdateTot(this.dataset.sid);_gsDirty();};
       inp.onfocus=function(){this.style.color='#0F172A';this.parentElement.style.boxShadow='inset 0 0 0 2px #2563EB';};
       inp.onblur=function(){var v=this.value===''?null:parseFloat(this.value);var max=parseInt(this.dataset.max);this.style.color=v!==null?(v>=max*0.5?'#16A34A':'#F59E0B'):'#CBD5E1';this.parentElement.style.boxShadow='';};
       inp.onkeydown=function(e){if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();var all=[].slice.call(document.querySelectorAll('#gs-tbl .gs-score-inp'));var idx=all.indexOf(this);if(idx>=0&&idx<all.length-1)all[idx+1].focus();}};
@@ -6539,7 +6546,7 @@ async function _gsSaveAll(){
   var sv=document.getElementById('gs-sv-btn');if(sv)sv.disabled=true;
   var st=document.getElementById('gs-status');if(st){st.textContent='กำลังบันทึก...';st.style.color='#64748B';}
   var ok=0,fail=0;
-  for(var i=0;i<items.length;i++){var c=items[i];try{await sbRecordSubmission({sid:c.sid,hwNum:c.hwNum,hwTitle:c.hwTitle,room:c.room,score:c.score,maxScore:c.maxScore});ok++;}catch(e){fail++;}}
+  for(var i=0;i<items.length;i++){var c=items[i];try{await sbRecordSubmission({sid:c.sid,hwNum:c.hwNum,hwTitle:c.hwTitle,room:c.room,score:c.score,maxScore:c.maxScore,term:c.term||1});ok++;}catch(e){fail++;}}
   _gsChanges={};if(sv)sv.disabled=false;
   if(!fail){if(st){st.textContent='✅ บันทึก '+ok+' รายการ';st.style.color='#22C55E';setTimeout(function(){if(st)st.textContent='';},3000);}renderDashboard();}
   else{if(st){st.textContent='⚠️ สำเร็จ '+ok+' ล้มเหลว '+fail;st.style.color='#EF4444';}}
