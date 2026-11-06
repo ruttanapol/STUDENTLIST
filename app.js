@@ -6536,7 +6536,7 @@ function _gsColFill(hwNum,defMax){
     inp.value=String(v);var max=parseInt(inp.dataset.max)||100;
     inp.style.color=v>=max*0.5?'#16A34A':'#F59E0B';inp.parentElement.style.background='#F0FDF4';
     var k=subKey(inp.dataset.sid,inp.dataset.hwnum,inp.dataset.room,parseInt(inp.dataset.term)||1);
-    _gsChanges[k]={sid:inp.dataset.sid,hwNum:parseInt(inp.dataset.hwnum),hwTitle:inp.dataset.htitle,room:inp.dataset.room,score:v,maxScore:max};
+    _gsChanges[k]={sid:inp.dataset.sid,hwNum:parseInt(inp.dataset.hwnum),hwTitle:inp.dataset.htitle,room:inp.dataset.room,score:v,maxScore:max,term:parseInt(inp.dataset.term)||1};
     _gsUpdateTot(inp.dataset.sid);
   });_gsDirty();
 }
