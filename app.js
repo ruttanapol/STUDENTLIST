@@ -7572,7 +7572,7 @@ function _renderSGSConfig(){
   if(!_sgsRoom&&rooms.length)_sgsRoom=rooms[0];
 
   var roomOpts=rooms.map(function(r){return '<option value="'+r+'"'+(r===_sgsRoom?' selected':'')+'>'+r+'</option>';}).join('');
-  var hws=(DB&&DB.homeworks?DB.homeworks:[]).filter(function(h){return !h.room||h.room===_sgsRoom;}).sort(function(a,b){return a.num-b.num;});
+  var hws=termHWs().filter(function(h){return !h.room||h.room===_sgsRoom;}).sort(function(a,b){return a.num-b.num;});
   var totalMax=_sgsCfg.sections.reduce(function(s,sec){return s+sec.max;},0);
   var totalOk=totalMax===100;
 
