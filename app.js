@@ -1923,9 +1923,12 @@ async function loginStudent(){
       submissions:{}
     };
     (subData||[]).forEach(r=>{
-      stuDB.submissions[subKey(r.student_id,r.hw_num,r.room,(stuDB.homeworks||[]).find(h=>h.num===r.hw_num&&h.room===(r.room||''))?.term||1)]={
+      // ใช้ r.term จาก DB ก่อน (เพราะ submissions มีคอลัมน์ term แล้ว)
+      // ถ้าไม่มีค่อย fallback ไปหาจาก homework (กรองด้วย term ด้วยเพื่อกัน dup)
+      const _rTerm = r.term || (stuDB.homeworks||[]).find(h=>h.num===r.hw_num&&h.room===(r.room||'')&&(h.term||1)===(r.term||1))?.term||1;
+      stuDB.submissions[subKey(r.student_id,r.hw_num,r.room,_rTerm)]={
         sid:r.student_id,hwNum:r.hw_num,hwTitle:r.hw_title,room:r.room,
-        score:r.score,maxScore:r.max_score||100,
+        score:r.score,maxScore:r.max_score||100,term:_rTerm,
         ts:r.submitted_at?new Date(r.submitted_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}):''
       };
     });
