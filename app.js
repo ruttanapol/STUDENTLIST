@@ -8432,6 +8432,19 @@ function initAttendanceTab() {
     dateEl.value = new Date().toISOString().slice(0,10);
   }
 
+  // Inject or update term badge near room selector
+  const t = DB.currentTerm || 1;
+  let termBadge = document.getElementById('att-term-badge');
+  if(!termBadge) {
+    termBadge = document.createElement('div');
+    termBadge.id = 'att-term-badge';
+    termBadge.style.cssText = 'display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:800;margin:0 0 10px 0;font-family:Sarabun,sans-serif;';
+    sel.parentElement && sel.parentElement.insertBefore(termBadge, sel);
+  }
+  termBadge.textContent = t === 1 ? '☀️ ภาคเรียนที่ 1' : '🍂 ภาคเรียนที่ 2';
+  termBadge.style.background = t === 1 ? '#FEF3C7' : '#F5F3FF';
+  termBadge.style.color = t === 1 ? '#B45309' : '#6D28D9';
+
   renderAttendanceList();
 }
 
@@ -8464,9 +8477,17 @@ async function loadAttendanceForDate(date, room) {
   }
   const dateKey = date.replace(/-/g,'');
   const roomKey = room.replace(/[^a-zA-Z0-9ก-ฮ]/g,'_');
-  const key = `att_${dateKey}_${roomKey}`;
-  const { data } = await SB.from('settings').select('value')
+  const term = DB.currentTerm || 1;
+  const key = `att_t${term}_${dateKey}_${roomKey}`;
+  const keyOld = `att_${dateKey}_${roomKey}`; // backward compat
+  let { data } = await SB.from('settings').select('value')
     .eq('key', key + '_' + CURRENT_TEACHER.id).maybeSingle();
+  // fallback to old key (records saved before term separation)
+  if(!data) {
+    const { data: dataOld } = await SB.from('settings').select('value')
+      .eq('key', keyOld + '_' + CURRENT_TEACHER.id).maybeSingle();
+    data = dataOld;
+  }
 
   _attRecords = {};
   _attIsDouble = !!data?.value?.isDouble;
@@ -8574,8 +8595,9 @@ async function saveAttendance() {
 
   const dateKey = date.replace(/-/g,'');
   const roomKey = room.replace(/[^a-zA-Z0-9ก-ฮ]/g,'_');
-  const key = `att_${dateKey}_${roomKey}`;
-  const value = { date, room, records, counts, isDouble: _attIsDouble, weight, savedAt: new Date().toISOString() };
+  const term = DB.currentTerm || 1;
+  const key = `att_t${term}_${dateKey}_${roomKey}`;
+  const value = { date, room, term, records, counts, isDouble: _attIsDouble, weight, savedAt: new Date().toISOString() };
 
   const { data: existing } = await SB.from('settings').select('key')
     .eq('key', key + '_' + CURRENT_TEACHER.id).maybeSingle();
@@ -8602,9 +8624,10 @@ async function loadAttendanceHistory() {
   const histEl = document.getElementById('att-history-list');
   if(histEl) histEl.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:13px;">⏳ กำลังโหลด...</div>';
 
+  const term = DB.currentTerm || 1;
   const { data, error } = await SB.from('settings')
     .select('key,value')
-    .like('key', `att_%_${CURRENT_TEACHER.id}`)
+    .like('key', `att_t${term}_%_${CURRENT_TEACHER.id}`)
     .order('key', { ascending: false })
     .limit(30);
 
@@ -8620,7 +8643,7 @@ async function loadAttendanceHistory() {
       style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:10px;margin-bottom:5px;border:1.5px solid #F1F5F9;cursor:pointer;"
       onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='#F1F5F9'">
       <div style="flex:1;">
-        <div style="font-size:13px;font-weight:700;color:var(--text);">${d} · ${v.room||'-'}${v.isDouble?' <span style="font-size:10px;font-weight:800;color:#1D4ED8;background:#DBEAFE;padding:1px 6px;border-radius:6px;">🔁×2</span>':''}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);">${d} · ${v.room||'-'}${v.isDouble?' <span style="font-size:10px;font-weight:800;color:#1D4ED8;background:#DBEAFE;padding:1px 6px;border-radius:6px;">🔁×2</span>':''}<span style="font-size:10px;font-weight:800;color:${(v.term||1)===1?'#B45309':'#6D28D9'};background:${(v.term||1)===1?'#FEF3C7':'#F5F3FF'};padding:1px 6px;border-radius:6px;margin-left:4px;">${(v.term||1)===1?'☀️ เทอม 1':'🍂 เทอม 2'}</span></div>
         <div style="font-size:11px;color:var(--text3);margin-top:2px;">
           ✅ ${c.present||0} · ❌ ${c.absent||0} · ⏰ ${c.late||0} · 🏥 ${c.leave||0}
         </div>
