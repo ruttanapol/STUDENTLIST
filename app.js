@@ -8420,6 +8420,7 @@ const ATT_STATUS = {
 };
 
 function initAttendanceTab() {
+  _attStatsData = null; // clear cache ทุกครั้ง เพื่อไม่ให้ข้อมูลเทอมเก่าค้าง
   // Populate room selector
   const sel = document.getElementById('att-room-sel');
   if(!sel) return;
@@ -9145,11 +9146,13 @@ function switchAttTab(tab) {
     if(statsPanel) statsPanel.style.display = 'none';
     if(histBtn) { histBtn.style.background = 'var(--blue-light)'; histBtn.style.color = 'var(--blue-dark)'; histBtn.style.borderBottom = '2px solid var(--blue)'; }
     if(statsBtn) { statsBtn.style.background = '#fff'; statsBtn.style.color = 'var(--text2)'; statsBtn.style.borderBottom = '2px solid transparent'; }
+    loadAttendanceHistory();
   } else {
     if(histPanel) histPanel.style.display = 'none';
     if(statsPanel) statsPanel.style.display = 'block';
     if(statsBtn) { statsBtn.style.background = 'var(--blue-light)'; statsBtn.style.color = 'var(--blue-dark)'; statsBtn.style.borderBottom = '2px solid var(--blue)'; }
     if(histBtn) { histBtn.style.background = '#fff'; histBtn.style.color = 'var(--text2)'; histBtn.style.borderBottom = '2px solid transparent'; }
+    loadAttendanceStats(); // โหลดใหม่ทุกครั้ง ไม่ใช้ cache ข้ามเทอม
   }
 }
 
