@@ -8625,11 +8625,24 @@ async function loadAttendanceHistory() {
   if(histEl) histEl.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:13px;">⏳ กำลังโหลด...</div>';
 
   const term = DB.currentTerm || 1;
-  const { data, error } = await SB.from('settings')
-    .select('key,value')
-    .like('key', `att_t${term}_%_${CURRENT_TEACHER.id}`)
-    .order('key', { ascending: false })
-    .limit(30);
+  // ดึง key ใหม่ (att_t${term}_...) + key เก่า (att_...) แล้วกรองใน JS
+  const [resNew, resOld] = await Promise.all([
+    SB.from('settings').select('key,value').like('key', `att_t${term}_%_${CURRENT_TEACHER.id}`).order('key', { ascending: false }).limit(30),
+    SB.from('settings').select('key,value').like('key', `att_%_${CURRENT_TEACHER.id}`).not('key','like',`att_t%_${CURRENT_TEACHER.id}`).order('key', { ascending: false }).limit(30)
+  ]);
+  const error = resNew.error;
+  const termDateFilter = (dateStr) => {
+    if(!dateStr) return false;
+    const m = new Date(dateStr).getMonth() + 1;
+    return term === 1 ? (m >= 5 && m <= 10) : (m >= 11 || m <= 3);
+  };
+  const oldFiltered = (resOld.data||[]).filter(row => termDateFilter(row.value?.date));
+  // รวมและ de-dup + sort desc
+  const seen = new Set();
+  const data = [...(resNew.data||[]), ...oldFiltered]
+    .filter(r => { if(seen.has(r.key)) return false; seen.add(r.key); return true; })
+    .sort((a,b) => b.key.localeCompare(a.key))
+    .slice(0,30);
 
   if(error || !data) { if(histEl) histEl.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px;">โหลดประวัติไม่สำเร็จ</div>'; return; }
 
@@ -8938,10 +8951,30 @@ async function loadAttendanceStats() {
   if(statsEl) statsEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);">⏳ กำลังโหลดสถิติ...</div>';
 
   const roomKey = room.replace(/[^a-zA-Z0-9ก-ฮ]/g,'_');
-  const { data, error } = await SB.from('settings')
+  const term = DB.currentTerm || 1;
+  // โหลด key ทั้งหมดของห้องนี้ แล้วกรอง term ใน JS
+  const { data: rawData, error } = await SB.from('settings')
     .select('key,value')
     .like('key', `att_%_${roomKey}%_${CURRENT_TEACHER.id}`)
     .order('key');
+
+  // คำนวณช่วงวันที่ของแต่ละเทอม เพื่อกรอง key เก่า (ไม่มี term ใน key)
+  const curYear = new Date().getFullYear();
+  // เทอม 1: พ.ค.(05) – ต.ค.(10) | เทอม 2: พ.ย.(11) – มี.ค.(03) ปีหน้า
+  const termDateFilter = (dateStr) => {
+    if(!dateStr) return false;
+    const d = new Date(dateStr);
+    const m = d.getMonth() + 1; // 1-12
+    if(term === 1) return m >= 5 && m <= 10;
+    return m >= 11 || m <= 3; // พ.ย.–มี.ค.
+  };
+  // กรอง: key ใหม่ (att_t${term}_...) หรือ key เก่า (att_YYYY...) ตรงช่วงเทอม
+  const data = (rawData||[]).filter(row => {
+    const k = row.key || '';
+    if(k.startsWith(`att_t${term}_`)) return true;         // key ใหม่ ตรง term
+    if(/^att_t\d_/.test(k)) return false;                  // key ใหม่ แต่ต่าง term
+    return termDateFilter(row.value?.date);                 // key เก่า → กรองด้วยวันที่
+  });
 
   if(error || !data?.length) {
     if(statsEl) statsEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px;">${error?'โหลดไม่สำเร็จ':'ยังไม่มีข้อมูลเช็คชื่อ'}</div>`;
