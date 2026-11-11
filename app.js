@@ -6565,6 +6565,7 @@ function openStudentFilter(){
   var ov=document.getElementById('sf-ov');ov.style.display='flex';
   var dd=document.getElementById('sf-room-dd');
   if(dd){dd.innerHTML='<option value="all">ทุกห้อง</option>'+DB.rooms.map(function(r){return '<option value="'+r+'">'+r+'</option>';}).join('');dd.value=_sfRoom;}
+  var sfTi=document.getElementById('sf-title');if(sfTi){var t=DB.currentTerm||1;sfTi.textContent='🔍 คัดกรองนักเรียนตามคะแนน · '+(t===1?'☀️ เทอม 1':'🍂 เทอม 2');}
   _sfRun();
 }
 function _sfBuild(){
@@ -6572,7 +6573,7 @@ function _sfBuild(){
   ov.style.cssText='display:none;position:fixed;inset:0;z-index:9997;background:#F1F5F9;flex-direction:column;font-family:Sarabun,sans-serif;';
   var hd=document.createElement('div');hd.style.cssText='background:#fff;border-bottom:1.5px solid #E2E8F0;padding:12px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;';
   var cl=document.createElement('button');cl.style.cssText='width:34px;height:34px;border-radius:50%;border:1.5px solid #E2E8F0;background:#F8FAFC;cursor:pointer;font-size:16px;';cl.innerHTML='✕';cl.onclick=function(){ov.style.display='none';};
-  var ti=document.createElement('div');ti.style.cssText='font-size:15px;font-weight:800;color:#0F172A;flex:1;';ti.textContent='🔍 คัดกรองนักเรียนตามคะแนน';
+  var ti=document.createElement('div');ti.style.cssText='font-size:15px;font-weight:800;color:#0F172A;flex:1;';ti.textContent='🔍 คัดกรองนักเรียนตามคะแนน';ti.id='sf-title';
   hd.appendChild(cl);hd.appendChild(ti);ov.appendChild(hd);
   var ctrl=document.createElement('div');ctrl.style.cssText='background:#fff;padding:12px 14px;border-bottom:1.5px solid #E2E8F0;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;flex-shrink:0;';
   function mkG(lbl){var g=document.createElement('div');g.style.cssText='display:flex;flex-direction:column;gap:4px;';var l=document.createElement('div');l.style.cssText='font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;';l.textContent=lbl;g.appendChild(l);return g;}
@@ -6619,7 +6620,7 @@ function _sfRun(){
   DB.students.forEach(function(s){
     if(_sfRoom!=='all'&&s.room!==_sfRoom)return;
     if(s.status&&s.status!=='active')return; // ข้ามนักเรียนที่ลาออก/ย้ายออก
-    var hws=(DB&&DB.homeworks?DB.homeworks:[]).filter(function(h){return !h.room||h.room===s.room;});
+    var hws=termHWs().filter(function(h){return !h.room||h.room===s.room;});
     if(!hws.length)return;
     var totalMax=hws.reduce(function(sum,h){return sum+(h.maxScore||100);},0);
     var totalScore=0;var done=0;
